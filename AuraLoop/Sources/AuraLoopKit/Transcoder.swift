@@ -70,8 +70,10 @@ public func transcodeToHEVC(
     readerOutput.alwaysCopiesSampleData = false
     reader.add(readerOutput)
 
-    try? FileManager.default.removeItem(at: destination)
-    let writer = try AVAssetWriter(outputURL: destination, fileType: .mov)
+    let tempURL = destination.deletingLastPathComponent()
+        .appendingPathComponent(".temp-\(UUID().uuidString).mov")
+    try? FileManager.default.removeItem(at: tempURL)
+    let writer = try AVAssetWriter(outputURL: tempURL, fileType: .mov)
     // Put the moov atom at the FRONT of the file. A player needs that index
     // before it can decode anything, so without this a streamed wallpaper has
     // to pull the whole file before the first frame appears.
@@ -156,6 +158,61 @@ public func transcodeToHEVC(
     guard writer.status == .completed else {
         throw TranscodeError.writerFailed(writer.error.map { "\($0)" } ?? "status \(writer.status.rawValue)")
     }
+    removeSafeSaveLeftovers(for: tempURL)
+
+    // Check if source has an audio track to preserve
+    var loadedAudioTrack: AVAssetTrack?
+    let audioDone = DispatchSemaphore(value: 0)
+    asset.loadTracks(withMediaType: .audio) { tracks, _ in
+        loadedAudioTrack = tracks?.first
+        audioDone.signal()
+    }
+    audioDone.wait()
+
+    if let sourceAudio = loadedAudioTrack {
+        let tempAsset = AVURLAsset(url: tempURL)
+        var tempVideoTrack: AVAssetTrack?
+        let tempVideoDone = DispatchSemaphore(value: 0)
+        tempAsset.loadTracks(withMediaType: .video) { tracks, _ in
+            tempVideoTrack = tracks?.first
+            tempVideoDone.signal()
+        }
+        tempVideoDone.wait()
+
+        if let tempVideoTrack {
+            let composition = AVMutableComposition()
+            if let compVideo = composition.addMutableTrack(
+                withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid
+            ), let compAudio = composition.addMutableTrack(
+                withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid
+            ) {
+                try? compVideo.insertTimeRange(tempVideoTrack.timeRange, of: tempVideoTrack, at: .zero)
+                compVideo.preferredTransform = tempVideoTrack.preferredTransform
+                try? compAudio.insertTimeRange(tempVideoTrack.timeRange, of: sourceAudio, at: .zero)
+
+                if let export = AVAssetExportSession(
+                    asset: composition, presetName: AVAssetExportPresetPassthrough
+                ) {
+                    try? FileManager.default.removeItem(at: destination)
+                    export.outputURL = destination
+                    export.outputFileType = .mov
+                    export.shouldOptimizeForNetworkUse = true
+                    let exportDone = DispatchSemaphore(value: 0)
+                    export.exportAsynchronously { exportDone.signal() }
+                    exportDone.wait()
+                    if export.status == .completed {
+                        try? FileManager.default.removeItem(at: tempURL)
+                        removeSafeSaveLeftovers(for: destination)
+                        return TranscodeResult(width: width, height: height, fps: outputFPS, duration: duration)
+                    }
+                }
+            }
+        }
+    }
+
+    // No audio or fallback: rename tempURL to destination
+    try? FileManager.default.removeItem(at: destination)
+    try FileManager.default.moveItem(at: tempURL, to: destination)
     removeSafeSaveLeftovers(for: destination)
 
     return TranscodeResult(width: width, height: height, fps: outputFPS, duration: duration)
@@ -230,8 +287,7 @@ public func copyVideoStream(source: URL, destination: URL) throws -> TranscodeRe
     let fps = Double(track.nominalFrameRate)
     let duration = CMTimeGetSeconds(track.timeRange.duration)
 
-    // Video only. This is also how the audio is stripped: the audio track is
-    // simply never inserted, so nothing has to be filtered out later.
+    // Assemble composition with video track and audio track (if present)
     let composition = AVMutableComposition()
     guard let videoTrack = composition.addMutableTrack(
         withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid
@@ -244,6 +300,22 @@ public func copyVideoStream(source: URL, destination: URL) throws -> TranscodeRe
         throw TranscodeError.readerFailed("\(error)")
     }
     videoTrack.preferredTransform = track.preferredTransform
+
+    // Audio track (preserve if source has one)
+    var loadedAudioTrack: AVAssetTrack?
+    let audioLoadDone = DispatchSemaphore(value: 0)
+    asset.loadTracks(withMediaType: .audio) { tracks, _ in
+        loadedAudioTrack = tracks?.first
+        audioLoadDone.signal()
+    }
+    audioLoadDone.wait()
+
+    if let sourceAudio = loadedAudioTrack,
+       let audioTrack = composition.addMutableTrack(
+           withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid
+       ) {
+        try? audioTrack.insertTimeRange(track.timeRange, of: sourceAudio, at: .zero)
+    }
 
     guard let export = AVAssetExportSession(
         asset: composition, presetName: AVAssetExportPresetPassthrough

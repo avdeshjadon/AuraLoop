@@ -61,7 +61,7 @@ public final class WallpaperWindowController {
     private var playOnlyOnDesktop = false
     private var replayOnClearDesktop = false
     private var desktopCovered: Bool?
-    public private(set) var isAudioEnabled = false
+    public private(set) var isAudioEnabled = true
     public private(set) var audioVolume: Float = 1.0
 
     public init(screen: NSScreen, videoURL: URL) {

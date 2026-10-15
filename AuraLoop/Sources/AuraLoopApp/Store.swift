@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import AVFoundation
 import AuraLoopKit
 import IOKit
 import IOKit.ps
@@ -1473,7 +1474,7 @@ final class AppStore: ObservableObject {
         saveConfig()
     }
 
-    var audioEnabled: Bool { config.audioEnabled ?? false }
+    var audioEnabled: Bool { config.audioEnabled ?? true }
     var audioVolume: Double { config.audioVolume ?? 1.0 }
 
     func setAudioEnabled(_ enabled: Bool) {
@@ -1897,17 +1898,25 @@ final class AppStore: ObservableObject {
                     AppStore.shared.importStatus = label + "…"
                     AppStore.shared.importProgress = 0
                 }
-                // The same file twice used to make two identical wallpapers.
-                // It is turned away like a second `.saver`, including the
-                // same file picked twice in one go.
                 let fingerprint = videoFingerprint(of: url)
                 if let match = alreadyImported(source: url, fingerprint: fingerprint, in: library) {
-                    already.append(match.title)
-                    continue
+                    let masterPath = root.appendingPathComponent("Masters/\(match.id).mov")
+                    let masterAsset = AVURLAsset(url: masterPath)
+                    let sourceAsset = AVURLAsset(url: url)
+                    let masterHasAudio = (try? await masterAsset.loadTracks(withMediaType: .audio))?.isEmpty == false
+                    let sourceHasAudio = (try? await sourceAsset.loadTracks(withMediaType: .audio))?.isEmpty == false
+                    if sourceHasAudio && !masterHasAudio {
+                        // Previous import stripped audio! Remove silent entry and re-import with audio
+                        library.removeAll { $0.id == match.id }
+                        try? FileManager.default.removeItem(at: masterPath)
+                    } else {
+                        already.append(match.title)
+                        continue
+                    }
                 }
                 do {
                     library.append(try importVideo(
-                        source: url, root: root, sourceFingerprint: fingerprint
+                        source: url, root: root, preserveOriginal: true, sourceFingerprint: fingerprint
                     ) { done in
                         Task { @MainActor in
                             guard AppStore.shared.importProgress != nil else { return }
