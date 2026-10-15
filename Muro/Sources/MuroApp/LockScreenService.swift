@@ -1,0 +1,1901 @@
+import CoreGraphics
+import Foundation
+import MuroKit
+
+enum LockScreenServiceError: LocalizedError {
+    case requiresTahoe
+    case extensionMissing
+    case extensionNotRegistered
+    case translocated
+    case wallpaperStoreMissing
+    case operationFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .requiresTahoe:
+            return "Lock-screen live wallpapers require macOS 26 or later."
+        case .extensionMissing:
+            return "Muro’s lock-screen extension is missing. Reinstall this build of Muro."
+        case .extensionNotRegistered:
+            return """
+            macOS would not load Muro’s lock-screen extension. \
+            Move Muro to your Applications folder, open it once from there, and try again.
+            """
+        case .translocated:
+            return """
+            macOS is running Muro from a temporary copy, so the lock screen cannot be set. \
+            Drag Muro into your Applications folder, then open it from there.
+            """
+        case .wallpaperStoreMissing:
+            return "The macOS wallpaper store could not be found."
+        case .operationFailed(let message):
+            return message
+        }
+    }
+}
+
+/// What `apply` settled on.
+///
+/// A lock-screen apply is really a request to WallpaperAgent, and the agent
+/// answers on its own schedule. `.needsSystemSettings` means every file and
+/// record Muro owns is in place but the agent has not acknowledged it yet.
+/// That is a message, not a failure: the old code treated it as one and threw
+/// away a selection that was usually about to settle a second later.
+enum LockScreenApplyOutcome {
+    case applied
+    /// Written, held by the stores, but macOS has not come to collect it yet.
+    ///
+    /// Deliberately separate from `.needsSystemSettings`, which puts a modal
+    /// alert in front of the user. This one says nothing on screen and only
+    /// reaches the diagnostics log. An apply that macOS picks up a moment late
+    /// is common; telling somebody their wallpaper failed when it is about to
+    /// work would be worse than the silence it replaced.
+    case pendingAcknowledgement
+    case needsSystemSettings
+}
+
+/// Owns the Apple-managed half of Muro playback. It stages only wallpapers
+/// selected for the lock screen and writes them into both wallpaper stores
+/// (`Index.plist` and macOS 26+'s authoritative `Index2.plist`).
+///
+/// The lock screen has no surface of its own, so it renders whatever fills the
+/// desktop role. Which key that is depends on the node, and `AppleWallpaperStore`
+/// owns that rule: `Desktop` when the desktop and lock screen are set apart,
+/// `Linked` when they share one wallpaper. `Idle` is the screen *saver* and is
+/// never ours. Muro's own borderless window still owns the *visible* desktop,
+/// and the extension keeps `alwaysPauseDesktop`, so it is a paused still on the
+/// desktop and only plays while locked.
+///
+/// It restores every record it owns before deleting staged files.
+final class LockScreenService {
+    static let extensionBundleID = "com.mrrockysl.muro.wallpaper-extension"
+    private static let removedSelection = "__none__"
+
+    private struct SelectionState: Codable {
+        /// "all" or display UUID -> wallpaper ID, for the desktop role, which
+        /// is what the lock screen renders.
+        var selections: [String: String] = [:]
+        /// The same, for the screen saver.
+        var screenSaver: [String: String] = [:]
+        /// The wallpaper a playlist or automation last staged behind each
+        /// role's fixed id, keyed by `LockScreenRotation.stateKey`. It is what
+        /// that id stands for whenever a selection holds it, so the app can
+        /// say which wallpaper the lock screen or the screen saver is showing.
+        var rotationWallpapers: [String: String] = [:]
+
+        init() {}
+
+        /// Written by hand so a state file from a build that had no screen
+        /// saver still decodes. The synthesised initialiser throws on the
+        /// missing key, and this file is loaded with `try?`, so that would
+        /// have quietly thrown away somebody's lock screen selection.
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            selections = try container.decodeIfPresent(
+                [String: String].self, forKey: .selections
+            ) ?? [:]
+            screenSaver = try container.decodeIfPresent(
+                [String: String].self, forKey: .screenSaver
+            ) ?? [:]
+            rotationWallpapers = try container.decodeIfPresent(
+                [String: String].self, forKey: .rotationWallpapers
+            ) ?? [:]
+        }
+    }
+
+    private struct ExtensionEntry: Codable {
+        let id: String
+        let title: String
+        let videoFilename: String
+        let thumbnailFilename: String
+    }
+
+    private struct ExtensionLibrary: Codable {
+        var wallpapers: [ExtensionEntry]
+    }
+
+    private struct ExtensionPrefs: Codable {
+        let alwaysPauseDesktop: Bool
+    }
+
+    private struct StoreSnapshot: Sendable {
+        let url: URL
+        let data: Data?
+    }
+
+    private let root: URL
+    private var state: SelectionState
+
+    /// Cheap half only: read Muro's own small state file. Everything
+    /// expensive moved to `healIfNeeded()`.
+    init(root: URL) {
+        self.root = root
+        state = Self.loadState(root: root)
+    }
+
+    /// WallpaperAgent may reject or remove a provider (for example after a
+    /// test bundle is replaced). Never keep showing "Applied" when Apple no
+    /// longer has a matching record.
+    ///
+    /// This used to run inside `init`, which the app reaches while building
+    /// its store, on the main actor, before the window is drawn. It reads and
+    /// rewrites Apple's property lists, runs `pluginkit`, and restarts
+    /// WallpaperAgent, so on a slow launch it froze the interface behind a
+    /// process spawn. It is a background job now, and the only thing it
+    /// changes in the interface is an "Applied" badge that was already wrong.
+    func healIfNeeded() async {
+        // Before anything else, and on every launch rather than only when a
+        // lock-screen wallpaper is set: an app that is still quarantined has an
+        // extension macOS will not load, and the user finds out at the worst
+        // moment. Cheap when there is nothing to clear (two `getxattr` calls).
+        await Task.detached(priority: .utility) { Self.clearQuarantine() }.value
+
+        let root = self.root
+        let extensionURL = extensionBundleURL
+
+        // Muro claiming nothing is not the same as Apple holding nothing. A
+        // record can outlive the wallpaper it names, and this branch used to
+        // return before it could ever look. The result was a Mac where macOS
+        // asked Muro for a lock-screen wallpaper on every wake, Muro answered
+        // with nothing because the file was gone, and neither side knew: the
+        // app showed no lock-screen wallpaper set, so there was nothing to
+        // suggest anything was wrong.
+        guard !activeWallpaperIDs.isEmpty else {
+            let changed = await Task.detached(priority: .utility) {
+                (try? Self.purgeDeadMuroSurfaces(root: root)) == true
+            }.value
+            if changed {
+                await Task.detached(priority: .utility) { Self.restartWallpaperAgent() }.value
+            }
+            return
+        }
+
+        let stillSelected = await Task.detached(priority: .utility) {
+            Self.wallpaperStoresHaveSelection()
+        }.value
+        // A healthy selection can still sit alongside records left by earlier
+        // wallpapers, so this path sweeps rather than simply returning.
+        //
+        // **It sweeps without restarting WallpaperAgent, and that is the whole
+        // point of this branch.** Killing the agent takes every wallpaper off
+        // the screen until macOS resolves them again, and that is not
+        // instant: measured at **58 seconds** on the owner's Mac on
+        // 2026-09-10. During it macOS draws its own default picture, because
+        // the provider it has a record for is not running. While Muro is open
+        // nobody sees that, its own windows are over the top. Quit inside that
+        // window and the desktops are Apple's default, which is exactly the
+        // "second quit gives me Tahoe" report: the first quit is clean, the
+        // reopen sweeps and kills the agent, and the quit after it lands in
+        // the gap. Locking the Mac ends it early, because that makes macOS
+        // resolve the wallpaper again, which is why locking and unlocking
+        // always looked like the cure.
+        //
+        // Nothing here is worth that. The sweep is bookkeeping: it corrects
+        // records for wallpapers that are already gone, while a healthy
+        // selection is being served by a running extension. Writing the store
+        // is enough, macOS reads it when it next resolves, and the wallpaper
+        // on screen never goes anywhere. The unhealthy path below still
+        // restarts the agent, because there the wallpaper is already wrong and
+        // getting it looked at again is the fix rather than the cost.
+        guard !stillSelected else {
+            _ = await Task.detached(priority: .utility) {
+                (try? Self.purgeDeadMuroSurfaces(root: root)) == true
+            }.value
+            // Muro being *somewhere* in the stores is what got us into this
+            // branch, and that is not the same as Muro holding everything it
+            // claims. The desktop and the lock screen can be perfectly healthy
+            // while the screen saver has been handed to Apple's aerials, which
+            // is what an update installed over a running Muro does. Nothing
+            // used to notice, so it stayed Apple's until the user applied a
+            // screen saver again by hand.
+            let currentState = self.state
+            let repaired = await Task.detached(priority: .utility) {
+                await Self.repairScreenSaverIfMissing(currentState, root: root)
+            }.value
+            if repaired {
+                // Only reached when the screen saver really was wrong, so this
+                // is the case the comment above calls worth the restart: the
+                // agent is holding a resolution that does not match the store.
+                // `reviveExtensionIfNeeded` below waits for the extension to
+                // answer, so the gap it opens is closed before anyone can see
+                // the desktop.
+                await Task.detached(priority: .utility) { Self.restartWallpaperAgent() }.value
+            }
+            await Self.reviveExtensionIfNeeded()
+            return
+        }
+
+        await Task.detached(priority: .utility) {
+            try? await Self.restoreWallpaperStores(targetKey: "all", root: root)
+            try? FileManager.default.removeItem(at: Self.stateURL(root: root))
+            try? Self.pruneStagedLibrary(keeping: [])
+            Self.unregisterExtension(at: extensionURL)
+            try? FileManager.default.removeItem(at: Self.backupDirectoryURL(root: root))
+            try? FileManager.default.removeItem(at: Self.legacyBackupURL(root: root))
+            Self.restartWallpaperAgent()
+        }.value
+        state = SelectionState()
+    }
+
+    // `collapseToOneSelection` was here, with the one helper it used. It
+    // enforced an older rule, one lock screen for the whole Mac, and it ran on
+    // every launch. Once a lock screen per display became the rule, this is
+    // what it did, measured on the owner's Mac on 2026-09-10 with a MacBook
+    // and a DELL: he set a lock screen on each, both worked, he quit and
+    // reopened Muro, and on that launch it saw two, kept whichever one Apple's
+    // store happened to name, and threw the other away. The discarded
+    // wallpaper's staged video went with it, `purgeDeadMuroSurfaces` then
+    // handed that display's slot back to a plain picture, and the screen saver
+    // died as well because it pruned to the single lock screen id and forgot
+    // `state.screenSaver` existed. Three symptoms, one function.
+    //
+    // What it guarded against is real and is handled elsewhere now: every
+    // staged wallpaper is a row in System Settings, and
+    // `LockScreenSelections.afterApply` bounds the record at one per connected
+    // display plus `all`, so the rows cannot pile up.
+
+    var isAvailable: Bool {
+        ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26
+            && FileManager.default.fileExists(atPath: extensionBundleURL.path)
+    }
+
+    /// macOS keeps **one screen saver for the whole Mac**, so a per-display
+    /// screen saver does not exist to write.
+    ///
+    /// This is what made the first attempt look like it had done nothing. The
+    /// wallpaper store keeps the screen saver in a node called
+    /// `AllSpacesAndDisplays`, typed `idle`, which is the screen saver and
+    /// nothing else. A per-display apply matches on the display's UUID, that
+    /// node carries no UUID, so every per-display node got Muro and the one
+    /// node macOS actually reads kept saying `default`. System Settings went
+    /// on showing Apple's own screen saver and there was nothing in the store
+    /// to suggest anything was wrong.
+    ///
+    /// Apple's own interface has no per-display screen saver picker either,
+    /// and macOS asks this extension for the same wallpaper once per screen
+    /// when it starts, which is the same fact seen from the other side.
+    static func storeTargetKey(_ targetKey: String, for surface: AppleWallpaperStore.Surface) -> String {
+        surface == .screenSaver ? "all" : targetKey
+    }
+
+    /// The selections for one role. Both live in the same file and share one
+    /// staged library, so a wallpaper on the lock screen and the screen saver
+    /// at once is staged once and stored once.
+    private static func selections(
+        _ state: SelectionState, for surface: AppleWallpaperStore.Surface
+    ) -> [String: String] {
+        surface == .screenSaver ? state.screenSaver : state.selections
+    }
+
+    private static func setSelections(
+        _ value: [String: String],
+        for surface: AppleWallpaperStore.Surface,
+        in state: inout SelectionState
+    ) {
+        if surface == .screenSaver { state.screenSaver = value } else { state.selections = value }
+    }
+
+    /// Every wallpaper either role is holding. What has to stay staged.
+    private static func heldIDs(_ state: SelectionState) -> Set<String> {
+        Set(state.selections.values)
+            .union(state.screenSaver.values)
+            .subtracting([removedSelection])
+    }
+
+    var activeWallpaperIDs: Set<String> {
+        Self.heldIDs(state)
+    }
+    var activeWallpaperID: String? {
+        resolved(
+            state.selections["all"]
+                ?? state.selections.values.first(where: { $0 != Self.removedSelection }),
+            role: .desktop
+        )
+    }
+
+    var screenSaverWallpaperID: String? {
+        resolved(
+            state.screenSaver["all"]
+                ?? state.screenSaver.values.first(where: { $0 != Self.removedSelection }),
+            role: .screenSaver
+        )
+    }
+
+    // MARK: - Playlists and automations
+
+    /// The wallpaper a selection stands for. Only a role's fixed id changes
+    /// here, into whichever wallpaper was last staged behind it; every other
+    /// value is already a wallpaper id.
+    private func resolved(_ value: String?, role: AppleWallpaperStore.Surface) -> String? {
+        LockScreenRotation.resolvedWallpaperID(
+            selectionValue: value,
+            rotationID: LockScreenRotation.fixedID(for: role),
+            currentStepID: state.rotationWallpapers[LockScreenRotation.stateKey(for: role)]
+        )
+    }
+
+    /// What this role shows now, by `all` or display UUID, with a playlist's
+    /// fixed id read as the wallpaper it was showing and opt-outs left out.
+    /// Remembered when a playlist starts, so turning it off can put the place
+    /// back the way it was.
+    func shownSelections(_ role: AppleWallpaperStore.Surface) -> [String: String] {
+        var out: [String: String] = [:]
+        for (key, value) in Self.selections(state, for: role) where value != Self.removedSelection {
+            if let id = resolved(value, role: role) { out[key] = id }
+        }
+        return out
+    }
+
+    /// Whether a playlist or automation holds this role right now, which is
+    /// to say whether its fixed id is what every display reads.
+    func isRotating(_ role: AppleWallpaperStore.Surface) -> Bool {
+        Self.selections(state, for: role)[LockScreenSelections.allKey]
+            == LockScreenRotation.fixedID(for: role)
+    }
+
+    /// The wallpaper a playlist or automation is showing on this role, or nil
+    /// when none holds it. It stays after the playlist stops, the same as the
+    /// desktop keeps the last wallpaper a playlist put there.
+    func rotationWallpaperID(_ role: AppleWallpaperStore.Surface) -> String? {
+        guard isRotating(role) else { return nil }
+        return state.rotationWallpapers[LockScreenRotation.stateKey(for: role)]
+    }
+
+    /// Puts one step of a playlist or an automation on the lock screen or the
+    /// screen saver.
+    ///
+    /// The first one is an ordinary apply to every display, with one
+    /// difference: Apple's store is written with the role's fixed id instead
+    /// of the wallpaper's own. Every step after it only swaps the video staged
+    /// behind that id and tells the extension, which changes the video on the
+    /// surface it is already showing. So the store is written once, and
+    /// WallpaperAgent is not restarted and nothing flashes between steps.
+    ///
+    /// The video is hard linked, so a step costs no disk space. Wallpapers kept
+    /// on another drive cannot be linked from here, and are copied instead.
+    ///
+    /// Returns nil for a step that only swapped the file.
+    @discardableResult
+    func showInRotation(
+        entry: WallpaperEntry,
+        videoURL: URL,
+        thumbnailURL: URL,
+        role: AppleWallpaperStore.Surface,
+        connectedDisplays: Set<String>
+    ) async throws -> LockScreenApplyOutcome? {
+        let fixedID = LockScreenRotation.fixedID(for: role)
+        let stateKey = LockScreenRotation.stateKey(for: role)
+        let holding = isRotating(role)
+        let storeShowsIt = holding
+            ? await Task.detached(priority: .userInitiated) {
+                Self.storeShowsRotation(fixedID, role: role)
+            }.value
+            : false
+
+        guard holding, storeShowsIt else {
+            // macOS is not reading the fixed id: the first step, or someone
+            // put another wallpaper there since. Apply it like one picked by
+            // hand, under the fixed id.
+            let outcome = try await apply(
+                entry: entry,
+                videoURL: videoURL,
+                thumbnailURL: thumbnailURL,
+                target: .all,
+                surface: role,
+                connectedDisplays: connectedDisplays,
+                storeID: fixedID,
+                linkFiles: true
+            )
+            state.rotationWallpapers[stateKey] = entry.id
+            try? Self.saveState(state, root: root)
+            return outcome
+        }
+
+        try await Task.detached(priority: .userInitiated) {
+            try Self.stage(
+                id: fixedID, entry: entry, videoURL: videoURL,
+                thumbnailURL: thumbnailURL, link: true
+            )
+        }.value
+        // Written into the record as it is now, not a copy taken before the
+        // file work, so an apply that finished in the meantime is kept.
+        state.rotationWallpapers[stateKey] = entry.id
+        try Self.saveState(state, root: root)
+        Self.notifyLibraryChanged()
+        return nil
+    }
+
+    /// Whether macOS keeps the lock screen and the screen saver on one key,
+    /// a `linked` node (see `AppleWallpaperStore.surfaceName`). There they
+    /// are one place: a playlist on each would take the key back from the
+    /// other at every step.
+    var lockAndSaverAreLinked: Bool {
+        guard let url = Self.wallpaperStoreURLs.first,
+              let store = Self.loadWallpaperStore(at: url)
+        else { return false }
+        var linked = false
+        AppleWallpaperStore.forEachNode(in: store) { _, node in
+            if node["Type"] as? String == "linked" { linked = true }
+        }
+        return linked
+    }
+
+    /// Whether `Index.plist`, the store macOS reads, has this role on Muro
+    /// with the fixed id. Not only on Muro: a Muro wallpaper picked in System
+    /// Settings is Muro too, and swapping the file behind the fixed id would
+    /// change nothing anyone can see.
+    private static func storeShowsRotation(
+        _ fixedID: String, role: AppleWallpaperStore.Surface
+    ) -> Bool {
+        guard let url = wallpaperStoreURLs.first,
+              let store = loadWallpaperStore(at: url)
+        else { return false }
+        var found = false
+        AppleWallpaperStore.forEachNode(in: store) { _, node in
+            guard !found,
+                  let name = AppleWallpaperStore.surfaceName(of: node, for: role),
+                  let surface = node[name] as? [String: Any]
+            else { return }
+            if muroWallpaperID(of: surface) == fixedID { found = true }
+        }
+        return found
+    }
+
+    /// The targets whose lock screen currently shows one of `ids`. A delete
+    /// clears exactly those, rather than wiping the lock screen on every
+    /// display because one of them happened to hold a wallpaper going away.
+    func targets(
+        showing ids: Set<String>,
+        surface: AppleWallpaperStore.Surface = .desktop
+    ) -> [ApplyTarget] {
+        Self.selections(state, for: surface)
+            .filter { $0.value != Self.removedSelection && ids.contains($0.value) }
+            .map { $0.key == "all" || surface == .screenSaver ? .all : .display($0.key) }
+    }
+
+    /// True when Muro's lock screen is sitting on this display's macOS
+    /// wallpaper slot.
+    ///
+    /// Asked before the desktop still is written, because there is only one
+    /// slot per display and writing a picture into it would throw the lock
+    /// screen away. Answered from Muro's own record rather than from
+    /// `NSWorkspace.desktopImageURL`, which does not reliably name an
+    /// extension as the owner.
+    func ownsWallpaperSurface(displayUUID: String) -> Bool {
+        // The lock screen role only. The screen saver lives on `Idle`, which
+        // is not the key the desktop still is written to, so it is not this
+        // question. The one Mac where it would be is a linked one, where macOS
+        // keeps both on `Linked`; that is a known limit rather than a guess
+        // made here, because changing this rule changes the desktop, and the
+        // desktop is not what the screen saver was asked to touch.
+        let effective = state.selections[displayUUID] ?? state.selections["all"]
+        guard let effective, effective != Self.removedSelection else { return false }
+        return true
+    }
+
+    func isApplied(
+        wallpaperID: String,
+        target: ApplyTarget,
+        surface: AppleWallpaperStore.Surface = .desktop
+    ) -> Bool {
+        let selections = Self.selections(state, for: surface)
+        // A playlist or automation holds its role with a fixed id, and that
+        // id stands for the wallpaper it is showing. Every other value is a
+        // wallpaper id already and comes back unchanged.
+        func shown(_ value: String?) -> String? { resolved(value, role: surface) }
+        // One screen saver for the Mac: asking about a single display is the
+        // same question as asking about all of them.
+        if surface == .screenSaver {
+            return shown(selections["all"]) == wallpaperID
+        }
+        switch target {
+        case .all:
+            guard shown(selections["all"]) == wallpaperID else { return false }
+            return selections
+                .filter { $0.key != "all" }
+                .values
+                .allSatisfy { shown($0) == wallpaperID }
+        case .display(let uuid):
+            let effective = selections[uuid] ?? selections["all"]
+            return shown(effective) == wallpaperID
+        }
+    }
+
+    /// The extension's side of the handshake. Mirrors the type it writes.
+    private struct AcquireReceipt: Codable {
+        var id: String
+        var at: Date
+        var ok: Bool
+        var preview: Bool
+        var detail: String
+    }
+
+    private static var acquireReceiptURL: URL {
+        extensionDocumentsURL.appendingPathComponent("acquire-receipt.json")
+    }
+
+    private static func latestReceipt() -> AcquireReceipt? {
+        guard let data = try? Data(contentsOf: acquireReceiptURL) else { return nil }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try? decoder.decode(AcquireReceipt.self, from: data)
+    }
+
+    /// Waits for macOS to actually come and collect the wallpaper.
+    ///
+    /// This replaces re-reading the property list Muro had just written, which
+    /// could only ever fail if WallpaperAgent deleted the line within a few
+    /// seconds. Everything else, macOS ignoring the choice included, read as
+    /// success. A receipt is written by the extension when macOS calls
+    /// `acquire`, so it cannot be produced by Muro talking to itself.
+    ///
+    /// A preview acquire counts. It is still macOS accepting the provider and
+    /// finding the staged file, and refusing it would invent failures on any
+    /// Mac that previews before it commits.
+    private static func awaitAcknowledgement(
+        wallpaperID: String,
+        since: Date,
+        timeout: TimeInterval
+    ) async -> Bool {
+        func matches() -> Bool {
+            guard let receipt = latestReceipt() else { return false }
+            return receipt.ok
+                && receipt.id == wallpaperID
+                && receipt.at >= since.addingTimeInterval(-1)
+        }
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if matches() { return true }
+            try? await Task.sleep(nanoseconds: 250_000_000)
+        }
+        return matches()
+    }
+
+    /// - Parameters:
+    ///   - storeID: the id Apple's store is written with. The wallpaper's own
+    ///     id unless a playlist or automation passes its role's fixed id. See
+    ///     `showInRotation`.
+    ///   - linkFiles: hard link the video into place instead of copying it.
+    @discardableResult
+    func apply(
+        entry: WallpaperEntry,
+        videoURL: URL,
+        thumbnailURL: URL,
+        target: ApplyTarget,
+        surface: AppleWallpaperStore.Surface = .desktop,
+        connectedDisplays: Set<String> = [],
+        storeID: String? = nil,
+        linkFiles: Bool = false
+    ) async throws -> LockScreenApplyOutcome {
+        try validateAvailability()
+        let storeID = storeID ?? entry.id
+        let targetKey = Self.storeTargetKey(Self.targetKey(target), for: surface)
+        let previousState = state
+        var nextState = state
+        // One per connected display, not one for the whole Mac. This used to
+        // be `[targetKey: entry.id]`, which threw away every other display's
+        // lock screen on each apply. See LockScreenSelections for what that
+        // cost and why it was written that way. A screen saver apply always
+        // carries "all", so this is the same record it always was for it.
+        Self.setSelections(
+            LockScreenSelections.afterApply(
+                current: Self.selections(nextState, for: surface),
+                targetKey: targetKey,
+                wallpaperID: storeID,
+                connectedDisplays: connectedDisplays
+            ),
+            for: surface,
+            in: &nextState
+        )
+
+        let extensionURL = extensionBundleURL
+        let root = root
+        let outcome = try await Task.detached(priority: .userInitiated) {
+            () -> LockScreenApplyOutcome in
+            let storeSnapshots = Self.wallpaperStoreURLs.map {
+                StoreSnapshot(url: $0, data: try? Data(contentsOf: $0))
+            }
+            do {
+                try Self.stage(
+                    id: storeID, entry: entry, videoURL: videoURL,
+                    thumbnailURL: thumbnailURL, link: linkFiles
+                )
+                try Self.writePreferences()
+                try await Self.registerExtension(at: extensionURL)
+
+                // WallpaperAgent restarts asynchronously and rewrites the store
+                // from its own state, so a single write followed by a fixed
+                // sleep was a coin toss: that race is what made this fail on
+                // some machines and not others. Write, kick the agent, then
+                // watch for the selection to appear; if the agent clobbered it,
+                // write again. Three passes, about ten seconds in the worst
+                // case, and almost always settled on the first.
+                let applyStart = Date()
+                var acknowledged = false
+                var storeHolds = false
+                for _ in 1...3 {
+                    try await Self.updateWallpaperStores(
+                        wallpaperID: storeID,
+                        videoURL: Self.stagedVideoURL(id: storeID),
+                        targetKey: targetKey,
+                        surface: surface,
+                        root: root
+                    )
+                    Self.notifyLibraryChanged()
+                    Self.restartWallpaperAgent()
+                    if await Self.awaitAcknowledgement(
+                        wallpaperID: storeID, since: applyStart, timeout: 3
+                    ) {
+                        acknowledged = true
+                    }
+                    // **A receipt is no longer enough on its own, and neither
+                    // is "Muro is in one of the files".** Both were true on the
+                    // owner's Mac on 2026-09-10 while `Index.plist`, the file
+                    // macOS reads, had the screen saver back on Apple's
+                    // default. The loop broke on the first pass with two passes
+                    // in hand and the screen saver played Apple's aerial
+                    // wallpaper. Ask the question that matters: does **every**
+                    // store hold **this role**, for **this target**.
+                    if Self.storesMissingRole(targetKey: targetKey, surface: surface).isEmpty {
+                        storeHolds = true
+                        break
+                    }
+                }
+                // Three passes and a store still refuses it. The verdict below
+                // stays exactly as loose as it has always been, so nothing that
+                // used to report success starts telling the user to go to
+                // System Settings; only the retrying got stricter.
+                if !storeHolds { storeHolds = Self.wallpaperStoresHaveSelection() }
+
+                try Self.saveState(nextState, root: root)
+                try Self.pruneStagedLibrary(keeping: Self.heldIDs(nextState))
+                let settled = acknowledged || storeHolds
+                // The wallpaper this one replaced has just lost its staged
+                // file, so every record still naming it is now dead. Sweeping
+                // here is what stops the stores growing a layer per wallpaper.
+                // The live record is untouched, so the agent only re-reads
+                // what it is already showing.
+                if (try? Self.purgeDeadMuroSurfaces(root: root)) == true {
+                    Self.restartWallpaperAgent()
+                }
+                // Recorded every time now, not only on failure. An apply that
+                // reports success and quietly does nothing is exactly the case
+                // that used to leave no trace at all, which is what made the
+                // first report of it unanswerable.
+                Self.recordDiagnostics(
+                    root: root,
+                    wallpaperID: entry.id,
+                    targetKey: targetKey,
+                    registered: true,
+                    settled: settled,
+                    acknowledged: acknowledged
+                )
+                if !settled { return .needsSystemSettings }
+                return acknowledged ? .applied : .pendingAcknowledgement
+            } catch {
+                // Only a real failure rolls back: the extension would not
+                // register, or a store write threw. A slow agent no longer
+                // costs the user their selection.
+                for snapshot in storeSnapshots {
+                    if let data = snapshot.data {
+                        try? data.write(to: snapshot.url, options: .atomic)
+                    } else {
+                        try? FileManager.default.removeItem(at: snapshot.url)
+                    }
+                }
+                Self.restartWallpaperAgent()
+                try? Self.saveState(previousState, root: root)
+                try? Self.pruneStagedLibrary(keeping: Self.heldIDs(previousState))
+                if Self.heldIDs(previousState).isEmpty {
+                    Self.unregisterExtension(at: extensionURL)
+                    try? FileManager.default.removeItem(at: Self.backupDirectoryURL(root: root))
+                    try? FileManager.default.removeItem(at: Self.legacyBackupURL(root: root))
+                }
+                Self.recordDiagnostics(
+                    root: root,
+                    wallpaperID: entry.id,
+                    targetKey: targetKey,
+                    registered: Self.extensionIsRegistered(),
+                    settled: false,
+                    error: error
+                )
+                throw error
+            }
+        }.value
+        state = nextState
+        return outcome
+    }
+
+    func remove(
+        target: ApplyTarget,
+        surface: AppleWallpaperStore.Surface = .desktop
+    ) async throws {
+        let targetKey = Self.storeTargetKey(Self.targetKey(target), for: surface)
+        var nextState = state
+        var selections = Self.selections(nextState, for: surface)
+        if targetKey == "all" {
+            selections.removeAll()
+        } else if selections["all"] != nil {
+            // An explicit empty override lets one display opt out while the
+            // all-displays fallback remains active everywhere else.
+            selections[targetKey] = Self.removedSelection
+        } else {
+            selections[targetKey] = nil
+        }
+        Self.setSelections(selections, for: surface, in: &nextState)
+        let root = root
+        let extensionURL = extensionBundleURL
+        let stateAfter = nextState
+        try await Task.detached(priority: .userInitiated) {
+            try await Self.restoreWallpaperStores(
+                targetKey: targetKey, surface: surface, root: root
+            )
+            try Self.saveState(stateAfter, root: root)
+            Self.restartWallpaperAgent()
+            try Self.pruneStagedLibrary(keeping: Self.heldIDs(stateAfter))
+            // `restoreWallpaperStores` only rewrites surfaces matching this
+            // target. Records for the same wallpaper under a display that is
+            // no longer connected, or under another Space, are not matched and
+            // used to survive a removal forever.
+            if (try? Self.purgeDeadMuroSurfaces(root: root)) == true {
+                Self.restartWallpaperAgent()
+            }
+            // Only once neither role is holding anything. Unregistering while
+            // the screen saver is still Muro would take the screen saver away
+            // with the lock screen.
+            if Self.heldIDs(stateAfter).isEmpty {
+                Self.unregisterExtension(at: extensionURL)
+                try? FileManager.default.removeItem(at: Self.backupDirectoryURL(root: root))
+                try? FileManager.default.removeItem(at: Self.legacyBackupURL(root: root))
+            }
+        }.value
+        state = nextState
+    }
+
+    /// Takes a stopped playlist's or automation's fixed id off one role, when
+    /// the wallpaper staged behind it has been deleted. Only the records that
+    /// show that id go back to the person's own wallpaper, and a display with
+    /// a lock screen of its own keeps it.
+    ///
+    /// `remove(target: .all)` was used for this and cleared every selection,
+    /// so deleting the wallpaper a stopped lock screen playlist had left on
+    /// every display also took away the MacBook's own lock screen
+    /// (2026-10-01). For the screen saver, which is always `all`, the two do
+    /// the same thing.
+    func removeRotation(_ role: AppleWallpaperStore.Surface) async throws {
+        let fixedID = LockScreenRotation.fixedID(for: role)
+        var nextState = state
+        Self.setSelections(
+            LockScreenSelections.afterRemovingRotation(
+                current: Self.selections(nextState, for: role),
+                fixedID: fixedID,
+                removedMarker: Self.removedSelection
+            ),
+            for: role,
+            in: &nextState
+        )
+        let root = root
+        let extensionURL = extensionBundleURL
+        let stateAfter = nextState
+        try await Task.detached(priority: .userInitiated) {
+            try await Self.restoreSurfaces(showing: fixedID, surface: role, root: root)
+            try Self.saveState(stateAfter, root: root)
+            Self.restartWallpaperAgent()
+            try Self.pruneStagedLibrary(keeping: Self.heldIDs(stateAfter))
+            if (try? Self.purgeDeadMuroSurfaces(root: root)) == true {
+                Self.restartWallpaperAgent()
+            }
+            if Self.heldIDs(stateAfter).isEmpty {
+                Self.unregisterExtension(at: extensionURL)
+                try? FileManager.default.removeItem(at: Self.backupDirectoryURL(root: root))
+                try? FileManager.default.removeItem(at: Self.legacyBackupURL(root: root))
+            }
+        }.value
+        state = nextState
+    }
+
+    /// `remove` for several roles at once, with one WallpaperAgent restart
+    /// instead of one per role.
+    ///
+    /// For handing a place over to one of Apple's wallpapers that only macOS
+    /// shows (`MacOSWallpaperService`). That choice is written into Apple's
+    /// store first, so the surfaces it replaced are no longer Muro's and the
+    /// restore below leaves them alone; what is left to do is Muro's own
+    /// record, its staged files and the one restart that makes macOS read
+    /// the store again. Every restart blanks the screens for a moment, and
+    /// the owner saw each one as a black flash (2026-09-30).
+    func remove(target: ApplyTarget, surfaces: [AppleWallpaperStore.Surface]) async throws {
+        var nextState = state
+        var keys: [(key: String, surface: AppleWallpaperStore.Surface)] = []
+        for surface in surfaces {
+            let targetKey = Self.storeTargetKey(Self.targetKey(target), for: surface)
+            var selections = Self.selections(nextState, for: surface)
+            if targetKey == "all" {
+                selections.removeAll()
+            } else if selections["all"] != nil {
+                selections[targetKey] = Self.removedSelection
+            } else {
+                selections[targetKey] = nil
+            }
+            Self.setSelections(selections, for: surface, in: &nextState)
+            keys.append((targetKey, surface))
+        }
+        let root = root
+        let extensionURL = extensionBundleURL
+        let stateAfter = nextState
+        try await Task.detached(priority: .userInitiated) {
+            for entry in keys {
+                try await Self.restoreWallpaperStores(
+                    targetKey: entry.key, surface: entry.surface, root: root
+                )
+            }
+            try Self.saveState(stateAfter, root: root)
+            _ = try? Self.purgeDeadMuroSurfaces(root: root)
+            Self.restartWallpaperAgent()
+            try Self.pruneStagedLibrary(keeping: Self.heldIDs(stateAfter))
+            if Self.heldIDs(stateAfter).isEmpty {
+                Self.unregisterExtension(at: extensionURL)
+                try? FileManager.default.removeItem(at: Self.backupDirectoryURL(root: root))
+                try? FileManager.default.removeItem(at: Self.legacyBackupURL(root: root))
+            }
+        }.value
+        state = nextState
+    }
+
+    /// Cache clearing is deliberately stronger than ordinary selection removal:
+    /// no Apple record, extension library entry, preference, or copied video is
+    /// allowed to survive it.
+    func clearAll() async {
+        let root = root
+        let extensionURL = extensionBundleURL
+        await Task.detached(priority: .userInitiated) {
+            try? await Self.restoreWallpaperStores(targetKey: "all", root: root)
+            Self.restartWallpaperAgent()
+            Self.unregisterExtension(at: extensionURL)
+            try? FileManager.default.removeItem(at: Self.extensionDocumentsURL)
+            try? FileManager.default.removeItem(at: Self.stateURL(root: root))
+            try? FileManager.default.removeItem(at: Self.acquireReceiptURL)
+            try? FileManager.default.removeItem(at: Self.backupDirectoryURL(root: root))
+            try? FileManager.default.removeItem(at: Self.legacyBackupURL(root: root))
+        }.value
+        state = SelectionState()
+    }
+
+    private func validateAvailability() throws {
+        guard ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26 else {
+            throw LockScreenServiceError.requiresTahoe
+        }
+        guard !Self.isTranslocated else {
+            throw LockScreenServiceError.translocated
+        }
+        guard FileManager.default.fileExists(atPath: extensionBundleURL.path) else {
+            throw LockScreenServiceError.extensionMissing
+        }
+    }
+
+    /// Gatekeeper path randomisation: macOS runs a quarantined app from a
+    /// read-only copy under `/private/var/.../AppTranslocation/`, and
+    /// `Bundle.main` points at that copy rather than at the install.
+    ///
+    /// Found while testing the quarantine fix, and it defeats the whole
+    /// feature quietly: clearing quarantine writes to a throwaway copy, and
+    /// the extension registers from a path that vanishes when the app quits,
+    /// so WallpaperAgent is left holding a provider that no longer exists.
+    /// There is nothing an app can do about its own translocation from the
+    /// inside, so say what the user has to do instead of failing vaguely.
+    static var isTranslocated: Bool {
+        Bundle.main.bundleURL.path.contains("/AppTranslocation/")
+    }
+
+    private var extensionBundleURL: URL {
+        Bundle.main.bundleURL
+            .appendingPathComponent("Contents/Extensions", isDirectory: true)
+            .appendingPathComponent("MuroWallpaperExtension.appex", isDirectory: true)
+    }
+
+    /// Where the lock screen's and the screen saver's videos are staged, for
+    /// the Storage row.
+    static var stagedVideosURL: URL {
+        extensionDocumentsURL.appendingPathComponent("videos", isDirectory: true)
+    }
+
+    private static var extensionDocumentsURL: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Containers", isDirectory: true)
+            .appendingPathComponent(extensionBundleID, isDirectory: true)
+            .appendingPathComponent("Data/Documents", isDirectory: true)
+    }
+
+    private static var wallpaperStoreDirectoryURL: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/com.apple.wallpaper/Store", isDirectory: true)
+    }
+
+    private static let wallpaperStoreFileNames = ["Index.plist", "Index2.plist"]
+
+    private static var wallpaperStoreURLs: [URL] {
+        wallpaperStoreFileNames.map { wallpaperStoreDirectoryURL.appendingPathComponent($0) }
+    }
+
+    private static func stateURL(root: URL) -> URL {
+        root.appendingPathComponent("lockscreen.json")
+    }
+
+    private static func backupDirectoryURL(root: URL) -> URL {
+        root.appendingPathComponent("LockScreenStoreBackups", isDirectory: true)
+    }
+
+    private static func legacyBackupURL(root: URL) -> URL {
+        root.appendingPathComponent("lockscreen-apple-backup.plist")
+    }
+
+    private static func backupURL(root: URL, storeName: String) -> URL {
+        backupDirectoryURL(root: root).appendingPathComponent(storeName)
+    }
+
+    private static func missingStoreMarkerURL(root: URL, storeName: String) -> URL {
+        backupDirectoryURL(root: root).appendingPathComponent("\(storeName).missing")
+    }
+
+    private static func targetKey(_ target: ApplyTarget) -> String {
+        switch target {
+        case .all: return "all"
+        case .display(let uuid): return uuid
+        }
+    }
+
+    private static func loadState(root: URL) -> SelectionState {
+        guard let data = try? Data(contentsOf: stateURL(root: root)),
+              let state = try? JSONDecoder().decode(SelectionState.self, from: data)
+        else { return SelectionState() }
+        return state
+    }
+
+    private static func loadWallpaperStore(at url: URL) -> Any? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? PropertyListSerialization.propertyList(from: data, format: nil)
+    }
+
+    /// One store holding the selection is enough.
+    ///
+    /// This used to demand both. `Index.plist` and `Index2.plist` are plainly
+    /// not maintained together: on the owner's own Mac `Index2.plist` had not
+    /// been touched in a month while `Index.plist` was live. Requiring both
+    /// meant a correct apply reported itself as a failure.
+    private static func wallpaperStoresHaveSelection() -> Bool {
+        wallpaperStoreURLs.contains {
+            AppleWallpaperStore.containsProvider(
+                extensionBundleID, in: loadWallpaperStore(at: $0)
+            )
+        }
+    }
+
+    /// The store files that are **not** holding this role right now.
+    ///
+    /// `wallpaperStoresHaveSelection` above is deliberately loose: it answers
+    /// "is Muro anywhere at all", and `healIfNeeded` needs exactly that,
+    /// because the branch it guards tears everything down. It must not be
+    /// tightened.
+    ///
+    /// An apply needs the opposite. Muro writes two store files, and on
+    /// 2026-09-10 the owner's Mac finished an apply with the screen saver held
+    /// by Muro in `Index2.plist` and by Apple's default in `Index.plist`. macOS
+    /// reads `Index.plist`, so the screen saver played Apple's aerial
+    /// wallpaper, which is the "Tahoe wallpaper" report. The loose check saw
+    /// Muro in the other file, called the apply settled and broke out of a
+    /// retry loop that existed for this exact case and had two passes left.
+    ///
+    /// Empty means every file holds it. Anything else is a pass worth making.
+    private static func storesMissingRole(
+        targetKey: String,
+        surface: AppleWallpaperStore.Surface
+    ) -> [URL] {
+        wallpaperStoreURLs.filter { url in
+            !AppleWallpaperStore.holdsRole(
+                extensionBundleID,
+                in: loadWallpaperStore(at: url),
+                targetKey: targetKey,
+                surface: surface
+            )
+        }
+    }
+
+    /// Puts back a role Muro's own record claims but Apple's stores no longer
+    /// hold, without staging anything or touching the record.
+    ///
+    /// **Scoped to the screen saver on purpose.** That is the role that was
+    /// observed being taken away, and it is the simple one: it is always
+    /// `all`, so there is no per-display node to reason about. The lock screen
+    /// is per connected display, is confirmed working on two displays, and
+    /// `healIfNeeded` has no display list to check against, so a repair there
+    /// would rewrite a display that is merely unplugged. It is left alone.
+    ///
+    /// **How the screen saver goes missing.** Replacing `/Applications/Muro.app`
+    /// while Muro is running makes macOS log "Wallpaper extension was removed",
+    /// and WallpaperAgent then hands the screen saver to Apple's aerials and
+    /// writes that into the store. Measured on the owner's Mac on 2026-09-10:
+    /// the bundle was replaced at 18:33:49 and by 18:34:10 the aerials
+    /// extension had been launched and the store saved. Muro's desktop and
+    /// lock screen come back on relaunch because they are re-applied; the
+    /// screen saver had nothing that noticed. That is every user who updates
+    /// Muro while it is open, not only a build machine.
+    private static func repairScreenSaverIfMissing(
+        _ state: SelectionState, root: URL
+    ) async -> Bool {
+        guard let id = state.screenSaver[LockScreenSelections.allKey],
+              id != removedSelection
+        else { return false }
+        let video = stagedVideoURL(id: id)
+        // No staged file means the wallpaper is genuinely gone, and rewriting
+        // the store would only point macOS at nothing.
+        guard FileManager.default.fileExists(atPath: video.path) else { return false }
+        guard !storesMissingRole(targetKey: "all", surface: .screenSaver).isEmpty else {
+            return false
+        }
+        try? await updateWallpaperStores(
+            wallpaperID: id,
+            videoURL: video,
+            targetKey: "all",
+            surface: .screenSaver,
+            root: root
+        )
+        return true
+    }
+
+
+    private static func saveState(_ state: SelectionState, root: URL) throws {
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let data = try JSONEncoder().encode(state)
+        try data.write(to: stateURL(root: root), options: .atomic)
+    }
+
+    // MARK: - Extension deployment
+
+    private static func stagedVideoURL(id: String) -> URL {
+        extensionDocumentsURL
+            .appendingPathComponent("videos", isDirectory: true)
+            .appendingPathComponent(id, isDirectory: true)
+            .appendingPathComponent("wallpaper.mov")
+    }
+
+    /// `id` is the wallpaper's own unless a playlist or automation stages
+    /// under its role's fixed id. `link` hard links the files instead of
+    /// copying them, and falls back to a copy where a link cannot go.
+    private static func stage(
+        id: String? = nil,
+        entry: WallpaperEntry,
+        videoURL: URL,
+        thumbnailURL: URL,
+        link: Bool = false
+    ) throws {
+        let id = id ?? entry.id
+        let manager = FileManager.default
+        let videos = extensionDocumentsURL.appendingPathComponent("videos", isDirectory: true)
+        try manager.createDirectory(at: videos, withIntermediateDirectories: true)
+
+        let destination = videos.appendingPathComponent(id, isDirectory: true)
+        let staging = videos.appendingPathComponent(".staging-\(UUID().uuidString)", isDirectory: true)
+        try manager.createDirectory(at: staging, withIntermediateDirectories: true)
+        do {
+            try placeFile(videoURL, at: staging.appendingPathComponent("wallpaper.mov"), link: link)
+            try placeFile(thumbnailURL, at: staging.appendingPathComponent("thumbnail.jpg"), link: link)
+            // Swapped, not deleted and rebuilt. macOS can ask the extension
+            // for this video at any moment, and the old code took the folder
+            // away first: an acquire landing in that gap was answered with
+            // "not staged", which leaves macOS with nothing to draw. That is
+            // the black screen that only happened sometimes, and only when a
+            // wallpaper was being replaced. It also removes the failure where
+            // the move found the folder still there and threw.
+            if manager.fileExists(atPath: destination.path) {
+                _ = try manager.replaceItemAt(destination, withItemAt: staging)
+            } else {
+                try manager.moveItem(at: staging, to: destination)
+            }
+        } catch {
+            try? manager.removeItem(at: staging)
+            throw error
+        }
+
+        let libraryURL = extensionDocumentsURL.appendingPathComponent("library.json")
+        var library = loadExtensionLibrary()
+        library.wallpapers.removeAll { $0.id == id }
+        library.wallpapers.append(ExtensionEntry(
+            id: id,
+            title: entry.title,
+            videoFilename: "wallpaper.mov",
+            thumbnailFilename: "thumbnail.jpg"
+        ))
+        let data = try JSONEncoder().encode(library)
+        try data.write(to: libraryURL, options: .atomic)
+    }
+
+    /// A hard link when `link` is set, so a playlist step on the lock screen
+    /// or the screen saver takes no disk space of its own. A link cannot
+    /// cross to another drive, where the wallpapers may be kept (see
+    /// `DownloadFolder`), so any failure falls back to the copy every other
+    /// apply makes.
+    private static func placeFile(_ source: URL, at destination: URL, link: Bool) throws {
+        let manager = FileManager.default
+        if link, (try? manager.linkItem(at: source, to: destination)) != nil { return }
+        try manager.copyItem(at: source, to: destination)
+    }
+
+    private static func loadExtensionLibrary() -> ExtensionLibrary {
+        let url = extensionDocumentsURL.appendingPathComponent("library.json")
+        guard let data = try? Data(contentsOf: url),
+              let library = try? JSONDecoder().decode(ExtensionLibrary.self, from: data)
+        else { return ExtensionLibrary(wallpapers: []) }
+        return library
+    }
+
+    private static func pruneStagedLibrary(keeping ids: Set<String>) throws {
+        let manager = FileManager.default
+        var library = loadExtensionLibrary()
+        let removed = library.wallpapers.filter { !ids.contains($0.id) }
+        library.wallpapers.removeAll { !ids.contains($0.id) }
+        for entry in removed {
+            let directory = extensionDocumentsURL
+                .appendingPathComponent("videos", isDirectory: true)
+                .appendingPathComponent(entry.id, isDirectory: true)
+            try? manager.removeItem(at: directory)
+        }
+        try manager.createDirectory(at: extensionDocumentsURL, withIntermediateDirectories: true)
+        let data = try JSONEncoder().encode(library)
+        try data.write(
+            to: extensionDocumentsURL.appendingPathComponent("library.json"),
+            options: .atomic
+        )
+        notifyLibraryChanged()
+    }
+
+    /// Hand the extension the picture the desktop is set to.
+    ///
+    /// macOS keeps one wallpaper per display and a lock-screen apply puts this
+    /// extension on it, so once Muro's own window is gone the extension is
+    /// also what the desktop falls back to. On its own it would freeze a frame
+    /// of the *lock* wallpaper there, which is not the wallpaper the desktop
+    /// was set to, and when that frame failed to composite it drew nothing at
+    /// all: the black desktop people reported after quitting Muro.
+    ///
+    /// Staging the desktop still separately is what lets the extension show
+    /// the right one of the two, the desktop's own picture while unlocked and
+    /// the lock wallpaper's video once locked.
+    ///
+    /// Nothing is created for somebody who has never used the lock screen: if
+    /// the extension has no container yet there is nothing to hand it.
+    /// Hand the extension the picture **each display's** desktop is set to.
+    ///
+    /// One file per display, named with the same `CGDirectDisplayID` macOS
+    /// puts in the acquire request, plus the unnumbered file as the fallback
+    /// for a surface that names no display. This used to publish a single
+    /// picture, the main display's, and hand it to every surface, so on a Mac
+    /// with two screens the second one showed the first one's wallpaper once
+    /// Muro quit. That reads as the two having swapped (owner, 2026-09-10).
+    ///
+    /// Files for displays that are no longer plugged in are removed, so the
+    /// container cannot grow a picture per monitor ever owned.
+    static func publishDesktopStills(perDisplay: [CGDirectDisplayID: URL], main: URL?) {
+        let manager = FileManager.default
+        let documents = extensionDocumentsURL
+        guard manager.fileExists(atPath: documents.path) else { return }
+
+        var wanted = Set<String>()
+        for (displayID, url) in perDisplay {
+            let name = "desktop-still-\(displayID).jpg"
+            wanted.insert(name)
+            stageStill(url, named: name, in: documents)
+        }
+        if let names = try? manager.contentsOfDirectory(atPath: documents.path) {
+            for name in names
+            where name.hasPrefix("desktop-still-") && name.hasSuffix(".jpg")
+                && !wanted.contains(name) {
+                try? manager.removeItem(at: documents.appendingPathComponent(name))
+                try? manager.removeItem(at: documents.appendingPathComponent(name + ".source"))
+            }
+        }
+        stageStill(main, named: "desktop-still.jpg", in: documents)
+        notifyDesktopStillChanged()
+    }
+
+    /// The whole-Mac form, for the caller that is clearing everything.
+    static func publishDesktopStill(_ url: URL?) {
+        publishDesktopStills(perDisplay: [:], main: url)
+    }
+
+    /// Puts one picture in the extension's container under `name`.
+    ///
+    /// Nothing is copied when the same source is already staged: the app asks
+    /// for this again on every apply and every playlist step, and that would
+    /// be a 4K JPEG copied each time. The source path written beside the file
+    /// is the record of what is already there.
+    private static func stageStill(_ url: URL?, named name: String, in documents: URL) {
+        let manager = FileManager.default
+        let image = documents.appendingPathComponent(name)
+        let marker = documents.appendingPathComponent(name + ".source")
+        let staged = try? String(contentsOf: marker, encoding: .utf8)
+
+        guard let url else {
+            try? manager.removeItem(at: image)
+            try? manager.removeItem(at: marker)
+            return
+        }
+        guard staged != url.path || !manager.fileExists(atPath: image.path) else { return }
+        // Copied beside it and moved into place, never written through. The
+        // extension decodes this file whenever it is told the preferences
+        // changed, and the app posts that same notification for other reasons,
+        // so a plain copy left a window in which the picture on the desktop was
+        // being read out of a half written file.
+        let incoming = documents.appendingPathComponent(name + ".incoming")
+        try? manager.removeItem(at: incoming)
+        guard (try? manager.copyItem(at: url, to: incoming)) != nil else { return }
+        do {
+            if manager.fileExists(atPath: image.path) {
+                _ = try manager.replaceItemAt(image, withItemAt: incoming)
+            } else {
+                try manager.moveItem(at: incoming, to: image)
+            }
+        } catch {
+            try? manager.removeItem(at: incoming)
+            return
+        }
+        try? url.path.write(to: marker, atomically: true, encoding: .utf8)
+    }
+
+    /// Ask the extension to draw the desktop's picture again, without staging
+    /// a different one.
+    ///
+    /// For quitting. Muro's window comes down first, so this lands while the
+    /// surface macOS draws is the thing on screen, and a surface that came up
+    /// with nothing on it is repainted at exactly the moment it is uncovered.
+    static func repaintDesktopStill() {
+        notifyDesktopStillChanged()
+    }
+
+    private static func notifyDesktopStillChanged() {
+        let center = CFNotificationCenterGetDarwinNotifyCenter()
+        CFNotificationCenterPostNotification(
+            center,
+            .init("com.mrrockysl.muro.wallpaper.preferences-changed" as CFString),
+            nil,
+            nil,
+            true
+        )
+    }
+
+    private static func writePreferences() throws {
+        try FileManager.default.createDirectory(
+            at: extensionDocumentsURL,
+            withIntermediateDirectories: true
+        )
+        let data = try JSONEncoder().encode(ExtensionPrefs(alwaysPauseDesktop: true))
+        try data.write(
+            to: extensionDocumentsURL.appendingPathComponent("muro-prefs.json"),
+            options: .atomic
+        )
+        let center = CFNotificationCenterGetDarwinNotifyCenter()
+        CFNotificationCenterPostNotification(
+            center,
+            .init("com.mrrockysl.muro.wallpaper.preferences-changed" as CFString),
+            nil,
+            nil,
+            true
+        )
+    }
+
+    private static func notifyLibraryChanged() {
+        let center = CFNotificationCenterGetDarwinNotifyCenter()
+        CFNotificationCenterPostNotification(
+            center,
+            .init("com.mrrockysl.muro.wallpaper.library-changed" as CFString),
+            nil,
+            nil,
+            true
+        )
+    }
+
+    // MARK: - Apple wallpaper store
+
+    private static func updateWallpaperStores(
+        wallpaperID: String,
+        videoURL: URL,
+        targetKey: String,
+        surface: AppleWallpaperStore.Surface,
+        root: URL
+    ) async throws {
+        let manager = FileManager.default
+        guard let primaryURL = wallpaperStoreURLs.first,
+              manager.fileExists(atPath: primaryURL.path)
+        else {
+            throw LockScreenServiceError.wallpaperStoreMissing
+        }
+        try manager.createDirectory(
+            at: backupDirectoryURL(root: root),
+            withIntermediateDirectories: true
+        )
+        let seedData = try Data(contentsOf: primaryURL)
+
+        let choice: [String: Any] = [
+            "Provider": extensionBundleID,
+            "Files": [["relative": videoURL.absoluteString]],
+            "Configuration": Data(wallpaperID.utf8),
+        ]
+
+        for storeURL in wallpaperStoreURLs {
+            let storeName = storeURL.lastPathComponent
+            let backup = backupURL(root: root, storeName: storeName)
+            let missingMarker = missingStoreMarkerURL(root: root, storeName: storeName)
+            let existed = manager.fileExists(atPath: storeURL.path)
+            if !manager.fileExists(atPath: backup.path),
+               !manager.fileExists(atPath: missingMarker.path) {
+                if existed {
+                    try manager.copyItem(at: storeURL, to: backup)
+                } else {
+                    try Data().write(to: missingMarker, options: .atomic)
+                }
+            }
+
+            let data = existed ? try Data(contentsOf: storeURL) : seedData
+            var store = try PropertyListSerialization.propertyList(from: data, format: nil)
+            // A Mac on "Use Screen Saver: Automatic" keeps one wallpaper for
+            // the lock screen and the screen saver. Muro's places are
+            // separate, so that Mac is switched to Custom first; a Mac already
+            // on Custom is left exactly as it is.
+            AppleWallpaperStore.unlinkNodes(in: &store)
+            // Each node says which surface it keeps its wallpaper under, and
+            // that is the one to write. Writing `Desktop` on a node whose
+            // desktop and lock screen are linked put the wallpaper somewhere
+            // macOS never reads, which is issue #11. A store can also offer
+            // no node for this display at all, and then the choice goes where
+            // that store already keeps its wallpaper.
+            AppleWallpaperStore.applyChoiceCreatingNode(
+                choice,
+                to: &store,
+                targetKey: targetKey,
+                surface: surface,
+                desktopFallback: firstNonMuroSurface(named: "Desktop", in: store) ?? defaultSurface(),
+                idleFallback: firstNonMuroSurface(named: "Idle", in: store) ?? defaultSurface()
+            )
+
+            try writePropertyList(store, to: storeURL)
+            // Written twice with a pause, because WallpaperAgent may rewrite
+            // the file from its own state in between. Task.sleep yields the
+            // thread; Thread.sleep parked one in the cooperative pool.
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            try writePropertyList(store, to: storeURL)
+        }
+    }
+
+    /// The store keys one role occupies, and the only ones a removal of that
+    /// role may hand back.
+    ///
+    /// `Linked` is in both lists on purpose. It is the one key that carries
+    /// the desktop and the screen saver together, which is what linking them
+    /// means, so neither can be taken off it without the other. Nothing else
+    /// overlaps: removing a lock screen wallpaper leaves a Muro screen saver
+    /// exactly where it was.
+    private static func surfaceNames(
+        for role: AppleWallpaperStore.Surface?
+    ) -> [String] {
+        switch role {
+        case .desktop: return ["Desktop", "Linked"]
+        case .screenSaver: return ["Idle", "Linked"]
+        case nil: return AppleWallpaperStore.surfaceNames
+        }
+    }
+
+    private static func restoreWallpaperStores(
+        targetKey: String,
+        surface role: AppleWallpaperStore.Surface? = nil,
+        root: URL
+    ) async throws {
+        let manager = FileManager.default
+        for storeURL in wallpaperStoreURLs where manager.fileExists(atPath: storeURL.path) {
+            let currentData = try Data(contentsOf: storeURL)
+            var current = try PropertyListSerialization.propertyList(from: currentData, format: nil)
+            let backupURL = backupURL(root: root, storeName: storeURL.lastPathComponent)
+            let backup = (try? Data(contentsOf: backupURL)).flatMap {
+                try? PropertyListSerialization.propertyList(from: $0, format: nil)
+            }
+
+            // Only the keys this role occupies. Passing no role sweeps all
+            // three, which is what a full clear and the launch heal want: they
+            // are also what strips records left by older builds, or by a
+            // manual System Settings click.
+            for surfaceName in surfaceNames(for: role) {
+                let fallback = backup.flatMap { firstNonMuroSurface(named: surfaceName, in: $0) }
+                    ?? firstNonMuroSurface(named: surfaceName, in: current)
+                    ?? crossStoreNonMuroSurface(named: surfaceName)
+                    ?? defaultSurface()
+                replaceMuroSurfaces(
+                    named: surfaceName,
+                    in: &current,
+                    path: [],
+                    targetKey: targetKey
+                ) { path, _ in
+                    // A node Muro split from Automatic is still linked in the
+                    // backup; `linkedSurface` answers only for such a node.
+                    backup.flatMap {
+                        surface(named: surfaceName, at: path, in: $0)
+                            ?? AppleWallpaperStore.linkedSurface(splitAt: path, in: $0)
+                    }
+                        .flatMap { isMuroSurface($0) ? nil : $0 }
+                        ?? fallback
+                }
+            }
+
+            try writePropertyList(current, to: storeURL)
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            try writePropertyList(current, to: storeURL)
+        }
+    }
+
+    /// `restoreWallpaperStores` for only the Muro records showing `id`, so a
+    /// display whose record shows a wallpaper of its own is left alone.
+    private static func restoreSurfaces(
+        showing id: String,
+        surface role: AppleWallpaperStore.Surface,
+        root: URL
+    ) async throws {
+        let manager = FileManager.default
+        for storeURL in wallpaperStoreURLs where manager.fileExists(atPath: storeURL.path) {
+            let currentData = try Data(contentsOf: storeURL)
+            var current = try PropertyListSerialization.propertyList(from: currentData, format: nil)
+            let backup = (try? Data(contentsOf: backupURL(root: root, storeName: storeURL.lastPathComponent)))
+                .flatMap { try? PropertyListSerialization.propertyList(from: $0, format: nil) }
+            for surfaceName in surfaceNames(for: role) {
+                let fallback = backup.flatMap { firstNonMuroSurface(named: surfaceName, in: $0) }
+                    ?? firstNonMuroSurface(named: surfaceName, in: current)
+                    ?? crossStoreNonMuroSurface(named: surfaceName)
+                    ?? defaultSurface()
+                mutateSurfaces(named: surfaceName, in: &current, path: []) { path, surface in
+                    guard muroWallpaperID(of: surface) == id else { return surface }
+                    return backup.flatMap {
+                        self.surface(named: surfaceName, at: path, in: $0)
+                            ?? AppleWallpaperStore.linkedSurface(splitAt: path, in: $0)
+                    }
+                        .flatMap { isMuroSurface($0) ? nil : $0 }
+                        ?? fallback
+                }
+            }
+            try writePropertyList(current, to: storeURL)
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            try writePropertyList(current, to: storeURL)
+        }
+    }
+
+    /// Takes every dead Muro record out of Apple's stores and gives the
+    /// surface back to whatever the user had.
+    ///
+    /// Needed because a wallpaper apply fans out. Apple keeps one `Desktop`
+    /// surface per Space per display and the write walks all of them, so a Mac
+    /// that has used the feature for a while accumulates a record per Space
+    /// for every wallpaper it has ever shown. Removing one wallpaper only ever
+    /// rewrote the surfaces matching that target, so the rest sat there
+    /// pointing at videos that had since been deleted: measured at 139 of 356
+    /// records on the developer's own Mac, with the two stores disagreeing
+    /// about which wallpaper was current.
+    ///
+    /// Returns whether anything changed, so the caller only restarts
+    /// WallpaperAgent when there is a reason to.
+    @discardableResult
+    private static func purgeDeadMuroSurfaces(root: URL) throws -> Bool {
+        let manager = FileManager.default
+        var changedAnyStore = false
+        for storeURL in wallpaperStoreURLs where manager.fileExists(atPath: storeURL.path) {
+            let data = try Data(contentsOf: storeURL)
+            var current = try PropertyListSerialization.propertyList(from: data, format: nil)
+            let backup = (try? Data(contentsOf: backupURL(root: root, storeName: storeURL.lastPathComponent)))
+                .flatMap { try? PropertyListSerialization.propertyList(from: $0, format: nil) }
+            var changed = false
+
+            for surfaceName in ["Desktop", "Idle", "Linked"] {
+                let fallback = backup.flatMap { firstNonMuroSurface(named: surfaceName, in: $0) }
+                    ?? firstNonMuroSurface(named: surfaceName, in: current)
+                    ?? crossStoreNonMuroSurface(named: surfaceName)
+                    ?? defaultSurface()
+                mutateSurfaces(named: surfaceName, in: &current, path: []) { path, surface in
+                    guard isDeadMuroSurface(surface) else { return surface }
+                    changed = true
+                    return backup.flatMap {
+                        self.surface(named: surfaceName, at: path, in: $0)
+                            ?? AppleWallpaperStore.linkedSurface(splitAt: path, in: $0)
+                    }
+                        .flatMap { isMuroSurface($0) ? nil : $0 }
+                        ?? fallback
+                }
+            }
+
+            guard changed else { continue }
+            try writePropertyList(current, to: storeURL)
+            changedAnyStore = true
+        }
+        return changedAnyStore
+    }
+
+    private static func writePropertyList(_ value: Any, to url: URL) throws {
+        let data = try PropertyListSerialization.data(
+            fromPropertyList: value,
+            format: .binary,
+            options: 0
+        )
+        try data.write(to: url, options: .atomic)
+    }
+
+    private static func mutateSurfaces(
+        named name: String,
+        in value: inout Any,
+        path: [String],
+        transform: ([String], [String: Any]) -> [String: Any]
+    ) {
+        guard var dictionary = value as? [String: Any] else { return }
+        if let surface = dictionary[name] as? [String: Any] {
+            dictionary[name] = transform(path + [name], surface)
+        }
+        for key in Array(dictionary.keys) where key != name {
+            guard var child = dictionary[key] else { continue }
+            mutateSurfaces(named: name, in: &child, path: path + [key], transform: transform)
+            dictionary[key] = child
+        }
+        value = dictionary
+    }
+
+    private static func replaceMuroSurfaces(
+        named name: String,
+        in value: inout Any,
+        path: [String],
+        targetKey: String,
+        replacement: ([String], [String: Any]) -> [String: Any]
+    ) {
+        mutateSurfaces(named: name, in: &value, path: path) { surfacePath, surface in
+            guard isMuroSurface(surface),
+                  AppleWallpaperStore.surfaceBelongsToTarget(surfacePath, targetKey: targetKey)
+            else { return surface }
+            return replacement(surfacePath, surface)
+        }
+    }
+
+    private static func isMuroSurface(_ surface: [String: Any]) -> Bool {
+        guard let content = surface["Content"] as? [String: Any],
+              let choices = content["Choices"] as? [[String: Any]]
+        else { return false }
+        return choices.contains { ($0["Provider"] as? String) == extensionBundleID }
+    }
+
+    /// The wallpaper this Muro record asks the extension to play. macOS hands
+    /// the same bytes back on `acquire`, so it is what the extension looks up.
+    private static func muroWallpaperID(of surface: [String: Any]) -> String? {
+        guard let content = surface["Content"] as? [String: Any],
+              let choices = content["Choices"] as? [[String: Any]]
+        else { return nil }
+        for choice in choices where (choice["Provider"] as? String) == extensionBundleID {
+            guard let data = choice["Configuration"] as? Data else { continue }
+            return String(data: data, encoding: .utf8)
+        }
+        return nil
+    }
+
+    /// A Muro record is dead when the video it names is no longer staged.
+    ///
+    /// Dead records leave macOS believing Muro owns the surface: it asks the
+    /// extension for a wallpaper whose file is gone, gets nothing back, and
+    /// shows Apple's default instead.
+    ///
+    /// Deliberately keyed on the staged file rather than on Muro's own
+    /// selection list. A wallpaper picked straight from System Settings never
+    /// reaches `lockscreen.json`, so judging by the selection list would tear
+    /// out a choice the user made by hand. A record naming a file that does
+    /// not exist cannot be anybody's working choice.
+    private static func isDeadMuroSurface(_ surface: [String: Any]) -> Bool {
+        guard isMuroSurface(surface) else { return false }
+        guard let id = muroWallpaperID(of: surface), !id.isEmpty else { return true }
+        return !FileManager.default.fileExists(atPath: stagedVideoURL(id: id).path)
+    }
+
+
+    private static func firstNonMuroSurface(named name: String, in value: Any) -> [String: Any]? {
+        if let dictionary = value as? [String: Any] {
+            if let surface = dictionary[name] as? [String: Any], !isMuroSurface(surface) {
+                return surface
+            }
+            for child in dictionary.values {
+                if let found = firstNonMuroSurface(named: name, in: child) { return found }
+            }
+        }
+        return nil
+    }
+
+    /// When one store's surfaces are all Muro (e.g. after a manual System
+    /// Settings click populated only `Index.plist`), the untouched sibling
+    /// store still holds the user's real wallpaper. Pull it from there so
+    /// removal restores the original instead of a blank default.
+    private static func crossStoreNonMuroSurface(named name: String) -> [String: Any]? {
+        for url in wallpaperStoreURLs {
+            if let store = loadWallpaperStore(at: url),
+               let surface = firstNonMuroSurface(named: name, in: store) {
+                return surface
+            }
+        }
+        return nil
+    }
+
+    private static func surface(named name: String, at path: [String], in root: Any) -> [String: Any]? {
+        var current = root
+        for component in path {
+            guard let dictionary = current as? [String: Any], let next = dictionary[component] else {
+                return nil
+            }
+            current = next
+        }
+        return current as? [String: Any]
+    }
+
+    private static func defaultSurface() -> [String: Any] {
+        [
+            "Content": [
+                "Choices": [[
+                    "Provider": "default",
+                    "Files": [],
+                    "Configuration": Data(),
+                ]],
+                "Shuffle": "$null",
+            ],
+            "LastSet": Date(),
+            "LastUse": Date(),
+        ]
+    }
+
+    // MARK: - Process lifecycle
+
+    /// `pluginkit -a` exits 0 even when it rejects the bundle, so its status
+    /// says nothing. The registry is the only honest answer: register, then
+    /// wait for the extension to actually appear in it.
+    /// Make sure the wallpaper extension is alive before Muro settles in.
+    ///
+    /// **Why this is here at all.** The extension is the only thing drawing
+    /// the desktop once Muro's own windows are gone, and launching Muro is
+    /// what takes it away. Measured twice on the owner's Mac, from macOS's own
+    /// log, within a second of the app starting:
+    ///
+    ///     extension-proxy: interruptionHandler called for com.mrrockysl.muro…
+    ///     extension-proxy: invalidationHandler called for com.mrrockysl.muro…
+    ///     extension-proxy: ERROR - connect: com.apple.extensionKit.errorDomain (2)
+    ///
+    /// macOS drops the extension, tries to reconnect once, fails, and then
+    /// leaves it. It came back on its own after 27 seconds in one run and 58
+    /// in another, and until it does macOS draws its own default picture,
+    /// because the provider its store names is not running.
+    ///
+    /// Nobody sees that while Muro is open, its windows are over the top.
+    /// **Quit inside the gap and both desktops are Apple's default**, and that
+    /// is the whole of the "the second quit gives me Tahoe" report: the first
+    /// quit is clean, the reopen drops the extension, and the quit after it
+    /// lands in the gap. Locking the Mac ends it early because that makes
+    /// macOS resolve the wallpaper again, which is why locking and unlocking
+    /// always looked like the cure.
+    ///
+    /// So the gap is closed here, at launch, where it costs nothing and no
+    /// one can be looking at the desktop yet. macOS is given two seconds to
+    /// reconnect on its own first, because usually it does and a restart is
+    /// the heavier thing.
+    private static func reviveExtensionIfNeeded() async {
+        // A lock screen set while macOS kept the extension switched off never
+        // played, and this is where it starts to, without being set again.
+        switchExtensionOn()
+        for _ in 0..<8 {
+            if extensionIsRunning() { return }
+            try? await Task.sleep(nanoseconds: 250_000_000)
+        }
+        restartWallpaperAgent()
+        for _ in 0..<24 {
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            if extensionIsRunning() { return }
+        }
+    }
+
+    /// Whether the extension process is up. Muro is not sandboxed, and this is
+    /// the only honest answer: `pluginkit` reports registration, which stays
+    /// true for an extension macOS has just thrown away.
+    static func extensionIsRunning() -> Bool {
+        !runCapturing("/usr/bin/pgrep", ["-f", "MuroWallpaperExtension.appex"])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .isEmpty
+    }
+
+    private static func registerExtension(at url: URL) async throws {
+        clearQuarantine()
+        _ = run("/usr/bin/pluginkit", ["-a", url.path])
+        for _ in 0..<12 {
+            if extensionIsRegistered() {
+                switchExtensionOn()
+                return
+            }
+            try? await Task.sleep(nanoseconds: 250_000_000)
+        }
+        throw LockScreenServiceError.extensionNotRegistered
+    }
+
+    /// Switch the extension on, not only register it.
+    ///
+    /// `pluginkit -a` registers it, and on some Macs that is not enough: macOS
+    /// keeps a registered extension switched off until it is chosen for use,
+    /// WallpaperAgent never asks it for anything, and the lock screen stays on
+    /// Apple's Aerial while Muro reports it applied. Seen on a new MacBook Air
+    /// M5 on macOS 27.0.1 (October 2026), where `pluginkit -e use` by hand made
+    /// it work at once. Most Macs use the extension without this, which is why
+    /// it went unnoticed, and on those it changes nothing. It only ever touches
+    /// Muro's own extension.
+    static func switchExtensionOn() {
+        _ = run("/usr/bin/pluginkit", ["-e", "use", "-i", extensionBundleID])
+    }
+
+    static func extensionIsRegistered() -> Bool {
+        runCapturing("/usr/bin/pluginkit", ["-m", "-i", extensionBundleID])
+            .contains(extensionBundleID)
+    }
+
+    /// Strip `com.apple.quarantine` from Muro and its embedded extension.
+    ///
+    /// This is the fix for the failure people reported. A DMG downloaded in a
+    /// browser is quarantined, the flag is inherited by everything copied out
+    /// of it, and "Open Anyway" clears just enough to launch the app while the
+    /// embedded appex stays flagged. macOS then refuses to load the extension,
+    /// so WallpaperAgent has no provider to acquire and the lock-screen choice
+    /// never sticks. It works when the owner builds locally because a local
+    /// build is never quarantined, which is exactly why this went unnoticed.
+    ///
+    /// Muro is not sandboxed, so it can clear its own bundle. `removexattr`
+    /// directly rather than shelling out to `xattr`: one syscall per file, no
+    /// process spawn, and nothing to quote.
+    static func clearQuarantine() {
+        let bundle = Bundle.main.bundleURL
+        guard isQuarantined(bundle)
+            || isQuarantined(bundle.appendingPathComponent("Contents/Extensions/MuroWallpaperExtension.appex"))
+        else { return }
+
+        var urls = [bundle]
+        if let walker = FileManager.default.enumerator(
+            at: bundle,
+            includingPropertiesForKeys: nil,
+            options: []
+        ) {
+            for case let child as URL in walker { urls.append(child) }
+        }
+        for url in urls {
+            _ = url.withUnsafeFileSystemRepresentation { path -> Int32 in
+                guard let path else { return 0 }
+                return removexattr(path, "com.apple.quarantine", XATTR_NOFOLLOW)
+            }
+        }
+    }
+
+    private static func isQuarantined(_ url: URL) -> Bool {
+        url.withUnsafeFileSystemRepresentation { path -> Bool in
+            guard let path else { return false }
+            return getxattr(path, "com.apple.quarantine", nil, 0, 0, XATTR_NOFOLLOW) >= 0
+        }
+    }
+
+    /// A line per failed apply, so the next bug report is answerable instead of
+    /// being one screenshot of an alert. Capped, because a log nobody rotates
+    /// is a disk leak.
+    private static func recordDiagnostics(
+        root: URL,
+        wallpaperID: String,
+        targetKey: String,
+        registered: Bool,
+        settled: Bool,
+        acknowledged: Bool = false,
+        error: Error? = nil
+    ) {
+        let version = ProcessInfo.processInfo.operatingSystemVersionString
+        // Names the surface Muro actually landed on and the node's own
+        // `Type`, rather than a bare yes or no. The whole of issue #11 was
+        // Muro writing the wrong one of three keys, and "ok" said nothing
+        // about which one, so the first report of it was unanswerable.
+        let stores = wallpaperStoreURLs.map { url -> String in
+            var seen: Set<String> = []
+            if let store = loadWallpaperStore(at: url) {
+                AppleWallpaperStore.forEachNode(in: store) { _, node in
+                    for name in AppleWallpaperStore.surfaceNames {
+                        guard let surface = node[name] as? [String: Any],
+                              AppleWallpaperStore.providers(of: surface).contains(extensionBundleID)
+                        else { continue }
+                        seen.insert("\(name)/\(node["Type"] as? String ?? "none")")
+                    }
+                }
+            }
+            let detail = seen.isEmpty ? "no" : seen.sorted().joined(separator: ",")
+            return "\(url.lastPathComponent)=\(detail)"
+        }.joined(separator: " ")
+        let line = [
+            ISO8601DateFormatter().string(from: Date()),
+            "macOS \(version)",
+            "wallpaper=\(wallpaperID)",
+            "target=\(targetKey)",
+            "registered=\(registered)",
+            "settled=\(settled)",
+            // The honest half. `settled` only says the stores kept what Muro
+            // wrote; `acknowledged` says macOS came and collected it.
+            "acknowledged=\(acknowledged)",
+            latestReceipt().map {
+                "receipt=\($0.detail)/\($0.ok ? "ok" : "failed")"
+                    + ($0.preview ? "/preview" : "")
+            } ?? "receipt=none",
+            stores,
+            error.map { "error=\($0.localizedDescription)" } ?? "",
+        ].filter { !$0.isEmpty }.joined(separator: " | ")
+
+        EngineLog.log("[lockscreen] \(line)")
+
+        let url = root.appendingPathComponent("lockscreen-diagnostics.log")
+        var text = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+        text += line + "\n"
+        if text.utf8.count > 32_768 {
+            text = String(text.suffix(400))
+        }
+        try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try? text.write(to: url, atomically: true, encoding: .utf8)
+    }
+
+    private static func unregisterExtension(at url: URL) {
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        _ = run("/usr/bin/pluginkit", ["-r", url.path])
+    }
+
+    private static func restartWallpaperAgent() {
+        _ = run("/usr/bin/killall", ["WallpaperAgent"])
+    }
+
+    private static func runCapturing(_ executable: String, _ arguments: [String]) -> String {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            return String(data: data, encoding: .utf8) ?? ""
+        } catch {
+            return ""
+        }
+    }
+
+    @discardableResult
+    private static func run(_ executable: String, _ arguments: [String]) -> Int32 {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus
+        } catch {
+            return -1
+        }
+    }
+}
