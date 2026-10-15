@@ -32,6 +32,12 @@ final class AuraLoopAppDelegate: NSObject, NSApplicationDelegate {
         watchForHideKey()
         watchForCloseKey()
 
+        // Enable Launch at Login by default so AuraLoop autostarts whenever the Mac turns on
+        let launchDisabledByUser = UserDefaults.standard.bool(forKey: "launchAtLoginDisabledByUser")
+        if !launchDisabledByUser && SMAppService.mainApp.status != .enabled {
+            try? SMAppService.mainApp.register()
+        }
+
         // A launch is not a request to see the gallery. AuraLoop lives in the menu
         // bar and keeps running, so the window is asked for, never announced.
         //
@@ -127,7 +133,8 @@ final class AuraLoopAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        true
+        // Keep running in the background (menu bar / live wallpaper) when the last window is closed
+        false
     }
 
     /// Hand the desktop back before going.

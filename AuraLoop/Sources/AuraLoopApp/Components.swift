@@ -497,18 +497,18 @@ func makeMinimiseHideTheWindow(titled title: String) {
 /// 2026-09-23. Put away like the yellow button does, the window is still
 /// updated, and in a test with the same card code every picture went within a
 /// second. To a person the two look the same: the window goes, and Open AuraLoop
-/// Make the gallery's red button terminate the app completely on a single click.
+/// Make the gallery's red button put the window away into the background without quitting the wallpaper engine.
 @MainActor
 func makeCloseHideTheGallery() {
     guard let button = mainWindow?.standardWindowButton(.closeButton) else { return }
     button.target = WindowButtonTarget.shared
-    button.action = #selector(WindowButtonTarget.quitFromRedButton(_:))
+    button.action = #selector(WindowButtonTarget.putAwayGallery(_:))
 }
 
-/// Put the gallery away or terminate, for its red button and Command-W.
+/// Put the gallery away, for its red button and Command-W (keeps background wallpaper and audio running).
 @MainActor
 func putGalleryAway() {
-    NSApp.terminate(nil)
+    mainWindow?.orderOut(nil)
 }
 
 /// Owns the retargeted button action. A plain function cannot be a `#selector`
@@ -523,14 +523,14 @@ final class WindowButtonTarget: NSObject {
         (sender as? NSView)?.window?.orderOut(nil)
     }
 
-    /// The gallery's red button: quit AuraLoop completely on a single click.
+    /// Hide window so live wallpaper keeps running in background.
     @objc func quitFromRedButton(_ sender: Any?) {
-        NSApp.terminate(nil)
+        (sender as? NSView)?.window?.orderOut(nil) ?? mainWindow?.orderOut(nil)
     }
 
-    /// The gallery's red button. See `makeCloseHideTheGallery`.
+    /// The gallery's red button: puts away the window so wallpaper stays running in background.
     @objc func putAwayGallery(_ sender: Any?) {
-        NSApp.terminate(nil)
+        (sender as? NSView)?.window?.orderOut(nil) ?? mainWindow?.orderOut(nil)
     }
 }
 

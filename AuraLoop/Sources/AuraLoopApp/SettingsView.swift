@@ -734,8 +734,10 @@ struct SettingsView: View {
         do {
             if enabled {
                 try SMAppService.mainApp.register()
+                UserDefaults.standard.set(false, forKey: "launchAtLoginDisabledByUser")
             } else {
                 try SMAppService.mainApp.unregister()
+                UserDefaults.standard.set(true, forKey: "launchAtLoginDisabledByUser")
             }
         } catch {
             launchAtLogin = SMAppService.mainApp.status == .enabled
