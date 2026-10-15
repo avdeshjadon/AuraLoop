@@ -19,7 +19,7 @@ import AuraLoopKit
 /// Anything not on the server, like a screen saver someone installed or a
 /// picture a later macOS adds, simply keeps Apple's small picture.
 enum ApplePreviews {
-    static let base = URL(string: "https://cdn.AuraLoopwallpaper.com/apple/")!
+    static let base = URL(string: "https://cdn.murowallpaper.com/apple/")!
 
     /// Screen savers whose picture would be the owner's own content.
     private static let personal: Set<String> = [

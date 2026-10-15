@@ -35,7 +35,7 @@ public enum AppleScreenSaverVideos {
     /// Explore's, from a moment that shows what the card promises), and the
     /// pictures beside AuraLoop's other pictures of Apple's wallpapers,
     /// `thumbs/<asset id>.jpg`.
-    static let base = URL(string: "https://cdn.AuraLoopwallpaper.com/apple/")!
+    static let base = URL(string: "https://cdn.murowallpaper.com/apple/")!
 
     struct Recording {
         let slug: String

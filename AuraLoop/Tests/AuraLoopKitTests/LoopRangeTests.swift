@@ -54,7 +54,7 @@ final class LoopRangeTests: XCTestCase {
     }
 
     func testAStreamIsNeverWaitedOn() {
-        let url = URL(string: "https://cdn.AuraLoopwallpaper.com/p720/example.mov")!
+        let url = URL(string: "https://cdn.murowallpaper.com/p720/example.mov")!
         XCTAssertNil(LoopRange.trimmed(AVURLAsset(url: url)))
     }
 
