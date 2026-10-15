@@ -127,7 +127,7 @@ final class AuraLoopAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        false   // keep playing wallpapers from the menu bar
+        true
     }
 
     /// Hand the desktop back before going.

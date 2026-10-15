@@ -61,6 +61,8 @@ public final class WallpaperWindowController {
     private var playOnlyOnDesktop = false
     private var replayOnClearDesktop = false
     private var desktopCovered: Bool?
+    public private(set) var isAudioEnabled = false
+    public private(set) var audioVolume: Float = 1.0
 
     public init(screen: NSScreen, videoURL: URL) {
         window = NSWindow(
@@ -73,8 +75,8 @@ public final class WallpaperWindowController {
         // wallpaper, below the icons — icons stay visible and clickable.
         window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopIconWindow)) - 1)
         window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
-        window.isOpaque = true
-        window.backgroundColor = .black
+        window.isOpaque = false
+        window.backgroundColor = .clear
         window.hasShadow = false
         window.ignoresMouseEvents = true
         // Hiding an app hides every window it owns, and the wallpaper is one
@@ -87,7 +89,8 @@ public final class WallpaperWindowController {
         window.animationBehavior = .none
 
         player = AVQueuePlayer()
-        player.isMuted = true
+        player.isMuted = !isAudioEnabled
+        player.volume = audioVolume
         player.preventsDisplaySleepDuringVideoPlayback = false
 
         playerLayer = AVPlayerLayer(player: player)
@@ -117,7 +120,8 @@ public final class WallpaperWindowController {
         discardPendingSwap()
 
         let nextPlayer = AVQueuePlayer()
-        nextPlayer.isMuted = true
+        nextPlayer.isMuted = !isAudioEnabled
+        nextPlayer.volume = audioVolume
         nextPlayer.preventsDisplaySleepDuringVideoPlayback = false
 
         let nextLayer = AVPlayerLayer(player: nextPlayer)
@@ -221,6 +225,11 @@ public final class WallpaperWindowController {
         }
         observers.removeAll()
         window.orderOut(nil)
+        window.close()
+    }
+
+    deinit {
+        stop()
     }
 
     /// Menu-bar play/pause. A user pause is just another hold, so it
@@ -330,6 +339,28 @@ public final class WallpaperWindowController {
         guard abs(rate - desiredRate) > 0.001 else { return }
         desiredRate = rate
         for player in allPlayers where player.rate > 0 { player.rate = rate }
+    }
+
+    /// Audio mute toggle. When disabled, player audio is muted.
+    public func setAudioEnabled(_ enabled: Bool) {
+        guard enabled != isAudioEnabled else { return }
+        isAudioEnabled = enabled
+        applyAudioSettings()
+    }
+
+    /// Audio volume (0.0 to 1.0).
+    public func setAudioVolume(_ volume: Float) {
+        let clamped = max(0, min(1, volume))
+        guard abs(clamped - audioVolume) > 0.001 else { return }
+        audioVolume = clamped
+        applyAudioSettings()
+    }
+
+    private func applyAudioSettings() {
+        for player in allPlayers {
+            player.isMuted = !isAudioEnabled
+            player.volume = audioVolume
+        }
     }
 
     // MARK: - Visibility-driven pause/resume

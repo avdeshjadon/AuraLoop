@@ -1472,6 +1472,19 @@ final class AppStore: ObservableObject {
         saveConfig()
     }
 
+    var audioEnabled: Bool { config.audioEnabled ?? false }
+    var audioVolume: Double { config.audioVolume ?? 1.0 }
+
+    func setAudioEnabled(_ enabled: Bool) {
+        config.audioEnabled = enabled
+        saveConfig()
+    }
+
+    func setAudioVolume(_ volume: Double) {
+        config.audioVolume = max(0, min(1, volume))
+        saveConfig()
+    }
+
     // Power auto-pause lives in config.json (not @AppStorage) because the
     // ENGINE is what acts on it — the same config hot-reload path as pause
     // and playback speed, and the AuraLoop-engine CLI honors it too.

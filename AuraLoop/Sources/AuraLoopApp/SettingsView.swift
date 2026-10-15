@@ -235,6 +235,27 @@ struct SettingsView: View {
                             .glassCapsule(fill: 0.09, stroke: 0.15)
                         }
                     }
+                    divider
+                    row(icon: .audio, title: "Wallpaper Audio",
+                        subtitle: "Play sound and audio tracks from live wallpapers") {
+                        HStack(spacing: 10) {
+                            if store.audioEnabled {
+                                Slider(value: Binding(
+                                    get: { store.audioVolume },
+                                    set: { store.setAudioVolume($0) }
+                                ), in: 0...1)
+                                .controlSize(.small)
+                                .frame(width: 80)
+                            }
+                            Toggle("", isOn: Binding(
+                                get: { store.audioEnabled },
+                                set: { store.setAudioEnabled($0) }
+                            ))
+                            .toggleStyle(.switch)
+                            .tint(Color.AuraLoopSwitch)
+                            .labelsHidden()
+                        }
+                    }
                 }
 
                 section("ENERGY") {

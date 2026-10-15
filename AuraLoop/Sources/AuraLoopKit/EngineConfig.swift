@@ -43,6 +43,10 @@ public struct EngineConfig: Codable {
     /// and then freezes. Off (nil = false), Pause After counts only after a
     /// start, an unlock or a wallpaper change, as it always has.
     public var replayOnClearDesktop: Bool?
+    /// Whether audio is enabled for live wallpapers (nil = false, muted by default).
+    public var audioEnabled: Bool?
+    /// Audio volume for live wallpapers 0.0–1.0 (nil = 1.0).
+    public var audioVolume: Double?
 
     public init(allDisplays: Assignment? = nil, perDisplay: [String: Assignment] = [:]) {
         self.allDisplays = allDisplays

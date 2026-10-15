@@ -497,27 +497,18 @@ func makeMinimiseHideTheWindow(titled title: String) {
 /// 2026-09-23. Put away like the yellow button does, the window is still
 /// updated, and in a test with the same card code every picture went within a
 /// second. To a person the two look the same: the window goes, and Open AuraLoop
-/// brings it back. Command-W does the same (`AuraLoopAppDelegate`).
-///
-/// The gallery only. Settings holds no card pictures and closes as before.
+/// Make the gallery's red button terminate the app completely on a single click.
 @MainActor
 func makeCloseHideTheGallery() {
     guard let button = mainWindow?.standardWindowButton(.closeButton) else { return }
     button.target = WindowButtonTarget.shared
-    button.action = #selector(WindowButtonTarget.putAwayGallery(_:))
+    button.action = #selector(WindowButtonTarget.quitFromRedButton(_:))
 }
 
-/// Put the gallery away, for its red button and Command-W.
+/// Put the gallery away or terminate, for its red button and Command-W.
 @MainActor
 func putGalleryAway() {
-    mainWindow?.orderOut(nil)
-    // With the Dock icon off AuraLoop has no menu bar, and an app left in front
-    // with nothing on screen swallows the next thing typed. Hand the keyboard
-    // back, as Command-H does, unless another AuraLoop window is still up.
-    if NSApp.activationPolicy() == .accessory,
-       !AuraLoopDocumentWindows.contains(where: { $0.isVisible }) {
-        NSApp.deactivate()
-    }
+    NSApp.terminate(nil)
 }
 
 /// Owns the retargeted button action. A plain function cannot be a `#selector`
@@ -532,9 +523,14 @@ final class WindowButtonTarget: NSObject {
         (sender as? NSView)?.window?.orderOut(nil)
     }
 
+    /// The gallery's red button: quit AuraLoop completely on a single click.
+    @objc func quitFromRedButton(_ sender: Any?) {
+        NSApp.terminate(nil)
+    }
+
     /// The gallery's red button. See `makeCloseHideTheGallery`.
     @objc func putAwayGallery(_ sender: Any?) {
-        putGalleryAway()
+        NSApp.terminate(nil)
     }
 }
 

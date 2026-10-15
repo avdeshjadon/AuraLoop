@@ -208,11 +208,17 @@ public final class EngineController {
         let paused = config.paused ?? false
         let rate = Float(config.playbackSpeed ?? 1.0)
         let pauseWhenCovered = config.autoPauseFullScreen ?? true
+        let audioOn = config.audioEnabled ?? false
+        let volume = Float(config.audioVolume ?? 1.0)
+        let primaryUUID = NSScreen.main.flatMap { displayUUID(for: $0) } ?? controllers.keys.sorted().first
         for (uuid, controller) in controllers {
             controller.setUserPaused(paused)
             controller.setPlaybackRate(rate)
             controller.setAutoPauseFullScreen(pauseWhenCovered)
             controller.setPauseAfter(desired[uuid]?.pauseAfter)
+            let isPrimary = (uuid == primaryUUID)
+            controller.setAudioEnabled(audioOn && isPrimary)
+            controller.setAudioVolume(volume)
         }
         applyPowerState(config: config)
         applyDesktopRules(config: config)

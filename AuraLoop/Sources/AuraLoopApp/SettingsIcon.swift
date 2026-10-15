@@ -19,7 +19,7 @@ import AppKit
 /// Replay on Clear Desktop has no tile. It belongs to the row above it, and a
 /// dependent setting keeps an arrow where its icon would be.
 enum SettingsIcon {
-    case launchAtLogin, menuBar, dockIcon, playbackSpeed, defaultQuality, pauseAfter
+    case launchAtLogin, menuBar, dockIcon, playbackSpeed, defaultQuality, pauseAfter, audio
     case replay, screenSaver, lowPower, lowBattery, covered, desktopOnly
     case builtInDisplay, externalDisplay, storage, downloadFolder, softwareUpdate, support
     /// Default, Light or Dark (6.0). Drawn here on the same grid and rules,
@@ -52,6 +52,7 @@ enum SettingsIcon {
         case .support: return Color(hex: 0xFF6B8E)
         case .appearance: return Color(hex: 0xB9C2D0)
         case .menuBarIcon: return Color(hex: 0xF5C451)
+        case .audio: return Color(hex: 0x3CC4F0)
         }
     }
 
@@ -64,6 +65,7 @@ enum SettingsIcon {
         case .playbackSpeed: return Color(hex: 0xFFCCA6)
         case .defaultQuality: return Color(hex: 0x9CEAD2)
         case .pauseAfter: return Color(hex: 0xBDBFFF)
+        case .audio: return Color(hex: 0x9EE2F8)
         case .replay: return .AuraLoopSecondary
         case .screenSaver: return Color(hex: 0x9EE2F8)
         case .lowPower: return Color(hex: 0xD1ECA4)
@@ -416,6 +418,8 @@ enum SettingsIcon {
                 p.addCurve(to: pt(9, 12.85), control1: pt(4.25, 11.7), control2: pt(6.35, 13.8))
                 p.addCurve(to: pt(16.25, 13.55), control1: pt(11.65, 11.9), control2: pt(14.15, 12.05))
             })
+        case .audio:
+            break
         }
     }
 
@@ -441,6 +445,7 @@ enum SettingsIcon {
         case .downloadFolder: return "folder.fill"
         case .softwareUpdate: return "arrow.triangle.2.circlepath.circle.fill"
         case .support: return "heart.fill"
+        case .audio: return "speaker.wave.2.fill"
         }
     }
 }

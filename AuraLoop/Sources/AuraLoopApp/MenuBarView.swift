@@ -13,6 +13,7 @@ struct MenuBarView: View {
             header
             transport
             speedRow
+            audioRow
             if !store.recentItems.isEmpty { recents }
             placesSection
             Rectangle().fill(Color.AuraLoopInk.opacity(0.08)).frame(height: 1)
@@ -180,6 +181,49 @@ struct MenuBarView: View {
             }
         }
         .padding(3)
+        .glassCapsule(fill: 0.07, stroke: 0.12)
+    }
+
+    // MARK: - Audio
+
+    private var audioRow: some View {
+        HStack(spacing: 8) {
+            Button {
+                store.setAudioEnabled(!store.audioEnabled)
+            } label: {
+                HStack(spacing: 7) {
+                    Image(systemName: store.audioEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundStyle(store.audioEnabled ? Color.AuraLoopAccent : Color.AuraLoopSecondary)
+                        .frame(width: 16)
+                    Text("Wallpaper Audio")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.AuraLoopInk)
+                }
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            if store.audioEnabled {
+                Slider(value: Binding(
+                    get: { store.audioVolume },
+                    set: { store.setAudioVolume($0) }
+                ), in: 0...1)
+                .controlSize(.mini)
+                .frame(width: 65)
+            }
+
+            Toggle("", isOn: Binding(
+                get: { store.audioEnabled },
+                set: { store.setAudioEnabled($0) }
+            ))
+            .toggleStyle(.switch)
+            .labelsHidden()
+            .controlSize(.mini)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
         .glassCapsule(fill: 0.07, stroke: 0.12)
     }
 
