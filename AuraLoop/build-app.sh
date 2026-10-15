@@ -8,8 +8,8 @@ set -e
 # The one place AuraLoop's version is written. The app bundle, the wallpaper
 # extension and the DMG name are all derived from these two lines, and the
 # build fails below if the app and the extension ever disagree.
-VERSION="6.2.0"
-BUILD="109"
+VERSION="6.3.0"
+BUILD="110"
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 APP="$DIR/dist/AuraLoop.app"
@@ -96,6 +96,8 @@ cp "$DIR/Icon/InApp/AuraLoopIcon-Default.png" "$DIR/Icon/InApp/AuraLoopIcon-Ligh
     "$DIR/Icon/InApp/AuraLoopIcon-Dark.png" "$APP/Contents/Resources/"
 cp "$DIR/../assets/"*.svg "$APP/Contents/Resources/" 2>/dev/null || true
 cp "$DIR/THIRD_PARTY_NOTICES.md" "$APP/Contents/Resources/THIRD_PARTY_NOTICES.md"
+cp "$DIR/assets/FeaturedWallpapers.json" "$APP/Contents/Resources/" 2>/dev/null || cp "$DIR/../assets/FeaturedWallpapers.json" "$APP/Contents/Resources/" 2>/dev/null || true
+
 
 # Bundled wallpaper: "Snowfall in Forest" full 4K master + thumb, so a fresh
 # install always has one wallpaper playing in the hero (owner decision — 4K

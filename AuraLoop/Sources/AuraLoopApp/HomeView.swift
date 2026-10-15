@@ -55,11 +55,19 @@ struct HomeView: View {
                 // Whether the banner is still behind the top bar, for the
                 // light look's top bar: white over the banner, dark once the
                 // page scrolls under it.
-                .background(BannerUnderBarWatcher(threshold: heroHeight - 100) { under in
+                .background(BannerUnderBarWatcher(threshold: heroHeight - 100, onOffsetChange: { offset in
+                    let scrolled = offset > 25
+                    if store.homeScrolled != scrolled {
+                        store.homeScrolled = scrolled
+                    }
+                }) { under in
                     if store.heroUnderTopBar != under { store.heroUnderTopBar = under }
                 })
             }
-            .onDisappear { store.heroUnderTopBar = true }
+            .onDisappear {
+                store.heroUnderTopBar = true
+                store.homeScrolled = false
+            }
             .ignoresSafeArea(edges: .top)
             // A drop that lands while the app is open replaces the row's
             // contents under whatever page the user had turned to, which would
@@ -421,22 +429,26 @@ private struct NoOverscroll: NSViewRepresentable {
 /// past the banner's height less 100 the page itself is behind the bar.
 private struct BannerUnderBarWatcher: NSViewRepresentable {
     let threshold: CGFloat
+    var onOffsetChange: ((CGFloat) -> Void)? = nil
     let onChange: (Bool) -> Void
 
     func makeNSView(context: Context) -> Probe {
         let probe = Probe()
         probe.threshold = threshold
+        probe.onOffsetChange = onOffsetChange
         probe.onChange = onChange
         return probe
     }
 
     func updateNSView(_ nsView: Probe, context: Context) {
         nsView.threshold = threshold
+        nsView.onOffsetChange = onOffsetChange
         nsView.onChange = onChange
     }
 
     final class Probe: NSView {
         var threshold: CGFloat = 460
+        var onOffsetChange: ((CGFloat) -> Void)?
         var onChange: ((Bool) -> Void)?
         private var observer: NSObjectProtocol?
         private var last: Bool?
@@ -472,6 +484,7 @@ private struct BannerUnderBarWatcher: NSViewRepresentable {
             let offset = clip.isFlipped
                 ? clip.bounds.origin.y
                 : documentHeight - clip.bounds.height - clip.bounds.origin.y
+            onOffsetChange?(max(0, offset))
             let under = offset < threshold
             guard under != last else { return }
             last = under

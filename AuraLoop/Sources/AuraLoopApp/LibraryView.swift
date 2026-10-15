@@ -10,10 +10,7 @@ struct LibraryView: View {
     /// stopped needing one: Liked now lists the catalog too, so the tab beside
     /// it was the narrower of the two while calling itself All.
     enum LibTab: String, CaseIterable {
-        case all = "Downloaded", liked = "Liked"
-        /// Playlists and automations share one tab, under the one Now Playing
-        /// bar that plays them. A switch inside it picks which of the two the
-        /// grid shows.
+        case all = "Downloaded"
         case schedules = "Playlists & Automations"
     }
 
@@ -99,6 +96,40 @@ struct LibraryView: View {
     private static let scrollTop = "library-scroll-top"
 
     var body: some View {
+        mainContent
+            .overlay(alignment: .bottom) {
+                if selecting && !selected.isEmpty { batchBar.padding(.bottom, 40) }
+            }
+            .animation(.spring(response: 0.3, dampingFraction: 0.82), value: selected.isEmpty)
+            .animation(.easeOut(duration: 0.18), value: selecting)
+            .onExitCommand { endSelecting() }
+            .onAppear { store.refreshImportedScreenSavers() }
+            .onChange(of: tab) { _, new in
+                if new != .all { endSelecting() }
+            }
+            .onChange(of: store.localItems.count + store.appleDownloadedIDs.count
+                      + store.importedScreenSavers.count) { _, _ in
+                cleanupSelection()
+            }
+            .sheet(item: $editorTarget) { target in
+                PlaylistEditorView(target: target)
+                    .environmentObject(store)
+            }
+            .sheet(item: $automationTarget) { target in
+                AutomationEditorView(target: target)
+                    .environmentObject(store)
+            }
+    }
+
+    private func cleanupSelection() {
+        guard selecting else { return }
+        var alive = Set(store.localItems.map(\.id))
+        alive.formUnion(store.appleDownloadedIDs)
+        alive.formUnion(store.importedScreenSavers.map(\.id))
+        selected.formIntersection(alive)
+    }
+
+    private var mainContent: some View {
         ZStack {
             AuraLoopPageBackground()
             GlassTray {
@@ -106,42 +137,8 @@ struct LibraryView: View {
                     tabsRow
                         .padding(.horizontal, 40)
                         .padding(.top, 34)
-                    // Each tab is its own scroll view, so SwiftUI replaces it
-                    // instead of swapping the contents of one, and every tab
-                    // starts at its top (owner, 2026-09-30). Overlaid in a
-                    // ZStack, so the two pass through each other in place.
                     ZStack {
-                        ScrollViewReader { proxy in
-                            ScrollView(.vertical, showsIndicators: false) {
-                                VStack(alignment: .leading, spacing: 22) {
-                                    switch tab {
-                                    case .all:
-                                        if !selecting { dropZone }
-                                        grid(items: searched)
-                                        saverGroup(saversSearched)
-                                        appleGroup(appleSearched)
-                                    case .liked:
-                                        grid(items: likedGridItems)
-                                        saverGroup(saversSearched.filter(\.liked))
-                                        appleGroup(likedAppleGridItems)
-                                    case .schedules:
-                                        schedulesTab
-                                    }
-                                }
-                                .padding(.horizontal, 40)
-                                .padding(.top, 22)
-                                .padding(.bottom, 40)
-                                .id(Self.scrollTop)
-                            }
-                            // The small Playlists / Automations switch is a
-                            // tab too, and starts at the top the same way.
-                            .onChange(of: scheduleKind) { _, _ in
-                                proxy.scrollTo(Self.scrollTop, anchor: .top)
-                            }
-                        }
-                        .scrollFade(top: 22, bottom: 46)
-                        .id(tab)
-                        .transition(.AuraLoopPage(shift: tabShift))
+                        tabScrollView
                     }
                     .animation(.AuraLoopPage, value: tab)
                 }
@@ -151,36 +148,34 @@ struct LibraryView: View {
             .padding(.top, 88)
             .padding(.bottom, 20)
         }
-        .overlay(alignment: .bottom) {
-            if selecting && !selected.isEmpty { batchBar.padding(.bottom, 40) }
+    }
+
+    private var tabScrollView: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 22) {
+                    switch tab {
+                    case .all:
+                        if !selecting { dropZone }
+                        grid(items: searched)
+                        saverGroup(saversSearched)
+                        appleGroup(appleSearched)
+                    case .schedules:
+                        schedulesTab
+                    }
+                }
+                .padding(.horizontal, 40)
+                .padding(.top, 22)
+                .padding(.bottom, 40)
+                .id(Self.scrollTop)
+            }
+            .onChange(of: scheduleKind) { _, _ in
+                proxy.scrollTo(Self.scrollTop, anchor: .top)
+            }
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.82), value: selected.isEmpty)
-        .animation(.easeOut(duration: 0.18), value: selecting)
-        // Esc is the way out of every other mode in the app, so it is the way
-        // out of this one.
-        .onExitCommand { endSelecting() }
-        // A screen saver may have been added in System Settings since.
-        .onAppear { store.refreshImportedScreenSavers() }
-        .onChange(of: tab) { _, new in
-            if new != .all && new != .liked { endSelecting() }
-        }
-        // After a batch delete the ids are gone but the set is not, which
-        // would leave the bar counting wallpapers that no longer exist.
-        .onChange(of: store.localItems.count + store.appleDownloadedIDs.count
-                  + store.importedScreenSavers.count) { _, _ in
-            guard selecting else { return }
-            let alive = Set(store.localItems.map(\.id)).union(store.appleDownloadedIDs)
-                .union(store.importedScreenSavers.map(\.id))
-            selected.formIntersection(alive)
-        }
-        .sheet(item: $editorTarget) { target in
-            PlaylistEditorView(target: target)
-                .environmentObject(store)
-        }
-        .sheet(item: $automationTarget) { target in
-            AutomationEditorView(target: target)
-                .environmentObject(store)
-        }
+        .scrollFade(top: 22, bottom: 46)
+        .id(tab)
+        .transition(.AuraLoopPage(shift: tabShift))
     }
 
     // MARK: - Tabs
@@ -195,11 +190,6 @@ struct LibraryView: View {
                     PillOption(
                         LibTab.all.rawValue, "Downloaded",
                         count: store.localItems.count + store.appleLibraryItems.count + saverItems.count
-                    ),
-                    PillOption(
-                        LibTab.liked.rawValue, "Liked",
-                        count: store.likedItems.count + store.likedAppleItems.count
-                            + saverItems.filter(\.liked).count
                     ),
                     PillOption(
                         LibTab.schedules.rawValue, "Playlists & Automations",
@@ -228,7 +218,7 @@ struct LibraryView: View {
                 if store.searchActive { SearchField() }
                 Spacer(minLength: 12)
                 if selecting { selectAllButton }
-                if tab == .all || tab == .liked { selectPill }
+                if tab == .all { selectPill }
             }
         }
         .frame(height: 48)
@@ -237,8 +227,7 @@ struct LibraryView: View {
     // MARK: - Select mode
 
     private var visibleItems: [WallpaperItem] {
-        let all = searched + saversSearched + appleSearched
-        return tab == .liked ? all.filter(\.liked) : all
+        searched + saversSearched + appleSearched
     }
 
     private var selectedItems: [WallpaperItem] {

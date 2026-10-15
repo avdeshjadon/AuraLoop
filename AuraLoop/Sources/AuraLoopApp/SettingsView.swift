@@ -12,7 +12,6 @@ struct SettingsView: View {
 
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var confirmClear = false
-    @ObservedObject private var downloadFolder = DownloadFolderController.shared
     @State private var customPauseAfter = false
     /// macOS's own screen saver delay, not a AuraLoop setting, so it is read from
     /// Apple's preference rather than stored here and re-read whenever this
@@ -336,24 +335,7 @@ struct SettingsView: View {
                                 .foregroundStyle(Color.AuraLoopSecondary)
                         }
                     }
-                    divider
-                    row(icon: .downloadFolder, title: "Download Folder",
-                        subtitle: downloadFolder.subtitle) {
-                        HStack(spacing: 8) {
-                            // A move can take minutes on a slow drive, and it
-                            // could not be stopped (full check, 2026-10-01).
-                            if downloadFolder.moving != nil {
-                                settingsPill("Cancel") { downloadFolder.cancel() }
-                                    .disabled(downloadFolder.cancelling)
-                                    .opacity(downloadFolder.cancelling ? 0.45 : 1)
-                            } else {
-                                if downloadFolder.isCustom {
-                                    settingsPill("Default") { downloadFolder.reset() }
-                                }
-                                settingsPill("Change") { downloadFolder.choose() }
-                            }
-                        }
-                    }
+
                     // An "Auto-clear memory: Manual / Daily / Weekly" row used
                     // to sit here. Nothing ever read it, and the RAM it claimed
                     // to free is not RAM AuraLoop holds, so it was removed rather
@@ -432,14 +414,7 @@ struct SettingsView: View {
         .frame(width: 780, height: 490)
         .menuHost()
         .background(SettingsWindowConfigurator())
-        .alert("Download Folder", isPresented: Binding(
-            get: { downloadFolder.message != nil },
-            set: { if !$0 { downloadFolder.message = nil } }
-        )) {
-            Button("OK", role: .cancel) { downloadFolder.message = nil }
-        } message: {
-            Text(downloadFolder.message ?? "")
-        }
+
         .alert("Clear Downloaded Wallpapers?", isPresented: $confirmClear) {
             Button("Cancel", role: .cancel) {}
             Button("Delete Cache", role: .destructive) { store.clearDownloadedCache() }

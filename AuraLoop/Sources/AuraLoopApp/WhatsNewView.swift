@@ -39,9 +39,9 @@ struct WhatsNewRelease: Identifiable {
 /// release is editing this one list.
 enum WhatsNew {
     static let current = WhatsNewRelease(
-        version: "6.2.0",
+        version: "6.3.0",
         date: "October 2026",
-        headline: "AuraLoop 6.2 introduces a clean minimalist installer, dedicated Favorites section, in-preview audio testing, and a refined Settings experience.",
+        headline: "AuraLoop 6.3 introduces adaptive scroll header animations, top bar appearance toggle, clean preview info modal, and featured rotation JSON configuration.",
         sections: [
             WhatsNewSection(name: "New", tint: .AuraLoopAccent, entries: [
                 WhatsNewEntry(title: "Favorites Section",

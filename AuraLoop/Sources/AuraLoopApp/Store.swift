@@ -276,6 +276,7 @@ final class AppStore: ObservableObject {
     /// bar, which stays white over the playing wallpaper and turns dark once
     /// the page scrolls under it. Set by Home only when it changes.
     @Published var heroUnderTopBar = true
+    @Published var homeScrolled = false
     /// The Apple section's notice card (`AppleNoticeCard`). Raised each time
     /// the section opens, until the person ticks "Do not show this message
     /// again".
@@ -2925,8 +2926,8 @@ func downloadRemoteWallpaper(
 }
 
 extension AppStore {
-    /// Auto-downloads smallest Nature wallpaper on first install for live hero,
-    /// rotates hero on app opens, and incrementally preloads catalog in background.
+    /// Auto-downloads wallpapers strictly from FeaturedRotationConfig (configured via FeaturedWallpapers.json),
+    /// rotates hero on app opens, and incrementally preloads the next item in the featured list.
     func scheduleIncrementalWallpaperPreload() {
         Task.detached(priority: .background) { [weak self] in
             guard let self else { return }
@@ -2934,44 +2935,43 @@ extension AppStore {
             let openCount = defaults.integer(forKey: "auraloop_app_open_count")
             defaults.set(openCount + 1, forKey: "auraloop_app_open_count")
 
+            let featuredList = FeaturedRotationConfig.loadConfiguredList()
+            guard !featuredList.isEmpty else { return }
+
             let allItems = await MainActor.run { self.items }
-            let downloaded = allItems.filter { $0.isDownloaded && !$0.isPersonalImport }
+            
+            // Map featured entries to catalog items
+            let featuredItems: [WallpaperItem] = featuredList.compactMap { entry in
+                allItems.first { $0.id == entry.id || $0.title.localizedCaseInsensitiveCompare(entry.title) == .orderedSame }
+            }
 
-            if downloaded.isEmpty {
-                // First install: download smallest Nature live wallpaper so hero plays live video immediately
-                let natureItems = allItems.filter {
-                    $0.category.localizedCaseInsensitiveContains("nature") && !$0.isDownloaded && $0.sizeBytes > 0
-                }.sorted { $0.sizeBytes < $1.sizeBytes }
+            guard !featuredItems.isEmpty else { return }
 
-                let candidate = natureItems.first ?? allItems.filter({ !$0.isDownloaded && $0.sizeBytes > 0 }).sorted(by: { $0.sizeBytes < $1.sizeBytes }).first
+            let downloadedFeatured = featuredItems.filter { $0.isDownloaded }
 
-                if let candidate {
-                    await MainActor.run { self.download(candidate) }
-                    for _ in 0..<30 {
-                        try? await Task.sleep(nanoseconds: 1_000_000_000)
-                        let isReady = await MainActor.run { self.item(id: candidate.id)?.isDownloaded == true }
-                        if isReady {
-                            await MainActor.run { self.heroID = candidate.id }
-                            break
-                        }
+            if downloadedFeatured.isEmpty {
+                // First install: download the first featured item (Waterfall Behind the Pines - ~2MB)
+                let firstCandidate = featuredItems.first!
+                await MainActor.run { self.download(firstCandidate) }
+                for _ in 0..<30 {
+                    try? await Task.sleep(nanoseconds: 1_000_000_000)
+                    let isReady = await MainActor.run { self.item(id: firstCandidate.id)?.isDownloaded == true }
+                    if isReady {
+                        await MainActor.run { self.heroID = firstCandidate.id }
+                        break
                     }
                 }
             } else {
-                // Rotate hero among downloaded wallpapers based on openCount
-                let heroCandidate = downloaded[openCount % downloaded.count]
+                // Rotate hero among downloaded featured wallpapers based on openCount
+                let heroCandidate = downloadedFeatured[openCount % downloadedFeatured.count]
                 await MainActor.run { self.heroID = heroCandidate.id }
 
-                // In background, incrementally download the next un-downloaded wallpaper
-                let next = allItems.first {
-                    !$0.isDownloaded && !$0.isPersonalImport && $0.sizeBytes > 0 &&
-                    !$0.id.hasPrefix(AppleAerials.drawnPrefix) &&
-                    !$0.id.hasPrefix(AppleScreenSavers.idPrefix)
-                }
-                if let next {
-                    try? await Task.sleep(nanoseconds: 4_000_000_000)
+                // In background, incrementally download the next un-downloaded wallpaper strictly from the featured list
+                if let nextToDownload = featuredItems.first(where: { !$0.isDownloaded }) {
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
                     await MainActor.run {
-                        if self.downloads[next.id] == nil {
-                            self.download(next)
+                        if self.downloads[nextToDownload.id] == nil {
+                            self.download(nextToDownload)
                         }
                     }
                 }

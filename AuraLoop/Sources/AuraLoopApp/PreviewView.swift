@@ -47,6 +47,7 @@ struct PreviewView: View {
     @State private var heldSetButtonWidth: CGFloat?
     @State private var customPauseAfter = false
     @State private var previewAudioOn = false
+    @State private var showInfoPopover = false
     @StateObject private var loader = PreviewLoader()
     /// Apple's aerials learn their real size and their sharp picture while
     /// this is open, and this has to redraw when they do.
@@ -169,24 +170,7 @@ struct PreviewView: View {
     private func pillBar(_ item: WallpaperItem) -> some View {
         HStack(spacing: 14) {
             backButton
-            VStack(alignment: .leading, spacing: 3) {
-                Text(item.title)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.AuraLoopInk)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                Text(metaLine(item))
-                    .font(.system(size: 10.5, weight: .medium))
-                    .foregroundStyle(Color.AuraLoopSecondary)
-                if let fitWarning = fitWarning(item) {
-                    Text(fitWarning)
-                        .font(.system(size: 10.5, weight: .semibold))
-                        .foregroundStyle(Color.AuraLoopWarn)
-                        .lineLimit(1)
-                }
-            }
-            .frame(maxWidth: 240, alignment: .leading)
-            .fixedSize(horizontal: true, vertical: false)
+            infoButton(item)
 
             if !isAerial, let url = store.videoURL(for: item, mode: "smooth") {
                 ShareLink(item: shareFile ?? url) {
@@ -310,6 +294,21 @@ struct PreviewView: View {
         .buttonStyle(.plain)
         .keyboardShortcut(.cancelAction)
     }
+
+    private func infoButton(_ item: WallpaperItem) -> some View {
+        Button {
+            showInfoPopover.toggle()
+        } label: {
+            barIcon("info.circle")
+        }
+        .buttonStyle(.plain)
+        .help("Wallpaper details & info")
+        .pointingCursor()
+        .anchoredCard(isPresented: $showInfoPopover, width: 290, align: .leading) {
+            WallpaperInfoCard(item: item, onClose: { showInfoPopover = false })
+        }
+    }
+
 
     /// `opticalYOffset` nudges glyphs whose visual weight sits off the
     /// font-metric center (e.g. share's arrow) so they look centered.
@@ -1081,5 +1080,77 @@ enum ShareFile {
 
     static func clear() {
         try? FileManager.default.removeItem(at: directory)
+    }
+}
+
+
+struct WallpaperInfoCard: View {
+    let item: WallpaperItem
+    let onClose: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.title)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(Color.AuraLoopInk)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if !item.category.isEmpty {
+                        Text(item.category.uppercased())
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(Color.AuraLoopAccent)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(Color.AuraLoopAccent.opacity(0.14)))
+                    }
+                }
+                Spacer()
+                Button(action: onClose) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Color.AuraLoopInk.opacity(0.4))
+                }
+                .buttonStyle(.plain)
+                .pointingCursor()
+            }
+
+            Divider().opacity(0.15)
+
+            VStack(spacing: 9) {
+                if item.width > 0 && item.height > 0 {
+                    infoRow(label: "Resolution", value: "\(item.width) × \(item.height)")
+                }
+                if item.sizeBytes > 0 {
+                    infoRow(label: "File Size", value: formatSize(item.sizeBytes))
+                }
+                if item.duration > 0 {
+                    infoRow(label: "Duration", value: formatDuration(item.duration))
+                }
+                if item.fps > 0 {
+                    infoRow(label: "Frame Rate", value: "\(Int(round(item.fps))) fps")
+                }
+            }
+        }
+        .padding(18)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.AuraLoopInk.opacity(0.12), lineWidth: 1)
+        )
+    }
+
+    private func infoRow(label: String, value: String) -> some View {
+        HStack {
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Color.AuraLoopSecondary)
+            Spacer()
+            Text(value)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color.AuraLoopInk)
+        }
     }
 }

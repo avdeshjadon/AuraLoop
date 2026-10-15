@@ -215,14 +215,23 @@ struct TopBar: View {
 
     private var ink: Color { onMedia ? .white : Color.AuraLoopInk }
 
+    private var isHomeScrolled: Bool {
+        store.tab == .home && store.homeScrolled
+    }
+
     var body: some View {
         ZStack {
             HStack(spacing: 0) {
                 logo
+                    .opacity(isHomeScrolled ? 0 : 1)
+                    .scaleEffect(isHomeScrolled ? 0.92 : 1.0)
+                    .animation(.easeInOut(duration: 0.25), value: isHomeScrolled)
                 Spacer()
                 actions
             }
             navPill
+                .offset(x: isHomeScrolled ? 48 : 0)
+                .animation(.easeInOut(duration: 0.25), value: isHomeScrolled)
         }
         .padding(.leading, 92)   // clear of the traffic lights
         .padding(.trailing, 40)
@@ -290,7 +299,23 @@ struct TopBar: View {
                     store.searchActive = true
                 }
             }
+            .pointingCursor()
+
+            GlassBubbleButton(
+                systemName: Appearance.shared.isLight ? "moon.stars.fill" : "sun.max.fill",
+                glyphScale: 0.42,
+                active: false,
+                help: Appearance.shared.isLight ? "Switch to Dark Appearance" : "Switch to Light Appearance"
+            ) {
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    Appearance.shared.set(Appearance.shared.isLight ? .standard : .light)
+                }
+            }
+            .pointingCursor()
+
             ImportButton()
+                .pointingCursor()
+
             GlassBubbleButton(
                 systemName: "gearshape",
                 glyphScale: 0.44,
