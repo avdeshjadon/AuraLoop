@@ -1,11 +1,11 @@
 name: Intel check
 
-# Runs Muro on real Intel hardware. GitHub's macos-*-intel images are standard
+# Runs AuraLoop on real Intel hardware. GitHub's macos-*-intel images are standard
 # runners, and standard runners are free and unlimited on public repositories.
 #
 # Two jobs, because they answer two different questions.
 #
-# The build job asks whether Muro compiles and passes its tests on Intel. It
+# The build job asks whether AuraLoop compiles and passes its tests on Intel. It
 # has to run on the macOS 26 image, since the interface uses the liquid glass
 # API that only the macOS 26 SDK carries. The older Xcode on the macOS 15
 # image cannot compile that call however the code is written, which is why
@@ -36,12 +36,12 @@ jobs:
           test "$(uname -m)" = "x86_64" || { echo "NOT an Intel runner"; exit 1; }
 
       - name: Build release
-        run: swift build -c release --package-path Muro
+        run: swift build -c release --package-path AuraLoop
 
       - name: Architecture of every binary
         run: |
-          for b in muro-app muro-engine muro-set muro-import muro-publish; do
-            echo "$b: $(lipo -archs "Muro/.build/release/$b")"
+          for b in AuraLoop-app AuraLoop-engine AuraLoop-set AuraLoop-import AuraLoop-publish; do
+            echo "$b: $(lipo -archs "AuraLoop/.build/release/$b")"
           done
 
       - name: Deployment target is still macOS 14
@@ -50,7 +50,7 @@ jobs:
           # Macs the README promises if its minimum stays 14.0. Xcode will
           # happily raise this, and nothing else would notice until an install
           # failed on somebody's Mac.
-          minos=$(otool -l Muro/.build/release/muro-app \
+          minos=$(otool -l AuraLoop/.build/release/AuraLoop-app \
                   | awk '/LC_BUILD_VERSION/{f=1} f&&/minos/{print $2; exit}')
           echo "minos: $minos"
           case "$minos" in
@@ -59,12 +59,12 @@ jobs:
           esac
 
       - name: Tests
-        run: swift test --package-path Muro
+        run: swift test --package-path AuraLoop
 
       - name: The binaries actually run
         run: |
-          Muro/.build/release/muro-publish --help
-          Muro/.build/release/muro-set --displays || true
+          AuraLoop/.build/release/AuraLoop-publish --help
+          AuraLoop/.build/release/AuraLoop-set --displays || true
 
       - name: Decode a real wallpaper with AVFoundation
         run: swift .github/workflows/hevccheck.swift
@@ -74,11 +74,11 @@ jobs:
         with:
           name: intel-binaries
           path: |
-            Muro/.build/release/muro-app
-            Muro/.build/release/muro-engine
-            Muro/.build/release/muro-set
-            Muro/.build/release/muro-import
-            Muro/.build/release/muro-publish
+            AuraLoop/.build/release/AuraLoop-app
+            AuraLoop/.build/release/AuraLoop-engine
+            AuraLoop/.build/release/AuraLoop-set
+            AuraLoop/.build/release/AuraLoop-import
+            AuraLoop/.build/release/AuraLoop-publish
           retention-days: 1
 
   older:
@@ -107,8 +107,8 @@ jobs:
           # A binary built against a newer SDK than this Mac has is exactly
           # what the DMG contains, so failing to launch here is the failure
           # worth catching.
-          bin/muro-publish --help
-          bin/muro-set --displays || true
+          bin/AuraLoop-publish --help
+          bin/AuraLoop-set --displays || true
 
       - name: Decode a real wallpaper with AVFoundation
         run: swift .github/workflows/hevccheck.swift

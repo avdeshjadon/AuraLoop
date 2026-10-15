@@ -1,0 +1,99 @@
+import Foundation
+
+/// What should play where. Written by the UI / `AuraLoop-set`, read (and watched)
+/// by the engine — the same mechanism the full app will use later.
+public struct EngineConfig: Codable {
+    public struct Assignment: Codable {
+        public var wallpaperID: String
+        /// "smooth" (original fps) or "efficient" (30 fps variant)
+        public var mode: String
+
+        public init(wallpaperID: String, mode: String = "smooth") {
+            self.wallpaperID = wallpaperID
+            self.mode = mode
+        }
+    }
+
+    /// Fallback for every display without a specific assignment.
+    public var allDisplays: Assignment?
+    /// Per-display overrides, keyed by display UUID.
+    public var perDisplay: [String: Assignment]
+    /// User pause from the menu bar (nil = false, keeps old configs valid).
+    public var paused: Bool?
+    /// Playback speed 0.5–1.5 (nil = 1.0).
+    public var playbackSpeed: Double?
+    /// Pause while macOS Low Power Mode is on (nil = false).
+    public var autoPauseLowPower: Bool?
+    /// Pause while discharging below 20% battery (nil = false).
+    public var autoPauseBattery: Bool?
+    /// Pause a display's wallpaper while something covers it, a full screen
+    /// app or any window (nil = true, which is how the engine has always
+    /// behaved and is what keeps a hidden wallpaper at 0% CPU).
+    public var autoPauseFullScreen: Bool?
+    /// Play for this many seconds after a wallpaper starts, then freeze on a
+    /// frame (nil or 0 = never freeze). Issue #3: fast wallpapers are
+    /// distracting, so let them move briefly and then settle.
+    public var pauseAfterSeconds: Int?
+    /// Issue #22, "Play only on desktop". Freeze a display's wallpaper while
+    /// any app window is open on that display, and play it only while its
+    /// desktop is clear (nil = false, so every existing install is unchanged).
+    public var playOnlyOnDesktop: Bool?
+    /// Issue #22, the Pause After half. Every time a display's desktop becomes
+    /// clear, Pause After counts again, so the wallpaper plays for that long
+    /// and then freezes. Off (nil = false), Pause After counts only after a
+    /// start, an unlock or a wallpaper change, as it always has.
+    public var replayOnClearDesktop: Bool?
+
+    public init(allDisplays: Assignment? = nil, perDisplay: [String: Assignment] = [:]) {
+        self.allDisplays = allDisplays
+        self.perDisplay = perDisplay
+    }
+
+    public func assignment(forDisplayUUID uuid: String?) -> Assignment? {
+        if let uuid, let specific = perDisplay[uuid] { return specific }
+        return allDisplays
+    }
+
+    // MARK: - Load / save
+
+    public static func configURL(root: URL) -> URL {
+        root.appendingPathComponent("config.json")
+    }
+
+    public static func load(root: URL) -> EngineConfig {
+        guard let data = try? Data(contentsOf: configURL(root: root)) else {
+            return EngineConfig()
+        }
+        return (try? JSONDecoder().decode(EngineConfig.self, from: data)) ?? EngineConfig()
+    }
+
+    public func save(root: URL) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try encoder.encode(self).write(to: EngineConfig.configURL(root: root), options: .atomic)
+    }
+}
+
+/// Picks the actual video file for an assignment: the Efficient variant when
+/// requested and available, otherwise the master.
+public func resolveVideoURL(entry: WallpaperEntry, mode: String, root: URL) -> URL {
+    if mode == "efficient", let efficient = entry.efficientFile {
+        return resolveLibraryFile(efficient, root: root)
+    }
+    return resolveLibraryFile(entry.file, root: root)
+}
+
+/// Where a path in a `WallpaperEntry` actually points.
+///
+/// A manifest path is relative to the library root, which is what lets the
+/// whole library folder be moved without rewriting it. An **absolute** path is
+/// a wallpaper AuraLoop does not own and must not copy: Apple's aerials live in
+/// macOS's own store and are played where they lie.
+///
+/// Written as one function rather than the same check in four places because
+/// getting it wrong is silent. `root.appendingPathComponent("/Users/...")`
+/// produces `<root>/Users/...`, which no file has ever been at, and the only
+/// symptom is a wallpaper that never appears.
+public func resolveLibraryFile(_ path: String, root: URL) -> URL {
+    path.hasPrefix("/") ? URL(fileURLWithPath: path) : root.appendingPathComponent(path)
+}

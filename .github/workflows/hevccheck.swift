@@ -5,7 +5,7 @@ import Foundation
 // silicon Mac still decodes on the Media Engine, so it never exercises Quick
 // Sync. This pulls the live catalog and decodes the same HEVC the app plays.
 func run() async throws {
-    let catalogURL = URL(string: "https://cdn.murowallpaper.com/catalog.json")!
+    let catalogURL = URL(string: "https://cdn.AuraLoopwallpaper.com/catalog.json")!
     let data = try Data(contentsOf: catalogURL)
     let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
     let items = json["wallpapers"] as! [[String: Any]]

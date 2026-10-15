@@ -1,0 +1,259 @@
+import AppKit
+
+/// Library mode: reads library.json + config.json, keeps one wallpaper
+/// window per assigned display, and reconciles whenever the config changes
+/// on disk (hot-reload) or displays are connected/disconnected.
+public final class EngineController {
+    private let root = LibraryManifest.defaultRoot()
+    private var controllers: [String: WallpaperWindowController] = [:]
+    /// Split deliberately. The window's geometry is the only thing that needs
+    /// a rebuild; the video is swapped in place, because tearing the window
+    /// down for a wallpaper change flashed black on every switch.
+    private var frames: [String: String] = [:]
+    private var videos: [String: String] = [:]
+    private var configWatcher: DispatchSourceFileSystemObject?
+    private var observers: [NSObjectProtocol] = []
+    private var diskObservers: [NSObjectProtocol] = []
+    private let power = PowerMonitor()
+    /// Displays whose wallpaper Pause After has frozen.
+    private var settled = Set<String>()
+    private var resting = false
+
+    /// True while every playing screen is frozen by Pause After, false as
+    /// soon as one moves. The app shows Paused in the menu bar from it.
+    public var onRestingChange: ((Bool) -> Void)?
+
+    /// The menu bar's play button while the wallpapers rest: every screen
+    /// plays again and its Pause After clock starts over.
+    public func replayAll() {
+        for controller in controllers.values { controller.replay() }
+    }
+
+    private func noteSettled(_ uuid: String, _ isSettled: Bool) {
+        if isSettled { settled.insert(uuid) } else { settled.remove(uuid) }
+        updateResting()
+    }
+
+    private func updateResting() {
+        settled.formIntersection(controllers.keys)
+        let now = !controllers.isEmpty && settled.count == controllers.count
+        guard now != resting else { return }
+        resting = now
+        onRestingChange?(now)
+    }
+    private let desktopWindows = DesktopWindowMonitor()
+
+    public init() {}
+
+    public func start() {
+        power.onChange = { [weak self] in self?.applyPowerState() }
+        power.start()
+        desktopWindows.onUpdate = { [weak self] covered in self?.applyDesktopCoverage(covered) }
+        reconcile()
+        watchConfigDirectory()
+        observers.append(NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            EngineLog.log("displays changed — reconciling")
+            self?.reconcile()
+        })
+        watchDisks()
+    }
+
+    /// The wallpapers can live on a drive (`DownloadFolder`). When that drive is
+    /// about to be ejected, its wallpapers are let go, or the eject is refused
+    /// because AuraLoop has the files open. When a drive comes or goes, the screens
+    /// are looked at again, so the wallpapers come back by themselves once it
+    /// is plugged in. Looking again is harmless for any other disk: nothing
+    /// that is already right is touched.
+    private func watchDisks() {
+        let center = NSWorkspace.shared.notificationCenter
+        diskObservers.append(center.addObserver(
+            forName: NSWorkspace.willUnmountNotification, object: nil, queue: .main
+        ) { [weak self] note in
+            guard let self,
+                  let volume = note.userInfo?[NSWorkspace.volumeURLUserInfoKey] as? URL,
+                  case .custom(let folder) = DownloadFolder.location(root: self.root),
+                  DownloadFolder.isInside(folder, volume)
+            else { return }
+            EngineLog.log("\(volume.lastPathComponent) is being ejected, letting go of its wallpapers")
+            self.stopAll()
+            // A refused eject never says so. Look again shortly: if the drive
+            // is still there, its wallpapers simply come back.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in self?.reconcile() }
+        })
+        for name in [NSWorkspace.didMountNotification, NSWorkspace.didUnmountNotification] {
+            diskObservers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                self?.reconcile()
+            })
+        }
+    }
+
+    /// Takes every wallpaper window off the screen, for a quit.
+    ///
+    /// AuraLoop's own window is what the desktop shows while AuraLoop runs, so this is
+    /// what hands the screen back to the picture macOS itself holds. Done
+    /// before the process goes rather than by the process going, so the app is
+    /// still alive afterwards to ask for that picture to be drawn again while
+    /// it is the thing on screen.
+    public func stopAll() {
+        for controller in controllers.values { controller.stop() }
+        controllers.removeAll()
+        updateResting()
+        frames.removeAll()
+        videos.removeAll()
+    }
+
+    /// Watches the library root for writes; config.json is saved atomically
+    /// so directory-level write events are the reliable signal.
+    private func watchConfigDirectory() {
+        let fd = open(root.path, O_EVTONLY)
+        guard fd >= 0 else {
+            EngineLog.log("warning: cannot watch \(root.path)")
+            return
+        }
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd, eventMask: [.write], queue: .main
+        )
+        source.setEventHandler { [weak self] in self?.reconcile() }
+        source.setCancelHandler { close(fd) }
+        source.resume()
+        configWatcher = source
+    }
+
+    private func reconcile() {
+        // A manifest that could not be read is not an empty library. Treating
+        // it as one leaves nothing assigned to any display, and the engine
+        // answers that by taking every wallpaper off the screen: a damaged
+        // file would blank the desktop as well as stalling the app.
+        var manifest: LibraryManifest
+        switch LibraryManifest.state(root: root) {
+        case .loaded(let loaded):
+            manifest = loaded
+        case .missing:
+            manifest = LibraryManifest()
+        case .damaged:
+            EngineLog.log("library.json could not be read — leaving the screen as it is")
+            return
+        }
+
+        // Apple's own aerials, which live in macOS's store and are never
+        // copied into library.json. Built here, from Apple's manifest, so
+        // assigning one resolves like any other wallpaper and AuraLoop's library
+        // file is left exactly as the user's own wallpapers left it.
+        manifest.wallpapers += AppleAerials.libraryEntries(libraryRoot: root)
+        let config = EngineConfig.load(root: root)
+
+        var desired: [String: (screen: NSScreen, url: URL, frame: String,
+                               video: String, pauseAfter: Int?)] = [:]
+        for screen in NSScreen.screens {
+            guard let uuid = displayUUID(for: screen) else { continue }
+            guard let assignment = config.assignment(forDisplayUUID: uuid),
+                  let entry = manifest.wallpapers.first(where: { $0.id == assignment.wallpaperID })
+            else { continue }
+            let url = resolveVideoURL(entry: entry, mode: assignment.mode, root: root)
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                EngineLog.log("skipping \(entry.title) — missing file \(url.lastPathComponent)")
+                continue
+            }
+            desired[uuid] = (
+                screen,
+                url,
+                NSStringFromRect(screen.frame),
+                "\(entry.id)|\(assignment.mode)",
+                // A wallpaper may carry its own "pause after"; otherwise the
+                // one global setting applies. `PauseAfter` owns the rule,
+                // including the part that is easy to get wrong: a wallpaper
+                // set to zero never freezes and does not fall back.
+                PauseAfter.resolve(
+                    wallpaper: entry.pauseAfterSeconds,
+                    global: config.pauseAfterSeconds
+                )
+            )
+        }
+
+        // Tear down displays that lost their assignment, or whose geometry
+        // changed. A resolution or arrangement change genuinely needs a new
+        // window; a different wallpaper does not.
+        for (uuid, controller) in controllers where desired[uuid]?.frame != frames[uuid] {
+            controller.stop()
+            controllers[uuid] = nil
+            frames[uuid] = nil
+            videos[uuid] = nil
+        }
+
+        // Bring up displays that need a (new) wallpaper.
+        for (uuid, want) in desired where controllers[uuid] == nil {
+            let controller = WallpaperWindowController(screen: want.screen, videoURL: want.url)
+            controller.onSettledChange = { [weak self] isSettled in self?.noteSettled(uuid, isSettled) }
+            controller.start()
+            controllers[uuid] = controller
+            frames[uuid] = want.frame
+            videos[uuid] = want.video
+            EngineLog.log("applied \(want.url.lastPathComponent) → \(want.screen.localizedName)")
+        }
+
+        // Same window, different wallpaper: crossfade to it in place.
+        for (uuid, want) in desired {
+            guard let controller = controllers[uuid], videos[uuid] != want.video else { continue }
+            controller.setVideo(url: want.url)
+            videos[uuid] = want.video
+        }
+
+        // A screen that went away is no longer resting.
+        updateResting()
+
+        // Live-applied state that never needs a window rebuild.
+        let paused = config.paused ?? false
+        let rate = Float(config.playbackSpeed ?? 1.0)
+        let pauseWhenCovered = config.autoPauseFullScreen ?? true
+        for (uuid, controller) in controllers {
+            controller.setUserPaused(paused)
+            controller.setPlaybackRate(rate)
+            controller.setAutoPauseFullScreen(pauseWhenCovered)
+            controller.setPauseAfter(desired[uuid]?.pauseAfter)
+        }
+        applyPowerState(config: config)
+        applyDesktopRules(config: config)
+    }
+
+    /// Issue #22. Hands both desktop switches to every display, and keeps the
+    /// window check running only while one of them is on, so nobody pays for
+    /// it otherwise.
+    private func applyDesktopRules(config: EngineConfig) {
+        let playOnlyOnDesktop = config.playOnlyOnDesktop ?? false
+        let replayOnClearDesktop = config.replayOnClearDesktop ?? false
+        for controller in controllers.values {
+            controller.setDesktopRules(
+                playOnlyOnDesktop: playOnlyOnDesktop, replayOnClearDesktop: replayOnClearDesktop
+            )
+        }
+        if DesktopPlayback.needsWindowCheck(
+            playOnlyOnDesktop: playOnlyOnDesktop, replayOnClearDesktop: replayOnClearDesktop
+        ) {
+            desktopWindows.start()
+        } else {
+            desktopWindows.stop()
+            for controller in controllers.values { controller.setDesktopCovered(nil) }
+        }
+    }
+
+    private func applyDesktopCoverage(_ covered: Set<String>) {
+        for (uuid, controller) in controllers {
+            controller.setDesktopCovered(covered.contains(uuid))
+        }
+    }
+
+    /// Combines the Settings toggles (from config.json) with the live power
+    /// state. Runs on every reconcile (config edits, display changes) and on
+    /// every PowerMonitor flip, so both sides stay in sync.
+    private func applyPowerState(config: EngineConfig? = nil) {
+        let config = config ?? EngineConfig.load(root: root)
+        let lowPower = (config.autoPauseLowPower ?? false) && power.isLowPowerMode
+        let lowBattery = (config.autoPauseBattery ?? false) && power.isLowBattery
+        for controller in controllers.values {
+            controller.setPowerPause(lowPower: lowPower, lowBattery: lowBattery)
+        }
+    }
+}

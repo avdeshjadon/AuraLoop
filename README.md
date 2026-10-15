@@ -1,8 +1,18 @@
 <div align="center">
 
-<img src="assets/icon-dark.png" width="120" alt="Muro">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/icon-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="assets/icon.png">
+  <img src="assets/icon-dark.png" width="124" alt="AuraLoop Icon">
+</picture>
 
-# Muro
+<br><br>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/auraloop-wordmark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="assets/auraloop-wordmark-dark.svg">
+  <img src="assets/auraloop-wordmark.svg" width="320" alt="AuraLoop">
+</picture>
 
 ### Live wallpapers for your Mac, with low CPU and RAM usage. Free.
 
@@ -10,9 +20,9 @@
 ![Universal](https://img.shields.io/badge/Universal-Apple_Silicon_%2B_Intel-black?logo=apple)
 ![License](https://img.shields.io/badge/License-PolyForm_Shield-green)
 ![Price](https://img.shields.io/badge/Price-Free-brightgreen)
-[![Website](https://img.shields.io/badge/Website-murowallpaper.com-A9C4FF)](https://murowallpaper.com)
-[![Download](https://img.shields.io/badge/⬇_Download-Muro-A9C4FF)](../../releases/latest)
-[![Buy a coffee](https://img.shields.io/badge/Buy_a_coffee-FFDD00)](https://github.com/sponsors/MrRockySL)
+[![Website](https://img.shields.io/badge/Website-AuraLoopwallpaper.com-A9C4FF)](https://AuraLoopwallpaper.com)
+[![Download](https://img.shields.io/badge/⬇_Download-AuraLoop-A9C4FF)](../../releases/latest)
+[![Buy a coffee](https://img.shields.io/badge/Buy_a_coffee-FFDD00)](https://github.com/sponsors/AvdeshJadon)
 
 </div>
 
@@ -27,9 +37,9 @@ holding the good wallpapers hostage.
 Most of them are Electron apps wrapping a web page. They sit at 300 to 400 MB of
 RAM and keep your CPU warm all day, for a picture that moves.
 
-## What Muro does
+## What AuraLoop does
 
-Muro is a native macOS app that plays looping video wallpapers on every display,
+AuraLoop is a native macOS app that plays looping video wallpapers on every display,
 and lets you browse them in a full screen gallery. It's written in Swift and
 SwiftUI, hands video decoding to your Mac's media hardware instead of the CPU,
 and pauses itself the moment you can't see it.
@@ -43,7 +53,7 @@ wallpaper and every feature is unlocked.
 
 - 🌙 **Live video wallpapers.** Looping, seamless, on every display at once.
 - 🔒 **Lock screen live wallpapers.** Play a wallpaper on your lock screen too, not just the desktop. Set it to the desktop, the lock screen, or both, on every display. Requires macOS 26 or newer.
-- 🖥️ **Screen saver.** Muro can be your screen saver as well, playing video rather than a still picture, and you set how long your Mac waits before it starts. Requires macOS 26 or newer.
+- 🖥️ **Screen saver.** AuraLoop can be your screen saver as well, playing video rather than a still picture, and you set how long your Mac waits before it starts. Requires macOS 26 or newer.
 - 🍎 **The Apple section.** Apple's aerials, Dynamic Wallpapers and screen savers in a tab of their own. The screen savers come as seamless 4K videos, so they play smoothly on the desktop and the lock screen too.
 - 🪶 **Very low CPU usage.** HEVC decoded in hardware, never on the CPU.
 - 😴 **Pauses itself** on full screen apps, display sleep, screen lock, Low Power Mode and low battery. A paused wallpaper uses no CPU at all.
@@ -55,9 +65,9 @@ wallpaper and every feature is unlocked.
 - ⏱️ **Automations.** Give every wallpaper its own time. Ten seconds each, or a full day schedule where each wallpaper has its own hours.
 - ⏸️ **Pause after a set time.** Let a wallpaper play for a while after it changes or after you unlock, then hold still. Set it in seconds, minutes or hours, for everything or for one wallpaper, and turn on Replay on Clear Desktop to get that time again whenever your desktop is clear.
 - 🗑️ **Delete what you do not want.** Remove wallpapers one at a time or several at once, imported videos included.
-- 📥 **Import your own.** Drop in any video and it gets transcoded once to HEVC and added to your library. Screen savers too: add `.saver` files like XScreenSaver and set them from Muro.
+- 📥 **Import your own.** Drop in any video and it gets transcoded once to HEVC and added to your library. Screen savers too: add `.saver` files like XScreenSaver and set them from AuraLoop.
 - 🎛️ **Menu bar controls.** Play, pause, skip and switch wallpapers without opening the app.
-- ✨ **Tells you when there is a new Muro.** What's New shows what changed in the release and downloads it for you.
+- ✨ **Tells you when there is a new AuraLoop.** What's New shows what changed in the release and downloads it for you.
 - 💾 **Space control.** See what each wallpaper costs on disk, remove downloads you're done with, or keep them all on another drive.
 - 🆓 **Free and source available.** Anyone can use it and read the code.
 
@@ -72,11 +82,11 @@ wallpaper and every feature is unlocked.
 ## What it looks like
 
 <p align="center">
-  <img src="screenshots/muro-6-demo.gif" width="820" alt="The Muro home gallery with a live wallpaper playing behind the featured banner">
+  <img src="screenshots/AuraLoop-6-demo.gif" width="820" alt="The AuraLoop home gallery with a live wallpaper playing behind the featured banner">
 </p>
 
 <p align="center">
-  <a href="https://github.com/MrRockySL/Muro/releases/latest/download/muro-demo.mp4"><strong>Watch Muro in action</strong></a>
+  <a href="https://github.com/avdeshjadon/AuraLoop/releases/latest/download/AuraLoop-demo.mp4"><strong>Watch AuraLoop in action</strong></a>
 </p>
 
 ---
@@ -86,27 +96,27 @@ wallpaper and every feature is unlocked.
 ### Homebrew
 
 ```bash
-brew install --cask MrRockySL/muro/muro
+brew install --cask AvdeshJadon/AuraLoop/AuraLoop
 ```
 
 ### Manual download
 
-1. Download the latest DMG from [murowallpaper.com](https://murowallpaper.com) or the [Releases](../../releases/latest) page.
-2. Open it and drag Muro into your Applications folder.
+1. Download the latest DMG from [AuraLoopwallpaper.com](https://AuraLoopwallpaper.com) or the [Releases](../../releases/latest) page.
+2. Open it and drag AuraLoop into your Applications folder.
 
-On first launch, let it through macOS security. Muro is free and self signed
+On first launch, let it through macOS security. AuraLoop is free and self signed
 rather than carrying a paid Apple notarised certificate, so macOS blocks the
-first launch with a *"can't be opened… Apple could not verify it is free of
-malware"* warning. To get past it:
+first launch with a _"can't be opened… Apple could not verify it is free of
+malware"_ warning. To get past it:
 
 1. Double click the app once, then close the warning.
 2. Open System Settings, go to Privacy & Security, scroll down to the message
-   about Muro, and click **Open Anyway**, then **Open** to confirm.
+   about AuraLoop, and click **Open Anyway**, then **Open** to confirm.
 3. On older macOS, you can right click the app instead, then pick Open twice.
 
 Open Explore, pick a wallpaper, hit Apply. Done.
 
-> Muro keeps running in your menu bar after you close the window. That's what
+> AuraLoop keeps running in your menu bar after you close the window. That's what
 > keeps your wallpaper playing. Use the menu bar icon to control it, or Quit to
 > stop it.
 
@@ -114,9 +124,9 @@ Open Explore, pick a wallpaper, hit Apply. Done.
 
 ## Set it and forget it
 
-Muro can change your wallpaper for you, two different ways.
+AuraLoop can change your wallpaper for you, two different ways.
 
-**On a timer.** Pick a set of wallpapers, give each one a length, and Muro
+**On a timer.** Pick a set of wallpapers, give each one a length, and AuraLoop
 cycles through them. Ten seconds each, or an hour each, whatever suits. Every
 change is a crossfade, never a black flash.
 
@@ -140,7 +150,7 @@ you unlock your Mac, then hold still on a frame. Set it in seconds, minutes or
 hours. It applies to everything by default, and any single wallpaper can
 override it or opt out entirely.
 
-A held frame costs no CPU at all, so this is the lightest Muro ever gets while
+A held frame costs no CPU at all, so this is the lightest AuraLoop ever gets while
 still showing you something you chose.
 
 ---
@@ -165,7 +175,7 @@ Both are off by default.
 
 ## Your screen saver too
 
-On macOS 26 or newer, Muro can be your screen saver as well, playing the video
+On macOS 26 or newer, AuraLoop can be your screen saver as well, playing the video
 rather than a still picture. Open a wallpaper, pick **Screensaver** in the apply
 card, and set it.
 
@@ -182,7 +192,7 @@ Library.
 
 The Apple tab holds Apple's own aerials and Dynamic Wallpapers, in Apple's own
 categories. Aerials download straight from Apple and play like any other
-wallpaper in Muro. The still pictures and the drawn ones are handed to macOS,
+wallpaper in AuraLoop. The still pictures and the drawn ones are handed to macOS,
 because only macOS can show them.
 
 Apple's screen savers are there too, Flurry, Hello, Drift and the rest, as
@@ -201,13 +211,13 @@ Nothing is ever deleted without asking first, and deleting a wallpaper cleans up
 everything that pointed at it: playlists, automations, and the lock screen.
 
 Want them on another drive? Settings has **Download Folder**: pick a folder and
-Muro moves your wallpapers there, shows how far it is, and lets you cancel.
+AuraLoop moves your wallpapers there, shows how far it is, and lets you cancel.
 
 ---
 
-## Muro tells you when there is a new version
+## AuraLoop tells you when there is a new version
 
-When a new Muro is released, the What's New button in the top bar picks it up on
+When a new AuraLoop is released, the What's New button in the top bar picks it up on
 its own. You get a dot on the button and a small note saying an update is
 available.
 
@@ -221,7 +231,7 @@ notes for the version you are already running sit underneath.
 
 You never have to update the app to get new wallpapers.
 
-Muro re-reads its online catalog every time it launches or comes to the front,
+AuraLoop re-reads its online catalog every time it launches or comes to the front,
 so anything newly published shows up in your Explore tab within about a minute.
 This works on every install that already exists, including older versions.
 
@@ -233,44 +243,44 @@ Library tab whenever you want the space back.
 ## Build from source
 
 ```bash
-git clone https://github.com/MrRockySL/Muro.git
-cd Muro/Muro
+git clone https://github.com/avdeshjadon/AuraLoop.git
+cd AuraLoop/AuraLoop
 ./build-app.sh --install     # builds, bundles, signs, installs to /Applications
 ```
 
-`./build-app.sh --dmg` also produces `dist/Muro-<version>.dmg`.
+`./build-app.sh --dmg` also produces `dist/AuraLoop-<version>.dmg`.
 
-The package builds MuroKit, which holds the shared engine and library code, the
-app itself, and a handful of command line tools (`muro-engine`, `muro-import`,
-`muro-set`, `muro-prepare` and `muro-publish`) that read the same config and
-library files as the app. It also builds `muro-saver-picture`, the small helper
+The package builds AuraLoopKit, which holds the shared engine and library code, the
+app itself, and a handful of command line tools (`AuraLoop-engine`, `AuraLoop-import`,
+`AuraLoop-set`, `AuraLoop-prepare` and `AuraLoop-publish`) that read the same config and
+library files as the app. It also builds `AuraLoop-saver-picture`, the small helper
 the app uses to take a picture of an imported screen saver.
 
 ---
 
 ## How it works
 
-Muro is native the whole way down: Swift, SwiftUI and AVFoundation. No Electron,
+AuraLoop is native the whole way down: Swift, SwiftUI and AVFoundation. No Electron,
 no web views.
 
 The wallpaper is a video playing in a window that sits just below your desktop
 icons, decoded in hardware by your Mac's video engine, so the CPU barely
-participates. The moment the wallpaper can't be seen, Muro pauses it, and a
+participates. The moment the wallpaper can't be seen, AuraLoop pauses it, and a
 paused wallpaper costs nothing.
 
 ---
 
-## Support Muro
+## Support AuraLoop
 
 <div align="center">
 
-Muro is free, and it stays that way. No Pro tier, no paywall, no account,
+AuraLoop is free, and it stays that way. No Pro tier, no paywall, no account,
 nothing held back.
 
-If you enjoy Muro, you can buy the developer a coffee to help keep the work
-going and keep Muro free for everyone.
+If you enjoy AuraLoop, you can buy the developer a coffee to help keep the work
+going and keep AuraLoop free for everyone.
 
-[![Buy a coffee for the developer](https://img.shields.io/badge/Buy%20a%20coffee%20for%20the%20developer-FFDD00?style=for-the-badge)](https://github.com/sponsors/MrRockySL)
+[![Buy a coffee for the developer](https://img.shields.io/badge/Buy%20a%20coffee%20for%20the%20developer-FFDD00?style=for-the-badge)](https://github.com/sponsors/AvdeshJadon)
 
 </div>
 
@@ -280,13 +290,13 @@ going and keep Muro free for everyone.
 
 <div align="center">
 
-**They showed the developer their love. They keep Muro free for everyone.** ❤️
+**They showed the developer their love. They keep AuraLoop free for everyone.** ❤️
 
 <table>
 <tr>
-<td align="center" valign="top" width="180"><a href="https://github.com/deimosfr"><img src="assets/sponsors/deimosfr.png" width="72" alt="Pierre Mavro"><br><b>Pierre Mavro</b></a><br><sub>Muro's first sponsor.</sub></td>
-<td align="center" valign="top" width="180"><a href="https://github.com/alexblunck"><img src="assets/sponsors/alexblunck.png" width="72" alt="Alexander Blunck"><br><b>Alexander Blunck</b></a><br><sub>Muro's top sponsor.</sub></td>
-<td align="center" valign="top" width="180"><a href="https://github.com/fleurscreed-gif"><img src="assets/sponsors/fleurscreed-gif.png" width="72" alt="fleurscreed-gif"><br><b>fleurscreed-gif</b></a><br><sub>Muro's sponsor.</sub></td>
+<td align="center" valign="top" width="180"><a href="https://github.com/deimosfr"><img src="assets/sponsors/deimosfr.png" width="72" alt="Pierre Mavro"><br><b>Pierre Mavro</b></a><br><sub>AuraLoop's first sponsor.</sub></td>
+<td align="center" valign="top" width="180"><a href="https://github.com/alexblunck"><img src="assets/sponsors/alexblunck.png" width="72" alt="Alexander Blunck"><br><b>Alexander Blunck</b></a><br><sub>AuraLoop's top sponsor.</sub></td>
+<td align="center" valign="top" width="180"><a href="https://github.com/fleurscreed-gif"><img src="assets/sponsors/fleurscreed-gif.png" width="72" alt="fleurscreed-gif"><br><b>fleurscreed-gif</b></a><br><sub>AuraLoop's sponsor.</sub></td>
 </tr>
 </table>
 
@@ -303,11 +313,11 @@ Found a bug, have an idea, or want to improve something?
 
 ## License
 
-Muro is free for everyone to use, at home or at work. Its code is public under the
+AuraLoop is free for everyone to use, at home or at work. Its code is public under the
 [PolyForm Shield 1.0.0](LICENSE) license: you can read it, learn from it and send
-changes. You may not release Muro, or a copy or changed version of it, as your own
+changes. You may not release AuraLoop, or a copy or changed version of it, as your own
 app, free or paid, without my permission. Want to build on it?
-[Open an issue](../../issues) or [email me](mailto:mrrockyslx@gmail.com) first.
+[Open an issue](../../issues) or [email me](mailto:AvdeshJadonx@gmail.com) first.
 
 Code published before 21 September 2026, including every release up to 5.0, stays
 under the MIT license it came with.
@@ -316,4 +326,4 @@ The wallpaper videos are not covered by this license. Each one belongs to its
 original creator and is redistributed here under its own terms. See
 [NOTICE](NOTICE.md).
 
-Made by [MrRockySL](https://github.com/MrRockySL).
+Made by [AvdeshJadon](https://github.com/avdeshjadon).

@@ -1,0 +1,309 @@
+import SwiftUI
+import AuraLoopKit
+
+/// One delete, waiting for an answer. Every place that can delete a wallpaper
+/// raises one of these rather than deleting on the spot, so the wording, the
+/// keyboard handling and the look are the same wherever it came from.
+struct DeleteRequest: Identifiable, Equatable {
+    let id = UUID()
+    var items: [WallpaperItem]
+    /// Raised by "Remove Download", so the sheet uses the same words as the
+    /// menu item that opened it rather than "Delete".
+    var removingDownload = false
+
+    static func == (lhs: DeleteRequest, rhs: DeleteRequest) -> Bool { lhs.id == rhs.id }
+}
+
+/// AuraLoop's own confirmation, in the app's dark glass rather than a system
+/// alert. macOS alerts are light, square and centred on the screen, which is
+/// the one place in the app the user would meet a control that looks nothing
+/// like the rest of it.
+struct ConfirmDeleteView: View {
+    @EnvironmentObject var store: AppStore
+    @Environment(\.dismiss) private var dismiss
+    let request: DeleteRequest
+
+    private static let danger = Color(hex: 0xFF6B6B)
+
+    private var items: [WallpaperItem] { request.items }
+    private var personal: [WallpaperItem] { items.filter { $0.remote == nil } }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            header
+            thumbStrip
+                .padding(.top, 20)
+            if !notices.isEmpty {
+                HStack(spacing: 8) {
+                    ForEach(notices, id: \.self) { noticeChip($0) }
+                }
+                .padding(.top, 16)
+            }
+            if let scheduleLine {
+                HStack(alignment: .firstTextBaseline, spacing: 7) {
+                    Image(systemName: "list.bullet.rectangle")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.AuraLoopWarn)
+                    Text(scheduleLine)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.AuraLoopInk.opacity(0.85))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.top, notices.isEmpty ? 16 : 12)
+            }
+            buttons
+                .padding(.top, 24)
+        }
+        .padding(26)
+        .frame(width: 440)
+        // Every other sheet in AuraLoop is built on this, and this one was the
+        // only place painting itself flat `AuraLoopBG`. That single line is most
+        // of why it looked like it came from a different app.
+        .sheetSurface()
+        .AuraLoopColorScheme()
+    }
+
+    /// Icon, question, and one line of consequence. The line used to be three
+    /// stacked sentences below the thumbnails, which read as a list to skim
+    /// past rather than a warning to weigh, and pushed the buttons so far down
+    /// that the thing being deleted had scrolled out of mind by the time you
+    /// reached them.
+    private var header: some View {
+        HStack(alignment: .top, spacing: 13) {
+            ZStack {
+                Circle().fill(Self.danger.opacity(0.14))
+                Image(systemName: "trash")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Self.danger)
+            }
+            .frame(width: 40, height: 40)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 16.5, weight: .semibold))
+                    .foregroundStyle(Color.AuraLoopInk)
+                Text(subtitle)
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(permanent ? Self.danger.opacity(0.95) : Color.AuraLoopSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.top, 1)
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var buttons: some View {
+        HStack(spacing: 10) {
+            Spacer()
+            Button { dismiss() } label: {
+                Text("Cancel")
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(Color.AuraLoopInk)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 8)
+                    .glassCapsule(fill: 0.09, stroke: 0.15)
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut(.cancelAction)
+
+            Button {
+                store.deleteWallpapers(items)
+                dismiss()
+            } label: {
+                Text(actionWord + (items.count > 1 ? " \(items.count)" : ""))
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(Color.AuraLoopInk)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 8)
+                    .background(Capsule().fill(Self.danger.opacity(0.9)))
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut(.defaultAction)
+        }
+    }
+
+    /// Amber, not red. Red is the delete button, and a warning that shouts as
+    /// loudly as the action makes neither of them mean anything. These say
+    /// "this one is in use", which is a reason to look again, not a danger.
+    ///
+    /// Shaped like `AppliedChip`, which is the app's existing way of marking a
+    /// wallpaper's state, so it is a vocabulary the user has already met on
+    /// the Home hero rather than a new one invented for this sheet.
+    private func noticeChip(_ text: String) -> some View {
+        HStack(spacing: 6) {
+            Circle().fill(Color.AuraLoopWarn).frame(width: 5.5, height: 5.5)
+            Text(text)
+                .font(.system(size: 9.5, weight: .semibold))
+                .tracking(0.9)
+                .foregroundStyle(Color.AuraLoopInk.opacity(0.92))
+        }
+        .padding(.leading, 9)
+        .padding(.trailing, 11)
+        .padding(.vertical, 5)
+        .background(Capsule().fill(Color.AuraLoopWarn.opacity(0.12)))
+        .overlay(Capsule().strokeBorder(Color.AuraLoopWarn.opacity(0.26), lineWidth: 1))
+    }
+
+    // MARK: - Thumbnails
+
+    /// Seeing the thing you are about to destroy is the whole reason this is
+    /// a sheet and not a line of text.
+    /// Sized to the 388pt of content this sheet actually has, which the old
+    /// numbers were not: four 96pt thumbnails with an overflow count beside
+    /// them came to 440pt inside a 392pt space, so a five wallpaper delete ran
+    /// off both edges. Three plus the counter fits with room to spare.
+    ///
+    /// A single wallpaper gets a real 16:9 frame rather than the old 3.6:1
+    /// letterbox, which cut the top and bottom off the one picture the sheet
+    /// exists to show you.
+    @ViewBuilder private var thumbStrip: some View {
+        let overflow = items.count > 4
+        let visible = Array(items.prefix(overflow ? 3 : 4))
+        let single = items.count == 1
+        let radius: CGFloat = single ? 14 : 9
+        HStack(spacing: 8) {
+            ForEach(visible) { item in
+                Color.black
+                    .frame(width: single ? 388 : 91, height: single ? 218 : 51)
+                    .overlay(ThumbImage(item: item))
+                    .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: radius, style: .continuous)
+                            .strokeBorder(Color.AuraLoopInk.opacity(0.08), lineWidth: 1)
+                    )
+            }
+            if overflow {
+                Text("+\(items.count - 3)")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.AuraLoopSecondary)
+                    .frame(width: 44, height: 51)
+                    .background(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .fill(.glassSheen(0.08, 0.03))
+                    )
+            }
+        }
+    }
+
+    // MARK: - Words
+
+    /// "Remove Download" opened a sheet asking "Delete this wallpaper?" (full
+    /// check, 2026-10-01). A request from that menu item keeps its words.
+    private var actionWord: String { request.removingDownload ? "Remove" : "Delete" }
+
+    private var title: String {
+        if request.removingDownload {
+            return items.count == 1 ? "Remove this download?" : "Remove \(items.count) downloads?"
+        }
+        if onlySavers {
+            return items.count == 1 ? "Delete this screen saver?" : "Delete \(items.count) screen savers?"
+        }
+        return items.count == 1 ? "Delete this wallpaper?" : "Delete \(items.count) wallpapers?"
+    }
+
+    /// The person's own screen savers. They go to the Trash rather than for
+    /// good, and are never downloaded again, so they get words of their own.
+    private var savers: [WallpaperItem] {
+        items.filter { $0.id.hasPrefix(AppleScreenSavers.installedIDPrefix) }
+    }
+
+    private var onlySavers: Bool { !savers.isEmpty && savers.count == items.count }
+
+    /// Said instead of the download line when screen savers are in it.
+    private var saverLine: String? {
+        if onlySavers { return items.count == 1 ? "It goes to the Trash." : "They go to the Trash." }
+        if !savers.isEmpty, personal.isEmpty {
+            return "Screen savers go to the Trash. The others you can download again."
+        }
+        return nil
+    }
+
+    /// At least one of these cannot be got back.
+    private var permanent: Bool { !personal.isEmpty }
+
+    /// One line, and only ever about the single thing a person actually needs
+    /// to decide with: can I get this back?
+    ///
+    /// The wallpaper titles came out of it. They were being read aloud in a
+    /// sentence directly under a picture of the same wallpaper, which is the
+    /// thumbnail's job and it does it better.
+    private var subtitle: String {
+        if let saverLine { return saverLine }
+        if personal.isEmpty {
+            return items.count == 1
+                ? "You can download it again any time."
+                : "You can download them again any time."
+        }
+        if personal.count == items.count {
+            return items.count == 1
+                ? "This is your own video. Deleting it is permanent."
+                : "These are your own videos. Deleting them is permanent."
+        }
+        return personal.count == 1
+            ? "1 is your own video, and that one is permanent."
+            : "\(personal.count) are your own videos, and those are permanent."
+    }
+
+    /// What is currently in use, as chips rather than sentences. Two lines of
+    /// prose became two short labels, which is the whole point: state is
+    /// something you glance at, not something you read.
+    private var notices: [String] {
+        var out: [String] = []
+        if let playing = playingNotice { out.append(playing) }
+        if lockScreenAffected { out.append("LOCK SCREEN") }
+        if screenSaverAffected { out.append("SCREEN SAVER") }
+        return out
+    }
+
+    /// Naming the display only when there is exactly one wallpaper on exactly
+    /// one screen. It also sidesteps a real bug in the sentence this replaced:
+    /// deleting three wallpapers with one of them playing produced "1 of them
+    /// are playing", because the count and the verb were chosen separately.
+    /// A label with no verb in it cannot disagree with itself.
+    private var playingNotice: String? {
+        let applied = items.filter { !store.appliedDisplays(for: $0.id).isEmpty }
+        guard let first = applied.first else {
+            // Apple's pictures are shown by macOS rather than played by AuraLoop.
+            let shown = items.contains {
+                AppleAerials.isMacOSOnly($0.id) && !store.appliedPlaces(for: $0.id).isEmpty
+            }
+            return shown ? "SHOWING NOW" : nil
+        }
+        let displays = store.appliedDisplays(for: first.id)
+        if applied.count == 1, displays.count == 1, let display = displays.first {
+            return "PLAYING ON \(friendly(display).uppercased())"
+        }
+        return "PLAYING NOW"
+    }
+
+    /// The playlists and automations a delete takes these out of. The sheet
+    /// said where a wallpaper was playing and not that a playlist would come
+    /// out of it smaller (full check, 2026-10-01); the delete already prunes
+    /// them, so this only says so out loud.
+    private var scheduleLine: String? {
+        let ids = Set(items.map(\.id))
+        let names = store.playlists.filter { !ids.isDisjoint(with: $0.wallpaperIDs) }.map(\.name)
+            + store.automations.filter { $0.steps.contains { ids.contains($0.wallpaperID) } }.map(\.name)
+        guard let last = names.last else { return nil }
+        let list: String
+        switch names.count {
+        case 1: list = last
+        case 2, 3: list = names.dropLast().joined(separator: ", ") + " and " + last
+        default: list = "\(names.count) playlists and automations"
+        }
+        return (items.count == 1 ? "It also comes out of " : "They also come out of ") + list + "."
+    }
+
+    private var lockScreenAffected: Bool {
+        guard let lockID = store.lockScreenWallpaperID else { return false }
+        return items.contains { $0.id == lockID }
+    }
+
+    private var screenSaverAffected: Bool {
+        guard let saverID = store.screenSaverWallpaperID else { return false }
+        return items.contains { $0.id == saverID }
+    }
+
+    private func friendly(_ display: DisplayInfo) -> String {
+        display.displayName
+    }
+}
