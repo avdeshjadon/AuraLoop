@@ -8,7 +8,7 @@ set -e
 # The one place AuraLoop's version is written. The app bundle, the wallpaper
 # extension and the DMG name are all derived from these two lines, and the
 # build fails below if the app and the extension ever disagree.
-VERSION="6.0.4"
+VERSION="6.0.5"
 BUILD="108"
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -165,12 +165,43 @@ for arg in "$@"; do
     --dmg)
         DMG="$DIR/dist/AuraLoop-$VERSION.dmg"
         STAGING="$DIR/dist/dmg-staging"
-        echo "==> building $DMG"
+        BG_IMG="$DIR/assets/dmg-background.png"
+        VOL_ICON="$DIR/Icon/AppIcon.icns"
+        echo "==> building custom $DMG"
         rm -rf "$STAGING" "$DMG"
         mkdir -p "$STAGING"
         cp -R "$APP" "$STAGING/AuraLoop.app"
-        ln -s /Applications "$STAGING/Applications"
-        hdiutil create -volname "AuraLoop" -srcfolder "$STAGING" -format UDZO -quiet "$DMG"
+
+        if command -v create-dmg >/dev/null 2>&1; then
+            echo "==> creating stylized installer DMG with create-dmg"
+            create-dmg \
+                --volname "AuraLoop" \
+                --volicon "$VOL_ICON" \
+                --background "$BG_IMG" \
+                --window-pos 200 120 \
+                --window-size 660 440 \
+                --icon-size 128 \
+                --text-size 13 \
+                --icon "AuraLoop.app" 160 250 \
+                --app-drop-link 500 250 \
+                --hide-extension "AuraLoop.app" \
+                --format UDZO \
+                --filesystem HFS+ \
+                --overwrite \
+                "$DMG" \
+                "$STAGING" || true
+        else
+            echo "Notice: create-dmg not installed, creating standard DMG with custom volume icon"
+            ln -s /Applications "$STAGING/Applications"
+            cp "$VOL_ICON" "$STAGING/.VolumeIcon.icns" 2>/dev/null || true
+            mkdir -p "$STAGING/.background"
+            cp "$BG_IMG" "$STAGING/.background/background.png" 2>/dev/null || true
+            SetFile -c icnC "$STAGING/.VolumeIcon.icns" 2>/dev/null || true
+            SetFile -a C "$STAGING" 2>/dev/null || true
+            SetFile -a V "$STAGING/.VolumeIcon.icns" 2>/dev/null || true
+            SetFile -a V "$STAGING/.background" 2>/dev/null || true
+            hdiutil create -volname "AuraLoop" -srcfolder "$STAGING" -format UDZO -quiet "$DMG"
+        fi
         rm -rf "$STAGING"
         echo "==> dmg: $DMG"
         ;;

@@ -50,6 +50,9 @@ jobs:
           AuraLoop/.build/release/AuraLoop-publish --help
           AuraLoop/.build/release/AuraLoop-set --help || true
 
+      - name: Install DMG Packaging Tools
+        run: brew install create-dmg
+
       - name: Build macOS App & DMG
         run: |
           cd AuraLoop
