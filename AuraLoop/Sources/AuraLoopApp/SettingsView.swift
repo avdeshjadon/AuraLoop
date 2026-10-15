@@ -306,13 +306,13 @@ struct SettingsView: View {
                                 .glassCapsule(fill: 0.09, stroke: 0.15)
                         }
                     }
-                    // The share of it that came from the Apple section, which
-                    // can be most of it: one aerial alone can be 1.5 GB.
-                    subRow(title: "Apple Downloads",
-                           subtitle: "Aerials and pictures from the Apple section") {
-                        Text(formatSize(store.appleDownloadBytes))
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(Color.AuraLoopSecondary)
+                    if store.appleDownloadBytes > 0 {
+                        subRow(title: "Apple Downloads",
+                               subtitle: "Aerials and pictures") {
+                            Text(formatSize(store.appleDownloadBytes))
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(Color.AuraLoopSecondary)
+                        }
                     }
                     divider
                     row(icon: .downloadFolder, title: "Download Folder",
@@ -360,7 +360,7 @@ struct SettingsView: View {
 
                 Spacer(minLength: 24)
             }
-            .padding(.horizontal, 28)
+            .padding(.horizontal, 34)
             }
             .onReceive(NotificationCenter.default.publisher(
                 for: NSWindow.willCloseNotification
@@ -391,7 +391,7 @@ struct SettingsView: View {
             }
             }
         }
-        .frame(width: 560, height: 600)
+        .frame(width: 660, height: 720)
         .menuHost()
         .background(SettingsWindowConfigurator())
         .alert("Download Folder", isPresented: Binding(
@@ -470,8 +470,8 @@ struct SettingsView: View {
             + " and frees about \(formatSize(plan.bytes + plan.appleBytes))."
         if !plan.apple.isEmpty {
             text += plan.apple.count == 1
-                ? " 1 of them is from the Apple section and can be downloaded again."
-                : " \(plan.apple.count) of them are from the Apple section and can be downloaded again."
+                ? " 1 of them is an Apple download."
+                : " \(plan.apple.count) of them are Apple downloads."
         }
         let keptPlaying = plan.kept - plan.keptForSchedules
         if keptPlaying > 0 {
@@ -495,47 +495,60 @@ struct SettingsView: View {
     // MARK: - Pieces
 
     private var header: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             AuraLoopAppIcon()
-                .frame(width: 64, height: 64)
+                .frame(width: 68, height: 68)
+                .shadow(color: Color.black.opacity(0.28), radius: 10, x: 0, y: 4)
             AuraLoopWordmark(color: Color.AuraLoopInk)
-                .frame(height: 22)
-            Text("Version \(AppStore.appVersion)")
-                .font(.system(size: 11))
-                .foregroundStyle(Color.AuraLoopSecondary)
-            if let version = store.latestRelease?.version {
-                Button {
-                    openWhatsNew(store)
-                } label: {
-                    Text("AuraLoop \(version) is available. See what's new.")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color.AuraLoopAccent)
+                .frame(height: 24)
+            HStack(spacing: 8) {
+                Text("Version \(AppStore.appVersion)")
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(Color.AuraLoopSecondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .glassCapsule(fill: 0.08, stroke: 0.12)
+                if let version = store.latestRelease?.version {
+                    Button {
+                        openWhatsNew(store)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Circle().fill(Color.AuraLoopAccent).frame(width: 6, height: 6)
+                            Text("v\(version) available")
+                                .font(.system(size: 11.5, weight: .semibold))
+                                .foregroundStyle(Color.AuraLoopAccent)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .glassCapsule(fill: 0.12, stroke: 0.2)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
-            CreditLink(text: "Designed & developed by \(Credits.name)", size: 10)
+            CreditLink(text: "Designed & developed by \(Credits.name)", size: 11)
                 .padding(.top, 2)
         }
+        .padding(.vertical, 10)
     }
 
     private func section(_ title: String, @ViewBuilder content: () -> some View) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             Text(title)
-                .font(.system(size: 10.5, weight: .semibold))
-                .tracking(1.2)
-                .foregroundStyle(Color.AuraLoopSecondary)
-                .padding(.leading, 2)
+                .font(.system(size: 11, weight: .bold))
+                .tracking(1.4)
+                .foregroundStyle(Color.AuraLoopSecondary.opacity(0.85))
+                .padding(.leading, 4)
             VStack(spacing: 0) { content() }
-                .liquidGlass(cornerRadius: 14, tint: 0.14, stroke: 0.1)
+                .liquidGlass(cornerRadius: 16, tint: 0.16, stroke: 0.12)
         }
-        .padding(.top, 20)
+        .padding(.top, 22)
     }
 
     private var divider: some View {
         Rectangle()
             .fill(Color.AuraLoopInk.opacity(0.06))
             .frame(height: 1)
-            .padding(.leading, 58)
+            .padding(.leading, 66)
     }
 
     /// A setting that only changes the row above it. Placed straight after
@@ -545,22 +558,22 @@ struct SettingsView: View {
     private func subRow(
         title: String, subtitle: String, @ViewBuilder control: () -> some View
     ) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
             SettingsIconView(icon: .replay)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 13.5, weight: .semibold))
                     .foregroundStyle(Color.AuraLoopInk)
                 Text(subtitle)
-                    .font(.system(size: 11))
+                    .font(.system(size: 11.5))
                     .foregroundStyle(Color.AuraLoopSecondary)
             }
-            Spacer()
+            Spacer(minLength: 16)
             control()
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 18)
         .padding(.top, 4)
-        .padding(.bottom, 12)
+        .padding(.bottom, 14)
     }
 
     /// Replay has nothing to replay without a time, so it says so while
@@ -679,21 +692,21 @@ struct SettingsView: View {
         icon: SettingsIcon, title: String, subtitle: String,
         @ViewBuilder control: () -> some View
     ) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
             SettingsIconView(icon: icon)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 13.5, weight: .semibold))
                     .foregroundStyle(Color.AuraLoopInk)
                 Text(subtitle)
-                    .font(.system(size: 11))
+                    .font(.system(size: 11.5))
                     .foregroundStyle(Color.AuraLoopSecondary)
             }
-            Spacer()
+            Spacer(minLength: 16)
             control()
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 13)
     }
 
     private func setLaunchAtLogin(_ enabled: Bool) {

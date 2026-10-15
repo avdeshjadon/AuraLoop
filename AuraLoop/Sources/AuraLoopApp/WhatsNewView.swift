@@ -41,13 +41,9 @@ enum WhatsNew {
     static let current = WhatsNewRelease(
         version: "6.0.2",
         date: "October 2026",
-        headline: "Apple's aerials and screen savers are in AuraLoop now, your playlists can play on the lock screen and the screen saver, and AuraLoop comes in Light and Dark with a new icon.",
+        headline: "Your playlists can play on the lock screen and the screen saver, and AuraLoop comes in Light and Dark with a new icon.",
         sections: [
             WhatsNewSection(name: "New", tint: .AuraLoopAccent, entries: [
-                WhatsNewEntry(title: "The Apple section",
-                              detail: "Apple's aerials and Dynamic Wallpapers, in a tab of their own."),
-                WhatsNewEntry(title: "Apple's screen savers in 4K",
-                              detail: "Flurry, Hello, Drift and five more as seamless 4K videos, for the desktop, the lock screen or the screen saver."),
                 WhatsNewEntry(title: "Playlists on the lock screen and the screen saver",
                               detail: "The desktop, the lock screen and the screen saver can each play their own, and Off brings back what was there before."),
                 WhatsNewEntry(title: "Default, Light and Dark",

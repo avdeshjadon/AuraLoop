@@ -418,46 +418,89 @@ enum SettingsIcon {
             })
         }
     }
+
+    var systemName: String {
+        switch self {
+        case .launchAtLogin: return "power"
+        case .menuBar: return "menubar.rectangle"
+        case .dockIcon: return "dock.rectangle"
+        case .appearance: return "circle.lefthalf.filled"
+        case .menuBarIcon: return "moon.stars.fill"
+        case .playbackSpeed: return "gauge.with.needle.fill"
+        case .defaultQuality: return "sparkles"
+        case .pauseAfter: return "timer"
+        case .replay: return "arrow.turn.down.right"
+        case .screenSaver: return "display"
+        case .lowPower: return "leaf.fill"
+        case .lowBattery: return "battery.25"
+        case .covered: return "macwindow.on.rectangle"
+        case .desktopOnly: return "display.2"
+        case .builtInDisplay: return "laptopcomputer"
+        case .externalDisplay: return "display"
+        case .storage: return "internaldrive.fill"
+        case .downloadFolder: return "folder.fill"
+        case .softwareUpdate: return "arrow.triangle.2.circlepath.circle.fill"
+        case .support: return "heart.fill"
+        }
+    }
 }
 
 struct SettingsIconView: View {
     let icon: SettingsIcon
 
     var body: some View {
-        // Read in the body, so the tile redraws when the look changes.
         let mode = Appearance.shared.mode
-        let glyph = icon.glyph(for: mode)
-        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
-        ZStack {
-            if let tint = icon.tint {
+        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+
+        if icon == .replay {
+            Image(systemName: icon.systemName)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Color.AuraLoopSecondary)
+                .frame(width: 34, height: 34)
+        } else {
+            let tint = icon.tint ?? Color(hex: 0x5B8CFF)
+            let glyph = icon.glyph(for: mode)
+            ZStack {
                 switch mode {
                 case .standard:
-                    shape.fill(Color(hex: 0x0C0F16))
-                    shape.fill(LinearGradient(colors: [tint.opacity(0.46), tint.opacity(0.16)],
-                                              startPoint: .top, endPoint: .bottom))
-                    shape.strokeBorder(LinearGradient(colors: [.white.opacity(0.3), .white.opacity(0.04)],
-                                                      startPoint: .top, endPoint: .bottom), lineWidth: 1)
+                    shape.fill(Color(hex: 0x0E121A))
+                    shape.fill(LinearGradient(
+                        colors: [tint.opacity(0.44), tint.opacity(0.14)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    ))
+                    shape.strokeBorder(LinearGradient(
+                        colors: [tint.opacity(0.55), .white.opacity(0.08)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    ), lineWidth: 1)
                 case .dark:
-                    // Black and white: graphite glass, no colour.
-                    shape.fill(Color(hex: 0x161616))
-                    shape.fill(LinearGradient(colors: [.white.opacity(0.16), .white.opacity(0.05)],
-                                              startPoint: .top, endPoint: .bottom))
-                    shape.strokeBorder(LinearGradient(colors: [.white.opacity(0.28), .white.opacity(0.04)],
-                                                      startPoint: .top, endPoint: .bottom), lineWidth: 1)
+                    shape.fill(Color(hex: 0x18181A))
+                    shape.fill(LinearGradient(
+                        colors: [.white.opacity(0.16), .white.opacity(0.04)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    ))
+                    shape.strokeBorder(LinearGradient(
+                        colors: [.white.opacity(0.28), .white.opacity(0.05)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    ), lineWidth: 1)
                 case .light:
-                    // A white tile washed with the colour, the way macOS's own
-                    // Settings icons sit on a light window.
                     shape.fill(Color.white)
-                    shape.fill(LinearGradient(colors: [tint.opacity(0.26), tint.opacity(0.11)],
-                                              startPoint: .top, endPoint: .bottom))
-                    shape.strokeBorder(LinearGradient(colors: [tint.opacity(0.42), tint.opacity(0.16)],
-                                                      startPoint: .top, endPoint: .bottom), lineWidth: 1)
+                    shape.fill(LinearGradient(
+                        colors: [tint.opacity(0.26), tint.opacity(0.08)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    ))
+                    shape.strokeBorder(LinearGradient(
+                        colors: [tint.opacity(0.42), tint.opacity(0.16)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    ), lineWidth: 1)
                 }
+
+                Image(systemName: icon.systemName)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(glyph)
+                    .shadow(color: tint.opacity(mode == .dark ? 0 : 0.45), radius: 4, x: 0, y: 1.5)
             }
-            Canvas { context, _ in icon.draw(context, color: glyph) }
-                .frame(width: 18, height: 18)
+            .frame(width: 34, height: 34)
         }
-        .frame(width: 30, height: 30)
     }
 }
 

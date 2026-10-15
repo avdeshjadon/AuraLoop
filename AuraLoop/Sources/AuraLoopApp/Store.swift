@@ -243,7 +243,7 @@ final class AppStore: ObservableObject {
     let statsSampler = StatsSampler()
 
     enum Tab: String, CaseIterable, Identifiable {
-        case home = "Home", explore = "Explore", apple = "Apple", library = "Library"
+        case home = "Home", explore = "Explore", library = "Library"
         var id: String { rawValue }
     }
 

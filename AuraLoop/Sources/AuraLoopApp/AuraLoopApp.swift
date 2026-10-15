@@ -333,7 +333,6 @@ struct RootView: View {
                 switch store.tab {
                 case .home: HomeView()
                 case .explore: ExploreView()
-                case .apple: AppleGalleryView()
                 case .library: LibraryView()
                 }
             }
@@ -347,17 +346,9 @@ struct RootView: View {
                     .zIndex(10)
                     .transition(.opacity)
             }
-
-            // Over everything, top bar included, so the section waits for it.
-            if store.appleNoticeOpen, store.tab == .apple {
-                AppleNoticeCard()
-                    .zIndex(20)
-                    .transition(.opacity)
-            }
         }
         .animation(.AuraLoopTab, value: store.tab)
         .animation(.easeInOut(duration: 0.18), value: store.previewItem?.id)
-        .animation(.easeOut(duration: 0.2), value: store.appleNoticeOpen)
         .alert("Couldn’t set wallpaper", isPresented: Binding(
             get: { store.applyError != nil },
             set: { if !$0 { store.applyError = nil } }
@@ -376,10 +367,6 @@ struct RootView: View {
         }
         .sheet(item: $store.pendingDelete) { request in
             ConfirmDeleteView(request: request)
-                .environmentObject(store)
-        }
-        .sheet(isPresented: $store.whatsNewOpen) {
-            WhatsNewView()
                 .environmentObject(store)
         }
         // The lock screen is set, macOS just has not noticed. A dead-end

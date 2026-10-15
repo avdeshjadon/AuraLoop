@@ -1,0 +1,48 @@
+name: Build & Test (macOS)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build & Test on Apple Silicon
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Runner Environment Info
+        run: |
+          echo "Architecture: $(uname -m)"
+          echo "macOS Version: $(sw_vers -productVersion)"
+          echo "Xcode Version: $(xcodebuild -version | tr '\n' ' ')"
+          test "$(uname -m)" = "arm64" || echo "Note: Runner is $(uname -m)"
+
+      - name: Swift Build (Debug)
+        run: swift build --package-path AuraLoop
+
+      - name: Run Unit Tests
+        run: swift test --package-path AuraLoop
+
+      - name: Swift Build (Release)
+        run: swift build -c release --package-path AuraLoop
+
+      - name: Verify Binaries
+        run: |
+          BIN_DIR="AuraLoop/.build/release"
+          for bin in AuraLoop-app AuraLoop-engine AuraLoop-set AuraLoop-import AuraLoop-publish AuraLoop-saver-picture; do
+            if [ -f "$BIN_DIR/$bin" ]; then
+              echo "✓ Found $bin: $(lipo -archs "$BIN_DIR/$bin")"
+            else
+              echo "⚠️ Missing $bin"
+            fi
+          done
+
+      - name: Verify CLI Tools Run
+        run: |
+          AuraLoop/.build/release/AuraLoop-publish --help
+          AuraLoop/.build/release/AuraLoop-set --help || true
