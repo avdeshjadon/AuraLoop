@@ -27,7 +27,7 @@ struct SettingsView: View {
     @State private var scrollToTopOnNextOpen = false
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             // Full-bleed glass layer: fills the ENTIRE window including under
             // the transparent, separator-less titlebar (so the top bar is the
             // same glass, no seam). Content scrolls on top.
@@ -37,11 +37,11 @@ struct SettingsView: View {
                 .ignoresSafeArea()
 
             ScrollViewReader { proxy in
-            ScrollView(.vertical, showsIndicators: false) {
+            ScrollView(.vertical, showsIndicators: true) {
             VStack(alignment: .leading, spacing: 0) {
                 header
                     .frame(maxWidth: .infinity)
-                    .padding(.top, 30)
+                    .padding(.top, 56)
                     .id("settings-top")
 
                 section("GENERAL") {
@@ -312,19 +312,20 @@ struct SettingsView: View {
                 }
 
                 section("STORAGE") {
-                    row(icon: .storage, title: "Library & Cache",
-                        subtitle: store.clearStatus ?? "Keeps the wallpaper in use") {
-                        HStack(spacing: 10) {
+                    row(icon: .storage, title: "Clear Cache",
+                        subtitle: store.clearStatus ?? "Delete downloaded wallpapers to free disk space") {
+                        HStack(spacing: 12) {
                             Text(formatSize(store.libraryBytes))
-                                .font(.system(size: 12, weight: .medium))
+                                .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(Color.AuraLoopSecondary)
-                            Button("Clear") { confirmClear = true }
+                            Button("Clear Cache") { confirmClear = true }
                                 .buttonStyle(.plain)
                                 .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(Color.AuraLoopInk)
+                                .foregroundStyle(Color.red.opacity(0.9))
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 5.5)
                                 .glassCapsule(fill: 0.09, stroke: 0.15)
+                                .pointingCursor()
                         }
                     }
                     if store.appleDownloadBytes > 0 {
@@ -411,8 +412,24 @@ struct SettingsView: View {
                 screenSaverDelayJustChanged = false
             }
             }
+
+            // Pinned top titlebar to protect traffic light controls during scroll
+            HStack(spacing: 0) {
+                Color.clear.frame(width: 78, height: 44)
+                Spacer()
+                Text("Settings")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.AuraLoopInk.opacity(0.85))
+                Spacer()
+                Color.clear.frame(width: 78, height: 44)
+            }
+            .frame(height: 46)
+            .background(.ultraThinMaterial.opacity(0.92))
+            .overlay(alignment: .bottom) {
+                Divider().opacity(0.15)
+            }
         }
-        .frame(width: 660, height: 720)
+        .frame(width: 780, height: 490)
         .menuHost()
         .background(SettingsWindowConfigurator())
         .alert("Download Folder", isPresented: Binding(
@@ -423,11 +440,11 @@ struct SettingsView: View {
         } message: {
             Text(downloadFolder.message ?? "")
         }
-        .alert("Clear the library?", isPresented: $confirmClear) {
+        .alert("Clear Downloaded Wallpapers?", isPresented: $confirmClear) {
             Button("Cancel", role: .cancel) {}
-            Button("Clear", role: .destructive) { store.clearDownloadedCache() }
+            Button("Delete Cache", role: .destructive) { store.clearDownloadedCache() }
         } message: {
-            Text(clearMessage)
+            Text("This will delete locally cached wallpapers (\(formatSize(store.libraryBytes))) from your Mac. You can re-download them anytime from Explore.")
         }
     }
 
@@ -516,40 +533,14 @@ struct SettingsView: View {
     // MARK: - Pieces
 
     private var header: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             AuraLoopAppIcon()
-                .frame(width: 68, height: 68)
+                .frame(width: 64, height: 64)
                 .shadow(color: Color.black.opacity(0.28), radius: 10, x: 0, y: 4)
             AuraLoopWordmark(color: Color.AuraLoopInk)
                 .frame(height: 24)
-            HStack(spacing: 8) {
-                Text("Version \(AppStore.appVersion)")
-                    .font(.system(size: 11.5, weight: .medium))
-                    .foregroundStyle(Color.AuraLoopSecondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .glassCapsule(fill: 0.08, stroke: 0.12)
-                if let version = store.latestRelease?.version {
-                    Button {
-                        openWhatsNew(store)
-                    } label: {
-                        HStack(spacing: 4) {
-                            Circle().fill(Color.AuraLoopAccent).frame(width: 6, height: 6)
-                            Text("v\(version) available")
-                                .font(.system(size: 11.5, weight: .semibold))
-                                .foregroundStyle(Color.AuraLoopAccent)
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .glassCapsule(fill: 0.12, stroke: 0.2)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            CreditLink(text: "Designed & developed by \(Credits.name)", size: 11)
-                .padding(.top, 2)
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, 14)
     }
 
     private func section(_ title: String, @ViewBuilder content: () -> some View) -> some View {

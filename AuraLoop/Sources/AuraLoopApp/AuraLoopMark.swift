@@ -56,17 +56,18 @@ public struct AuraLoopWordmarkLoopShape: Shape {
 
 /// Cache for the loaded SVG wordmark image.
 enum AuraLoopWordmarkCache {
-    static let image: NSImage? = {
-        // Try Bundle resources
-        if let url = Bundle.main.url(forResource: "auraloop-wordmark", withExtension: "svg"),
+    static func image(isDarkInk: Bool = false) -> NSImage? {
+        let name = isDarkInk ? "auraloop-wordmark-dark" : "auraloop-wordmark"
+        if let url = Bundle.main.url(forResource: name, withExtension: "svg"),
            let img = NSImage(contentsOf: url) {
             img.isTemplate = true
             return img
         }
-        // Try local dev paths
         let candidatePaths = [
-            "assets/auraloop-wordmark.svg",
-            "../assets/auraloop-wordmark.svg"
+            "assets/\(name).svg",
+            "../assets/\(name).svg",
+            "AuraLoop/assets/\(name).svg",
+            "/Users/avdeshjadon/AuraLoop/assets/\(name).svg"
         ]
         for path in candidatePaths {
             let u = URL(fileURLWithPath: path)
@@ -76,7 +77,9 @@ enum AuraLoopWordmarkCache {
             }
         }
         return nil
-    }()
+    }
+
+    static let image: NSImage? = image(isDarkInk: false)
 }
 
 /// The official AuraLoop wordmark ("AURAL∞P").
@@ -85,7 +88,9 @@ struct AuraLoopWordmark: View {
     var color: Color = Color.AuraLoopInk
 
     var body: some View {
-        if let img = AuraLoopWordmarkCache.image {
+        let isDarkInk = Appearance.shared.isLight
+        let img = AuraLoopWordmarkCache.image(isDarkInk: isDarkInk) ?? AuraLoopWordmarkCache.image
+        if let img {
             Image(nsImage: img)
                 .renderingMode(.template)
                 .resizable()

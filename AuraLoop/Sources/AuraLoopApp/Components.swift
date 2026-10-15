@@ -235,11 +235,8 @@ struct TopBar: View {
         HStack(spacing: 11) {
             AuraLoopAppIcon()
                 .frame(width: 32, height: 32)
-            VStack(alignment: .leading, spacing: 3) {
-                AuraLoopWordmark(color: ink)
-                    .frame(height: 18)
-                CreditLink(text: "made by \(Credits.name)")
-            }
+            AuraLoopWordmark(color: ink)
+                .frame(height: 20)
         }
     }
 
@@ -1304,5 +1301,20 @@ struct SearchField: View {
         // its own, and typing right after the button went nowhere (full
         // check, 2026-10-01). One turn later, once the field is in the window.
         .onAppear { DispatchQueue.main.async { focused = true } }
+    }
+}
+
+
+// MARK: - Pointing Cursor Modifier
+
+extension View {
+    public func pointingCursor() -> some View {
+        self.onHover { isInside in
+            if isInside {
+                NSCursor.pointingHand.push()
+            } else {
+                NSCursor.pop()
+            }
+        }
     }
 }

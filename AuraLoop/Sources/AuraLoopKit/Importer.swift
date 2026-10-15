@@ -66,7 +66,7 @@ public func importVideo(
     title: String? = nil,
     category: String? = nil,
     root: URL = LibraryManifest.defaultRoot(),
-    preserveOriginal: Bool = false,
+    preserveOriginal: Bool = true,
     sourceFingerprint: String? = nil,
     progress: ((Double) -> Void)? = nil
 ) throws -> WallpaperEntry {

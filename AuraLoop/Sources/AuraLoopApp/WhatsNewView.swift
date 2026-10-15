@@ -39,13 +39,23 @@ struct WhatsNewRelease: Identifiable {
 /// release is editing this one list.
 enum WhatsNew {
     static let current = WhatsNewRelease(
-        version: "6.0.5",
+        version: "6.1.0",
         date: "October 2026",
-        headline: "Your playlists can play on the lock screen and the screen saver, and AuraLoop comes in Light and Dark with a new icon.",
+        headline: "AuraLoop 6.1 introduces a dedicated Favorites section, in-preview audio playback testing, progressive nature preload, and a refined Settings experience.",
         sections: [
             WhatsNewSection(name: "New", tint: .AuraLoopAccent, entries: [
-                WhatsNewEntry(title: "Playlists on the lock screen and the screen saver",
-                              detail: "The desktop, the lock screen and the screen saver can each play their own, and Off brings back what was there before."),
+                WhatsNewEntry(title: "Favorites Section",
+                              detail: "Easily access all your liked wallpapers in one dedicated tab next to Explore and Library."),
+                WhatsNewEntry(title: "Audio Test in Preview",
+                              detail: "Test and listen to wallpaper audio directly in the preview bar with a single tap."),
+                WhatsNewEntry(title: "Lossless Import Quality",
+                              detail: "Your imported videos are preserved with zero quality loss, bit-for-bit."),
+                WhatsNewEntry(title: "Automatic Nature Preload",
+                              detail: "The smallest Nature live wallpaper downloads automatically on first launch so the hero plays live video immediately."),
+                WhatsNewEntry(title: "Refined Settings Layout",
+                              detail: "A spacious rectangular layout, pinned titlebar, clean menu-bar style icons, and a Clear Cache option."),
+                WhatsNewEntry(title: "Pure Vector Wordmark",
+                              detail: "Seamlessly adapts across Light and Dark appearance modes."),
                 WhatsNewEntry(title: "Default, Light and Dark",
                               detail: "Choose how AuraLoop looks in Settings: the classic midnight blue, clean white or true black."),
                 WhatsNewEntry(title: "A new icon",

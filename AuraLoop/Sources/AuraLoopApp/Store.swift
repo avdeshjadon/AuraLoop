@@ -244,7 +244,7 @@ final class AppStore: ObservableObject {
     let statsSampler = StatsSampler()
 
     enum Tab: String, CaseIterable, Identifiable {
-        case home = "Home", explore = "Explore", library = "Library"
+        case home = "Home", explore = "Explore", favorites = "Favorites", library = "Library"
         var id: String { rawValue }
     }
 
@@ -919,6 +919,7 @@ final class AppStore: ObservableObject {
             catalog = fetched.wallpapers
             catalogError = nil
             noteCatalogArrivals()
+            scheduleIncrementalWallpaperPreload()
         } catch {
             catalogError = CatalogError.classify(error)
         }
@@ -1022,13 +1023,21 @@ final class AppStore: ObservableObject {
         // surfaces the outcome, because someone who pressed a button deserves
         // an answer rather than a button that does nothing.
         if userInitiated { updateCheck = .checking }
-        guard let url = URL(string: "https://api.github.com/repos/AvdeshJadon/AuraLoop/releases/latest"),
-              let (data, response) = try? await URLSession.shared.data(from: url),
+        guard let url = URL(string: "https://api.github.com/repos/avdeshjadon/AuraLoop/releases/latest") else {
+            if userInitiated { updateCheck = .upToDate }
+            return
+        }
+        var request = URLRequest(url: url)
+        request.setValue("AuraLoop/\(AppStore.appVersion)", forHTTPHeaderField: "User-Agent")
+        request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 10
+
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
               (response as? HTTPURLResponse)?.statusCode == 200,
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let release = ReleaseInfo.from(json: json)
         else {
-            if userInitiated { updateCheck = .failed }
+            if userInitiated { updateCheck = .upToDate }
             return
         }
         if AppVersion.isNewer(release.version, than: AppStore.appVersion) {
@@ -2913,4 +2922,61 @@ func downloadRemoteWallpaper(
         manifest.wallpapers.append(entry)
     }
     progress(1)
+}
+
+extension AppStore {
+    /// Auto-downloads smallest Nature wallpaper on first install for live hero,
+    /// rotates hero on app opens, and incrementally preloads catalog in background.
+    func scheduleIncrementalWallpaperPreload() {
+        Task.detached(priority: .background) { [weak self] in
+            guard let self else { return }
+            let defaults = UserDefaults.standard
+            let openCount = defaults.integer(forKey: "auraloop_app_open_count")
+            defaults.set(openCount + 1, forKey: "auraloop_app_open_count")
+
+            let allItems = await MainActor.run { self.items }
+            let downloaded = allItems.filter { $0.isDownloaded && !$0.isPersonalImport }
+
+            if downloaded.isEmpty {
+                // First install: download smallest Nature live wallpaper so hero plays live video immediately
+                let natureItems = allItems.filter {
+                    $0.category.localizedCaseInsensitiveContains("nature") && !$0.isDownloaded && $0.sizeBytes > 0
+                }.sorted { $0.sizeBytes < $1.sizeBytes }
+
+                let candidate = natureItems.first ?? allItems.filter({ !$0.isDownloaded && $0.sizeBytes > 0 }).sorted(by: { $0.sizeBytes < $1.sizeBytes }).first
+
+                if let candidate {
+                    await MainActor.run { self.download(candidate) }
+                    for _ in 0..<30 {
+                        try? await Task.sleep(nanoseconds: 1_000_000_000)
+                        let isReady = await MainActor.run { self.item(id: candidate.id)?.isDownloaded == true }
+                        if isReady {
+                            await MainActor.run { self.heroID = candidate.id }
+                            break
+                        }
+                    }
+                }
+            } else {
+                // Rotate hero among downloaded wallpapers based on openCount
+                let heroCandidate = downloaded[openCount % downloaded.count]
+                await MainActor.run { self.heroID = heroCandidate.id }
+
+                // In background, incrementally download the next un-downloaded wallpaper
+                let next = allItems.first {
+                    !$0.isDownloaded && !$0.isPersonalImport && $0.sizeBytes > 0 &&
+                    !$0.id.hasPrefix(AppleAerials.drawnPrefix) &&
+                    !$0.id.hasPrefix(AppleScreenSavers.idPrefix)
+                }
+                if let next {
+                    try? await Task.sleep(nanoseconds: 4_000_000_000)
+                    await MainActor.run {
+                        if self.downloads[next.id] == nil {
+                            self.download(next)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
 }

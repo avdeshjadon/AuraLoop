@@ -340,6 +340,7 @@ struct RootView: View {
                 switch store.tab {
                 case .home: HomeView()
                 case .explore: ExploreView()
+                case .favorites: FavoritesView()
                 case .library: LibraryView()
                 }
             }

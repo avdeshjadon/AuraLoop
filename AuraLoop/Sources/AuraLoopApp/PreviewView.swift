@@ -46,6 +46,7 @@ struct PreviewView: View {
     @State private var setButtonWidth: CGFloat = 0
     @State private var heldSetButtonWidth: CGFloat?
     @State private var customPauseAfter = false
+    @State private var previewAudioOn = false
     @StateObject private var loader = PreviewLoader()
     /// Apple's aerials learn their real size and their sharp picture while
     /// this is open, and this has to redraw when they do.
@@ -107,11 +108,11 @@ struct PreviewView: View {
                 if let url = store.videoURL(for: item, mode: store.previewMode) ??
                              store.videoURL(for: item, mode: "smooth") {
                     // Downloaded → the real master, full quality.
-                    LoopingPlayerView(url: url)
+                    LoopingPlayerView(url: url, isMuted: !previewAudioOn)
                 } else if item.id == BundledWallpaper.id,
                           let url = BundledWallpaper.videoURL {
                     // The bundled 4K is already on disk — never show it soft.
-                    LoopingPlayerView(url: url)
+                    LoopingPlayerView(url: url, isMuted: !previewAudioOn)
                 } else {
                     // Not downloaded → thumbnail immediately, p720 loop once
                     // fetched. Deliberately soft: it shows the motion while
@@ -212,6 +213,16 @@ struct PreviewView: View {
             if item.isDownloaded, !isAerial { pauseAfterPill(item) }
 
             HeartButton(item: item, size: 40)
+                .pointingCursor()
+
+            Button {
+                previewAudioOn.toggle()
+            } label: {
+                barIcon(previewAudioOn ? "speaker.wave.2.fill" : "speaker.slash.fill")
+            }
+            .buttonStyle(.plain)
+            .help(previewAudioOn ? "Mute audio" : "Test audio playback")
+            .pointingCursor()
 
             setButton(item)
                 .background(GeometryReader { geo in

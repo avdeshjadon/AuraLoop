@@ -12,12 +12,14 @@ struct LoopingPlayerView: NSViewRepresentable {
     /// Home hero sitting behind a full screen preview. Occlusion, minimising
     /// and window close are detected by the view without this.
     var isActive = true
+    var isMuted = true
 
     func makeNSView(context: Context) -> LoopingPlayerNSView { LoopingPlayerNSView() }
 
     func updateNSView(_ view: LoopingPlayerNSView, context: Context) {
         view.play(url: url)
         view.setActive(isActive)
+        view.setMuted(isMuted)
     }
 }
 
@@ -106,6 +108,10 @@ final class LoopingPlayerNSView: NSView {
         guard active != isActive else { return }
         isActive = active
         updatePlayback()
+    }
+
+    func setMuted(_ muted: Bool) {
+        player.isMuted = muted
     }
 
     /// Read live rather than cached, so a stale flag can never leave the video
