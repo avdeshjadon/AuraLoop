@@ -39,7 +39,7 @@ struct WhatsNewRelease: Identifiable {
 /// release is editing this one list.
 enum WhatsNew {
     static let current = WhatsNewRelease(
-        version: "6.0.2",
+        version: "6.0.3",
         date: "October 2026",
         headline: "Your playlists can play on the lock screen and the screen saver, and AuraLoop comes in Light and Dark with a new icon.",
         sections: [
