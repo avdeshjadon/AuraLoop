@@ -96,7 +96,7 @@ cp "$DIR/Icon/InApp/AuraLoopIcon-Default.png" "$DIR/Icon/InApp/AuraLoopIcon-Ligh
     "$DIR/Icon/InApp/AuraLoopIcon-Dark.png" "$APP/Contents/Resources/"
 cp "$DIR/../assets/"*.svg "$APP/Contents/Resources/" 2>/dev/null || true
 cp "$DIR/THIRD_PARTY_NOTICES.md" "$APP/Contents/Resources/THIRD_PARTY_NOTICES.md"
-cp "$DIR/assets/FeaturedWallpapers.json" "$APP/Contents/Resources/" 2>/dev/null || cp "$DIR/../assets/FeaturedWallpapers.json" "$APP/Contents/Resources/" 2>/dev/null || true
+cp "$DIR/../assets/FeaturedWallpapers.json" "$APP/Contents/Resources/" 2>/dev/null || true
 
 
 # Bundled wallpaper: "Snowfall in Forest" full 4K master + thumb, so a fresh
@@ -167,7 +167,7 @@ for arg in "$@"; do
     --dmg)
         DMG="$DIR/dist/AuraLoop-$VERSION.dmg"
         STAGING="$DIR/dist/dmg-staging"
-        BG_IMG="$DIR/assets/dmg-background.png"
+        BG_IMG="$DIR/../assets/dmg-background.png"
         VOL_ICON="$DIR/Icon/AppIcon.icns"
         echo "==> building custom $DMG"
         rm -rf "$STAGING" "$DMG"

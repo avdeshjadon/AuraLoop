@@ -43,6 +43,21 @@ public enum FeaturedRotationConfig {
             return list
         }
 
+        // Try local developer assets path
+        for devPath in [
+            "assets/FeaturedWallpapers.json",
+            "../assets/FeaturedWallpapers.json",
+            "/Users/avdeshjadon/AuraLoop/assets/FeaturedWallpapers.json"
+        ] {
+            let url = URL(fileURLWithPath: devPath)
+            if FileManager.default.fileExists(atPath: url.path),
+               let data = try? Data(contentsOf: url),
+               let list = try? JSONDecoder().decode([FeaturedWallpaperEntry].self, from: data),
+               !list.isEmpty {
+                return list
+            }
+        }
+
         // Seed user file if directory exists
         if let userFile {
             try? FileManager.default.createDirectory(at: userFile.deletingLastPathComponent(), withIntermediateDirectories: true)
