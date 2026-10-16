@@ -149,9 +149,8 @@ function Case({ c, i, open, onToggle }) {
           >
             <div
               style={{
-                padding: '0 32px 32px 76px',
+                padding: '24px clamp(20px, 2.5vw, 32px) clamp(24px, 2.5vw, 32px)',
                 borderTop: '1px solid rgba(23, 19, 15, 0.06)',
-                paddingTop: '24px',
               }}
             >
               {/* Premium Harmonious Comparison Cards */}
@@ -228,8 +227,9 @@ function Case({ c, i, open, onToggle }) {
                   <div
                     key={s.title}
                     style={{
-                      background: 'rgba(244, 240, 235, 0.5)',
-                      border: '1px solid rgba(23, 19, 15, 0.05)',
+                      background: '#ffffff',
+                      border: '1px solid rgba(23, 19, 15, 0.08)',
+                      boxShadow: '0 2px 6px rgba(23, 19, 15, 0.03)',
                       borderRadius: '14px',
                       padding: '18px',
                       display: 'flex',
@@ -241,9 +241,9 @@ function Case({ c, i, open, onToggle }) {
                       style={{
                         fontFamily: 'var(--ta-mono)',
                         fontSize: '11px',
-                        fontWeight: 600,
+                        fontWeight: 650,
                         color: 'var(--ta-ember)',
-                        letterSpacing: '0.05em',
+                        letterSpacing: '0.06em',
                       }}
                     >
                       STEP {String(k + 1).padStart(2, '0')}
@@ -281,7 +281,7 @@ function Case({ c, i, open, onToggle }) {
 }
 
 export default function Workflows() {
-  const [open, setOpen] = useState('battery');
+  const [open, setOpen] = useState(null);
 
   return (
     <section id="workflows" className="ta-sec ta-cases" aria-labelledby="ta-cases-title" tabIndex={-1}>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { LayoutGroup, motion } from "motion/react";
 import Avatar from "./Avatar.jsx";
 import { CLASSIC_ROWS, PEOPLE, PEOPLE_CARDS } from "../data.js";
+import { unsplash } from "../shared/img.js";
 
 const move = { type: "spring", bounce: 0, duration: 0.75 };
 
@@ -17,7 +18,34 @@ const COPY = {
     "AuraLoop animates your Mac with cinematic 4K 60fps dynamic atmospheres, hardware-decoded with zero CPU overhead.",
 };
 
-function Row({ row, withSender, mark }) {
+const ATMOSPHERES = {
+  snowfall: {
+    badge: "4K · 60fps",
+    codec: "HEVC 10-bit P3",
+    resolution: "3840×2160 Master",
+    telemetry: "0.28% CPU · AVFoundation GPU",
+    status: "Active",
+    dotColor: "#10b981",
+  },
+  aurora: {
+    badge: "Dynamic Solar",
+    codec: "Solar Ephemeris",
+    resolution: "24h Solar Keyframes",
+    telemetry: "Sun Angle: -14.2° · Metal Shaders",
+    status: "Night Cycle",
+    dotColor: "#6366f1",
+  },
+  fuji: {
+    badge: "Mini-LED XDR",
+    codec: "ExtensionKit Sync",
+    resolution: "Liquid Retina XDR",
+    telemetry: "Shadows: 0.00 nits · Lock Screen",
+    status: "Synced",
+    dotColor: "#f59e0b",
+  },
+};
+
+function ClassicRow({ row, mark }) {
   const p = PEOPLE[row.who];
   return (
     <motion.li
@@ -26,16 +54,27 @@ function Row({ row, withSender, mark }) {
       transition={move}
       className={`ta-cmp-row${mark ? " is-mark" : ""}`}
     >
-      {withSender && <Avatar id={row.who} size={28} />}
-      {withSender && <span className="ta-cmp-row__who">{p.name}</span>}
+      <div className="ta-cmp-row__thumb">
+        {p?.photo ? (
+          <img
+            src={unsplash(p.photo, { w: 80, h: 56, crop: "crop", q: 75 })}
+            alt=""
+            loading="lazy"
+          />
+        ) : (
+          <Avatar id={row.who} size={28} />
+        )}
+      </div>
+      <span className="ta-cmp-row__who">{p?.name || row.who}</span>
       <span className="ta-cmp-row__subject">{row.subject}</span>
+      <span className="ta-cmp-row__badge">Fixed Frame</span>
       <time className="ta-cmp-row__time">{row.time}</time>
     </motion.li>
   );
 }
 
 export default function PeopleSection() {
-  const [mode, setMode] = useState("classic");
+  const [mode, setMode] = useState("grouped");
 
   return (
     <section
@@ -101,10 +140,9 @@ export default function PeopleSection() {
                   aria-label="Static wallpapers list"
                 >
                   {CLASSIC_ROWS.map((r) => (
-                    <Row
+                    <ClassicRow
                       key={r.id}
                       row={r}
-                      withSender
                       mark={r.who === "snowfall"}
                     />
                   ))}
@@ -114,7 +152,14 @@ export default function PeopleSection() {
               <div className="ta-pcards">
                 {PEOPLE_CARDS.map((who, i) => {
                   const p = PEOPLE[who];
-                  const rows = CLASSIC_ROWS.filter((r) => r.who === who);
+                  const spec = ATMOSPHERES[who] || {
+                    badge: "4K Motion",
+                    codec: "Metal GPU",
+                    resolution: "Ultra HD",
+                    telemetry: "Hardware Decoded",
+                    status: "Ready",
+                    dotColor: "#10b981",
+                  };
                   return (
                     <motion.article
                       key={who}
@@ -126,21 +171,54 @@ export default function PeopleSection() {
                         delay: 0.05 * i,
                         ease: [0.2, 0.7, 0.2, 1],
                       }}
-                      aria-label={`${p.name}, ${rows.length} atmospheres`}
+                      aria-label={`${p.name}, living atmosphere`}
                     >
                       <header className="ta-pcard__head">
-                        <Avatar id={who} size={40} />
-                        <span>
+                        <div className="ta-pcard__meta">
                           <strong>{p.name}</strong>
                           <small>{p.role}</small>
+                        </div>
+                        <span className="ta-pcard__tag">
+                          <span
+                            className="ta-pcard__pulse"
+                            style={{ backgroundColor: spec.dotColor }}
+                          />
+                          {spec.badge}
                         </span>
-                        <span className="ta-pcard__count">{rows.length}</span>
                       </header>
-                      <ol className="ta-pcard__list" role="list">
-                        {rows.map((r) => (
-                          <Row key={r.id} row={r} />
-                        ))}
-                      </ol>
+
+                      <div className="ta-pcard__preview">
+                        {p.photo && (
+                          <img
+                            src={unsplash(p.photo, {
+                              w: 720,
+                              h: 405,
+                              crop: "crop",
+                              q: 85,
+                            })}
+                            alt={p.name}
+                            loading="lazy"
+                            className="ta-pcard__img"
+                          />
+                        )}
+                        <div className="ta-pcard__overlay">
+                          <span className="ta-pcard__codec">{spec.codec}</span>
+                          <span className="ta-pcard__res">{spec.resolution}</span>
+                        </div>
+                      </div>
+
+                      <footer className="ta-pcard__foot">
+                        <span className="ta-pcard__telemetry">
+                          {spec.telemetry}
+                        </span>
+                        <span className="ta-pcard__status">
+                          <span
+                            className="ta-pcard__status-dot"
+                            style={{ backgroundColor: spec.dotColor }}
+                          />
+                          {spec.status}
+                        </span>
+                      </footer>
                     </motion.article>
                   );
                 })}
