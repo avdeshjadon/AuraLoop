@@ -1,4 +1,4 @@
-name: Build & Test (macOS)
+name: Build & Release (macOS & Windows)
 
 on:
   push:
@@ -9,8 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    name: Build & Test on Apple Silicon
+  build-macos:
+    name: Build macOS (DMG)
     runs-on: macos-latest
     steps:
       - name: Checkout code
@@ -21,32 +21,12 @@ jobs:
           echo "Architecture: $(uname -m)"
           echo "macOS Version: $(sw_vers -productVersion)"
           echo "Xcode Version: $(xcodebuild -version | tr '\n' ' ')"
-          test "$(uname -m)" = "arm64" || echo "Note: Runner is $(uname -m)"
 
-      - name: Swift Build (Debug)
-        run: swift build --package-path AuraLoop-Mac
-
-      - name: Run Unit Tests
+      - name: Swift Unit Tests
         run: swift test --package-path AuraLoop-Mac
 
       - name: Swift Build (Release)
         run: swift build -c release --package-path AuraLoop-Mac
-
-      - name: Verify Binaries
-        run: |
-          BIN_DIR="AuraLoop-Mac/.build/release"
-          for bin in AuraLoop-app AuraLoop-engine AuraLoop-set AuraLoop-import AuraLoop-publish AuraLoop-saver-picture; do
-            if [ -f "$BIN_DIR/$bin" ]; then
-              echo "✓ Found $bin: $(lipo -archs "$BIN_DIR/$bin")"
-            else
-              echo "⚠️ Missing $bin"
-            fi
-          done
-
-      - name: Verify CLI Tools Run
-        run: |
-          AuraLoop-Mac/.build/release/AuraLoop-publish --help
-          AuraLoop-Mac/.build/release/AuraLoop-set --help || true
 
       - name: Install DMG Packaging Tools
         run: brew install create-dmg
@@ -54,30 +34,109 @@ jobs:
       - name: Build macOS App & DMG
         run: |
           cd AuraLoop-Mac
-          chmod +x build-app.sh
+          chmod +x build-app.sh version.sh
           ./build-app.sh --dmg
 
-      - name: Upload DMG Artifact
+      - name: Upload macOS DMG Artifact
         uses: actions/upload-artifact@v4
         with:
           name: AuraLoop-macOS-DMG
           path: AuraLoop-Mac/dist/*.dmg
           if-no-files-found: error
 
+  build-windows:
+    name: Build Windows (.exe & .zip)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore NuGet Packages
+        run: dotnet restore AuraLoop-Win/AuraLoop-Win/AuraLoop-Win.csproj
+
+      - name: Build & Publish AuraLoop-Win (win-x64)
+        shell: pwsh
+        run: |
+          dotnet publish AuraLoop-Win/AuraLoop-Win/AuraLoop-Win.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:WindowsPackageType=None `
+            -p:WindowsAppSDKSelfContained=true `
+            -o ./dist-win
+
+      - name: Prepare Windows Artifacts
+        shell: pwsh
+        run: |
+          # Copy executable out to top-level for direct single-file access
+          Copy-Item "./dist-win/AuraLoop.exe" -Destination "./AuraLoop-Win-x64.exe"
+          # Package entire runtime directory into a clean distribution zip
+          Compress-Archive -Path ./dist-win/* -DestinationPath ./AuraLoop-Windows-x64.zip -Force
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AuraLoop-Windows
+          path: |
+            AuraLoop-Windows-x64.zip
+            AuraLoop-Win-x64.exe
+          if-no-files-found: error
+
+  release:
+    name: Publish Combined Release
+    needs: [build-macos, build-windows]
+    if: always() && github.ref == 'refs/heads/main' && (needs.build-macos.result == 'success' || needs.build-windows.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create Artifacts Staging Directory
+        run: mkdir -p ./release-assets
+
+      - name: Download macOS Artifacts
+        if: needs.build-macos.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: AuraLoop-macOS-DMG
+          path: ./release-assets
+
+      - name: Download Windows Artifacts
+        if: needs.build-windows.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: AuraLoop-Windows
+          path: ./release-assets
+
       - name: Create or Update GitHub Release
-        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION=$(grep '^VERSION=' AuraLoop-Mac/build-app.sh | cut -d'"' -f2)
+          # Read version from VERSION file
+          if [ -f "AuraLoop-Mac/VERSION" ]; then
+            VERSION=$(grep '^VERSION=' AuraLoop-Mac/VERSION | cut -d'=' -f2)
+          elif [ -f "AuraLoop-Win/VERSION" ]; then
+            VERSION=$(grep '^VERSION=' AuraLoop-Win/VERSION | cut -d'=' -f2)
+          else
+            VERSION="6.5.0"
+          fi
+          
           TAG="v$VERSION"
-          echo "Target Release: $TAG"
+          echo "Target Release Tag: $TAG"
+          echo "Release Assets Found:"
+          ls -lh ./release-assets
+
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG exists, updating DMG..."
-            gh release upload "$TAG" AuraLoop-Mac/dist/*.dmg --clobber
+            echo "Release $TAG already exists, updating assets..."
+            gh release upload "$TAG" ./release-assets/* --clobber
           else
             echo "Creating new release $TAG..."
-            gh release create "$TAG" AuraLoop-Mac/dist/*.dmg \
+            gh release create "$TAG" ./release-assets/* \
               --title "AuraLoop $TAG" \
-              --generate-notes
+              --notes "Official release of AuraLoop $TAG featuring native builds for macOS (.dmg) and Windows (.zip & .exe)."
           fi

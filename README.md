@@ -105,6 +105,10 @@ AuraLoop/
 
 ```bash
 cd AuraLoop-Mac
+# Update version across all Mac files and build metadata:
+./version.sh 6.5.0 112
+
+# Build & test:
 swift build
 swift test
 ./build-app.sh
@@ -115,14 +119,19 @@ swift test
 
 ```cmd
 cd AuraLoop-Win
+# Update version across all Windows project files (.csproj, XAML, metadata):
+version.cmd 6.5.0 112
+:: or via bash: ./version.sh 6.5.0 112
+
+# Build & publish:
 build.cmd
 ```
 or via PowerShell:
 ```powershell
-dotnet build AuraLoop-Win/AuraLoop-Win.csproj -c Release
+dotnet publish AuraLoop-Win/AuraLoop-Win.csproj -c Release -r win-x64 --self-contained true
 ```
 
-The compiled macOS application bundle will be created at `AuraLoop-Mac/dist/AuraLoop.app` and the standalone installer at `AuraLoop-Mac/dist/AuraLoop-*.dmg`.
+The compiled macOS application bundle is created at `AuraLoop-Mac/dist/AuraLoop.app` (and `dist/AuraLoop-*.dmg`). The Windows build and executable package are produced under `AuraLoop-Win/dist/`.
 
 ---
 

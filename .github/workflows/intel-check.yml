@@ -35,12 +35,12 @@ jobs:
           test "$(uname -m)" = "x86_64" || { echo "NOT an Intel runner"; exit 1; }
 
       - name: Build release
-        run: swift build -c release --package-path AuraLoop
+        run: swift build -c release --package-path AuraLoop-Mac
 
       - name: Architecture of every binary
         run: |
           for b in AuraLoop-app AuraLoop-engine AuraLoop-set AuraLoop-import AuraLoop-publish; do
-            echo "$b: $(lipo -archs "AuraLoop/.build/release/$b")"
+            echo "$b: $(lipo -archs "AuraLoop-Mac/.build/release/$b")"
           done
 
       - name: Deployment target is still macOS 14
@@ -49,7 +49,7 @@ jobs:
           # Macs the README promises if its minimum stays 14.0. Xcode will
           # happily raise this, and nothing else would notice until an install
           # failed on somebody's Mac.
-          minos=$(otool -l AuraLoop/.build/release/AuraLoop-app \
+          minos=$(otool -l AuraLoop-Mac/.build/release/AuraLoop-app \
                   | awk '/LC_BUILD_VERSION/{f=1} f&&/minos/{print $2; exit}')
           echo "minos: $minos"
           case "$minos" in
@@ -58,12 +58,12 @@ jobs:
           esac
 
       - name: Tests
-        run: swift test --package-path AuraLoop
+        run: swift test --package-path AuraLoop-Mac
 
       - name: The binaries actually run
         run: |
-          AuraLoop/.build/release/AuraLoop-publish --help
-          AuraLoop/.build/release/AuraLoop-set --displays || true
+          AuraLoop-Mac/.build/release/AuraLoop-publish --help
+          AuraLoop-Mac/.build/release/AuraLoop-set --displays || true
 
       - name: Decode a real wallpaper with AVFoundation
         run: swift .github/workflows/hevccheck.swift
@@ -73,11 +73,11 @@ jobs:
         with:
           name: intel-binaries
           path: |
-            AuraLoop/.build/release/AuraLoop-app
-            AuraLoop/.build/release/AuraLoop-engine
-            AuraLoop/.build/release/AuraLoop-set
-            AuraLoop/.build/release/AuraLoop-import
-            AuraLoop/.build/release/AuraLoop-publish
+            AuraLoop-Mac/.build/release/AuraLoop-app
+            AuraLoop-Mac/.build/release/AuraLoop-engine
+            AuraLoop-Mac/.build/release/AuraLoop-set
+            AuraLoop-Mac/.build/release/AuraLoop-import
+            AuraLoop-Mac/.build/release/AuraLoop-publish
           retention-days: 1
 
   older:
