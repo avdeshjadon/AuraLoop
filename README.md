@@ -1,329 +1,170 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/icon-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="assets/icon.png">
-  <img src="assets/icon-dark.png" width="124" alt="AuraLoop Icon">
+  <source media="(prefers-color-scheme: dark)" srcset="assets/png/icon-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="assets/png/icon.png">
+  <img src="assets/png/icon-dark.png" width="124" alt="AuraLoop Icon">
 </picture>
 
 <br><br>
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/auraloop-wordmark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="assets/auraloop-wordmark-dark.svg">
-  <img src="assets/auraloop-wordmark.svg" width="320" alt="AuraLoop">
+  <source media="(prefers-color-scheme: dark)" srcset="assets/svg/auraloop-wordmark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="assets/svg/auraloop-wordmark-dark.svg">
+  <img src="assets/svg/auraloop-wordmark.svg" width="320" alt="AuraLoop">
 </picture>
 
-### Live wallpapers for your Mac, with low CPU and RAM usage. Free.
+### High-Performance Native Live Wallpapers & Screensavers for macOS
 
-![macOS](https://img.shields.io/badge/macOS-14%2B-black?logo=apple)
-![Universal](https://img.shields.io/badge/Universal-Apple_Silicon_%2B_Intel-black?logo=apple)
-![License](https://img.shields.io/badge/License-PolyForm_Shield-green)
-![Price](https://img.shields.io/badge/Price-Free-brightgreen)
-[![Website](https://img.shields.io/badge/Website-AuraLoopwallpaper.com-A9C4FF)](https://AuraLoopwallpaper.com)
-[![Download](https://img.shields.io/badge/⬇_Download-AuraLoop-A9C4FF)](../../releases/latest)
-[![Buy a coffee](https://img.shields.io/badge/Buy_a_coffee-FFDD00)](https://github.com/sponsors/AvdeshJadon)
+[![macOS](https://img.shields.io/badge/macOS-14%2B-black?logo=apple)](https://apple.com/macos)
+[![Universal](https://img.shields.io/badge/Universal-Apple_Silicon_%2B_Intel-black?logo=apple)](https://apple.com)
+[![License](https://img.shields.io/badge/License-Proprietary_%7C_All_Rights_Reserved-red)](LICENSE)
+[![Swift](https://img.shields.io/badge/Swift-5.9%2B-FA7343?logo=swift&logoColor=white)](https://swift.org)
 
 </div>
 
 ---
 
-## Why I built this
+## Overview
 
-A still desktop picture is a waste of a good screen. But most of the live
-wallpaper apps I tried came with a catch. Usually a subscription, or a Pro tier
-holding the good wallpapers hostage.
-
-Most of them are Electron apps wrapping a web page. They sit at 300 to 400 MB of
-RAM and keep your CPU warm all day, for a picture that moves.
-
-## What AuraLoop does
-
-AuraLoop is a native macOS app that plays looping video wallpapers on every display,
-and lets you browse them in a full screen gallery. It's written in Swift and
-SwiftUI, hands video decoding to your Mac's media hardware instead of the CPU,
-and pauses itself the moment you can't see it.
-
-Everything is free. No Pro tier, no paywall, no license key, no account. Every
-wallpaper and every feature is unlocked.
+AuraLoop is a native macOS application engineered in Swift and SwiftUI that delivers smooth, looping video wallpapers and screen savers across all connected displays with near-zero CPU and memory footprint. By delegating video decoding directly to macOS hardware media engines, AuraLoop keeps system resource consumption minimal and automatically pauses during fullscreen apps, low power mode, or display sleep.
 
 ---
 
-## Features
+## Key Features
 
-- 🌙 **Live video wallpapers.** Looping, seamless, on every display at once.
-- 🔒 **Lock screen live wallpapers.** Play a wallpaper on your lock screen too, not just the desktop. Set it to the desktop, the lock screen, or both, on every display. Requires macOS 26 or newer.
-- 🖥️ **Screen saver.** AuraLoop can be your screen saver as well, playing video rather than a still picture, and you set how long your Mac waits before it starts. Requires macOS 26 or newer.
-- 🍎 **The Apple section.** Apple's aerials, Dynamic Wallpapers and screen savers in a tab of their own. The screen savers come as seamless 4K videos, so they play smoothly on the desktop and the lock screen too.
-- 🪶 **Very low CPU usage.** HEVC decoded in hardware, never on the CPU.
-- 😴 **Pauses itself** on full screen apps, display sleep, screen lock, Low Power Mode and low battery. A paused wallpaper uses no CPU at all.
-- 🖱️ **Play only on desktop.** Hold the wallpaper still while you work and let it play when the desktop is clear, one screen at a time.
-- ⚡ **Smooth or Efficient.** Keep a wallpaper's original frame rate, or drop it to 30 fps to halve the power draw. Your choice, per wallpaper.
-- 🖼️ **Explore gallery.** Browse the catalog, preview full screen, download only what you want.
-- 🔄 **New wallpapers arrive on their own.** The library updates without updating the app. More on that below.
-- 📃 **Playlists.** Rotate through a set on a timer, shuffled or in order. The desktop, the lock screen and the screen saver can each play their own.
-- ⏱️ **Automations.** Give every wallpaper its own time. Ten seconds each, or a full day schedule where each wallpaper has its own hours.
-- ⏸️ **Pause after a set time.** Let a wallpaper play for a while after it changes or after you unlock, then hold still. Set it in seconds, minutes or hours, for everything or for one wallpaper, and turn on Replay on Clear Desktop to get that time again whenever your desktop is clear.
-- 🗑️ **Delete what you do not want.** Remove wallpapers one at a time or several at once, imported videos included.
-- 📥 **Import your own.** Drop in any video and it gets transcoded once to HEVC and added to your library. Screen savers too: add `.saver` files like XScreenSaver and set them from AuraLoop.
-- 🎛️ **Menu bar controls.** Play, pause, skip and switch wallpapers without opening the app.
-- ✨ **Tells you when there is a new AuraLoop.** What's New shows what changed in the release and downloads it for you.
-- 💾 **Space control.** See what each wallpaper costs on disk, remove downloads you're done with, or keep them all on another drive.
-- 🆓 **Free and source available.** Anyone can use it and read the code.
+- 🌙 **Seamless Video Wallpapers** — Smooth, continuous looping on every connected display simultaneously.
+- 🔒 **Lock Screen Support** — Play distinct or synchronized live wallpapers on your macOS lock screen.
+- 🖥️ **Screen Saver Engine** — Run high-definition live video as your native macOS screen saver with customizable idle delays.
+- 🍎 **Curated Apple Aerials** — Browse and enjoy Apple's Aerials, Dynamic Wallpapers, and system aerial screen savers in 4K.
+- 🪶 **Hardware-Accelerated Efficiency** — Hardware-decoded HEVC/H.265 playback via AVFoundation ensures virtually zero CPU overhead.
+- 😴 **Smart Power Management** — Automatically pauses during fullscreen applications, display sleep, low power mode, and battery thresholds.
+- 🖱️ **Desktop Awareness** — Option to pause during active work and resume playback when the desktop is revealed.
+- ⚡ **Adaptive Frame Rates** — Switch between native high frame rate and energy-efficient 30 fps per wallpaper.
+- 🖼️ **Explore & Preview Catalog** — Fullscreen interactive preview with on-demand download management.
+- 📃 **Custom Playlists & Automation** — Timed rotations, randomized shuffling, and full 24-hour day/night schedules.
+- 📥 **Universal Importer** — Drag-and-drop support for custom video files (auto-transcoded to optimized HEVC) and `.saver` bundles.
+- 🎛️ **Menu Bar Controller** — Instant playback control, track skipping, and preset selection from the system menu bar.
 
-> Requires macOS 14 (Sonoma) or newer. The build is universal, so it runs on
-> both Apple Silicon and Intel Macs. Lock screen and screen saver wallpapers
-> need macOS 26 or newer. On macOS 26 and later the interface uses SwiftUI's
-> native liquid glass; on older versions it falls back to translucent
-> materials, which looks slightly different but works the same.
+> **System Requirements**: macOS 14.0 (Sonoma) or newer. Universal binary compiled for Apple Silicon and Intel architectures. Lock screen and screen saver features require macOS 15 / 26+.
 
 ---
 
-## What it looks like
+## Visual Showcase
 
 <p align="center">
-  <img src="screenshots/AuraLoop-6-demo.gif" width="820" alt="The AuraLoop home gallery with a live wallpaper playing behind the featured banner">
-</p>
-
-<p align="center">
-  <a href="https://github.com/avdeshjadon/AuraLoop/releases/latest/download/AuraLoop-demo.mp4"><strong>Watch AuraLoop in action</strong></a>
+  <img src="screenshots/AuraLoop-6-demo.gif" width="820" alt="AuraLoop interactive gallery demonstration">
 </p>
 
 ---
 
-## Install
+## Project Structure & Architecture
 
-### Homebrew
+The codebase follows a strictly organized, modular design:
 
-```bash
-brew install --cask AvdeshJadon/AuraLoop/AuraLoop
+```
+AuraLoop/
+├── assets/                          # Static branding and media assets
+│   ├── png/                         # High-resolution raster images & app icons
+│   │   ├── icon.png
+│   │   ├── icon-dark.png
+│   │   └── dmg-background.png
+│   ├── svg/                         # Scalable vector graphics and wordmarks
+│   │   ├── auraloop.svg
+│   │   ├── auraloop-dark.svg
+│   │   ├── auraloop-wordmark.svg
+│   │   └── auraloop-wordmark-dark.svg
+│   └── data/                        # Bundled catalog metadata & configurations
+│       └── FeaturedWallpapers.json
+│
+├── AuraLoop/                        # macOS Application Package & Core Modules
+│   ├── Package.swift                # Swift Package Manager manifest
+│   ├── build-app.sh                 # Production compilation, signing & DMG builder
+│   │
+│   ├── Icon/                        # macOS iconsets and icon generation
+│   │   ├── AuraLoopIcon.icon/       # Asset catalogs for macOS icon compiler (actool)
+│   │   ├── InApp/                   # Multi-theme in-app icon variations
+│   │   └── AppIcon.icns             # Standalone system application icon
+│   │
+│   ├── Sources/
+│   │   ├── AuraLoopApp/             # Primary SwiftUI application
+│   │   │   ├── AuraLoopApp.swift    # Application entry point & lifecycle
+│   │   │   ├── Views/               # Screen layouts (Home, Explore, Library, Settings, etc.)
+│   │   │   ├── Components/          # Design system, Liquid Glass UI, and controls
+│   │   │   ├── Icons/               # Vector glyphs, status symbols, and branding marks
+│   │   │   ├── Controllers/         # Menu bar, lock screen, and system observers
+│   │   │   └── Models/              # Data stores, playback states, and cache engines
+│   │   │
+│   │   ├── AuraLoopKit/             # Shared framework & domain logic
+│   │   │   ├── Core/                # Versioning, release metadata, and catalog parsers
+│   │   │   ├── Aerials/             # Apple aerial catalogs and system store bindings
+│   │   │   ├── Library/             # Wallpaper manifest, playlist manager, and importers
+│   │   │   ├── Playback/            # Multi-monitor rendering logic and schedule rules
+│   │   │   ├── Media/               # Hardware transcoders, thumbnailers, and preview cache
+│   │   │   └── Engine/              # Desktop window monitors and hardware playback engine
+│   │   │
+│   │   ├── AuraLoopWallpaperExtension/ # System wallpaper app extension
+│   │   ├── AuraLoopEngine/          # Background helper process
+│   │   ├── AuraLoopImport/          # CLI utility for batch importing video files
+│   │   ├── AuraLoopSet/             # CLI utility for setting wallpaper/screensaver
+│   │   ├── AuraLoopPrepare/         # Video asset optimization and pre-processing
+│   │   ├── AuraLoopPublish/         # Cloudflare R2 / CDN catalog publisher
+│   │   └── AuraLoopSaverPicture/    # Screensaver capture utility
+│   │
+│   └── Tests/                       # Comprehensive unit and integration test suite
+│       └── AuraLoopKitTests/        # 315+ automated test cases
+│
+├── screenshots/                     # Preview images and animated GIFs
+├── LICENSE                          # Proprietary software license
+└── README.md                        # Documentation
 ```
 
-### Manual download
-
-1. Download the latest DMG from [AuraLoopwallpaper.com](https://AuraLoopwallpaper.com) or the [Releases](../../releases/latest) page.
-2. Open it and drag AuraLoop into your Applications folder.
-
-On first launch, let it through macOS security. AuraLoop is free and self signed
-rather than carrying a paid Apple notarised certificate, so macOS blocks the
-first launch with a _"can't be opened… Apple could not verify it is free of
-malware"_ warning. To get past it:
-
-1. Double click the app once, then close the warning.
-2. Open System Settings, go to Privacy & Security, scroll down to the message
-   about AuraLoop, and click **Open Anyway**, then **Open** to confirm.
-3. On older macOS, you can right click the app instead, then pick Open twice.
-
-Open Explore, pick a wallpaper, hit Apply. Done.
-
-> AuraLoop keeps running in your menu bar after you close the window. That's what
-> keeps your wallpaper playing. Use the menu bar icon to control it, or Quit to
-> stop it.
-
 ---
 
-## Set it and forget it
+## Building from Source
 
-AuraLoop can change your wallpaper for you, two different ways.
+### Prerequisites
 
-**On a timer.** Pick a set of wallpapers, give each one a length, and AuraLoop
-cycles through them. Ten seconds each, or an hour each, whatever suits. Every
-change is a crossfade, never a black flash.
+- macOS 14.0 or newer
+- Xcode 15+ / Command Line Tools with Swift 5.9+
 
-**By the clock.** Give each wallpaper its own hours instead. Something calm for
-the morning, something else after dark. The day is drawn as a 24 hour timeline
-you drag, so you can see the whole thing at a glance rather than typing times
-into boxes.
-
-The desktop, the lock screen and the screen saver can each play their own
-playlist or automation. Start or stop them from the Library or the menu bar,
-and turning one off brings back what was there before.
-
----
-
-## Let it play, then let it rest
-
-A moving wallpaper is lovely for a minute and distracting for an hour.
-
-**Pause after** lets a wallpaper play for a set time after it changes or after
-you unlock your Mac, then hold still on a frame. Set it in seconds, minutes or
-hours. It applies to everything by default, and any single wallpaper can
-override it or opt out entirely.
-
-A held frame costs no CPU at all, so this is the lightest AuraLoop ever gets while
-still showing you something you chose.
-
----
-
-## Moving when you are looking, still when you are not
-
-Most of the day your wallpaper sits behind windows, where you barely see it.
-
-**Play only on desktop** holds a screen's wallpaper on a frame while any app
-window is open on that screen, and plays it the moment the desktop is clear.
-Minimise everything, or click the desktop, and it moves. Each display decides
-for itself, so a window on your laptop screen leaves your monitor playing. Turn
-it on in Settings, under Energy.
-
-**Replay on Clear Desktop** sits right under Pause After. Every time your
-desktop is clear again, Pause After counts from the beginning, so the wallpaper
-plays for that long and then holds.
-
-Both are off by default.
-
----
-
-## Your screen saver too
-
-On macOS 26 or newer, AuraLoop can be your screen saver as well, playing the video
-rather than a still picture. Open a wallpaper, pick **Screensaver** in the apply
-card, and set it.
-
-Settings also has **Start Screen Saver**, so you can choose how long your Mac
-waits before it begins without opening System Settings. macOS keeps one screen
-saver for the whole Mac, so this is one setting rather than one per display.
-
-You can also add your own `.saver` screen savers, like XScreenSaver, from the
-Library.
-
----
-
-## Apple's wallpapers too
-
-The Apple tab holds Apple's own aerials and Dynamic Wallpapers, in Apple's own
-categories. Aerials download straight from Apple and play like any other
-wallpaper in AuraLoop. The still pictures and the drawn ones are handed to macOS,
-because only macOS can show them.
-
-Apple's screen savers are there too, Flurry, Hello, Drift and the rest, as
-seamless 4K recordings, so they play smoothly on the desktop and the lock
-screen as well.
-
----
-
-## Your library, your rules
-
-Every wallpaper in your Library has a delete button, and you can select several
-and clear them together. Videos you imported yourself can go too, which was not
-possible before 3.0.
-
-Nothing is ever deleted without asking first, and deleting a wallpaper cleans up
-everything that pointed at it: playlists, automations, and the lock screen.
-
-Want them on another drive? Settings has **Download Folder**: pick a folder and
-AuraLoop moves your wallpapers there, shows how far it is, and lets you cancel.
-
----
-
-## AuraLoop tells you when there is a new version
-
-When a new AuraLoop is released, the What's New button in the top bar picks it up on
-its own. You get a dot on the button and a small note saying an update is
-available.
-
-Open it and you see what actually changed in that release, read straight from
-the release itself, with a button that downloads the new version for you. The
-notes for the version you are already running sit underneath.
-
----
-
-## New wallpapers arrive on their own
-
-You never have to update the app to get new wallpapers.
-
-AuraLoop re-reads its online catalog every time it launches or comes to the front,
-so anything newly published shows up in your Explore tab within about a minute.
-This works on every install that already exists, including older versions.
-
-Videos only download when you pick one, and you can remove them again from the
-Library tab whenever you want the space back.
-
----
-
-## Build from source
+### Build & Run Tests
 
 ```bash
-git clone https://github.com/avdeshjadon/AuraLoop.git
-cd AuraLoop/AuraLoop
-./build-app.sh --install     # builds, bundles, signs, installs to /Applications
+# Navigate to the Swift package directory
+cd AuraLoop
+
+# Compile the project
+swift build
+
+# Run the automated test suite
+swift test
 ```
 
-`./build-app.sh --dmg` also produces `dist/AuraLoop-<version>.dmg`.
+### Packaging Application & Installer DMG
 
-The package builds AuraLoopKit, which holds the shared engine and library code, the
-app itself, and a handful of command line tools (`AuraLoop-engine`, `AuraLoop-import`,
-`AuraLoop-set`, `AuraLoop-prepare` and `AuraLoop-publish`) that read the same config and
-library files as the app. It also builds `AuraLoop-saver-picture`, the small helper
-the app uses to take a picture of an imported screen saver.
+```bash
+cd AuraLoop
 
----
+# Build the complete universal application bundle
+./build-app.sh
 
-## How it works
+# Build and assemble the release DMG package
+./build-app.sh --dmg
+```
 
-AuraLoop is native the whole way down: Swift, SwiftUI and AVFoundation. No Electron,
-no web views.
-
-The wallpaper is a video playing in a window that sits just below your desktop
-icons, decoded in hardware by your Mac's video engine, so the CPU barely
-participates. The moment the wallpaper can't be seen, AuraLoop pauses it, and a
-paused wallpaper costs nothing.
-
----
-
-## Support AuraLoop
-
-<div align="center">
-
-AuraLoop is free, and it stays that way. No Pro tier, no paywall, no account,
-nothing held back.
-
-If you enjoy AuraLoop, you can buy the developer a coffee to help keep the work
-going and keep AuraLoop free for everyone.
-
-[![Buy a coffee for the developer](https://img.shields.io/badge/Buy%20a%20coffee%20for%20the%20developer-FFDD00?style=for-the-badge)](https://github.com/sponsors/AvdeshJadon)
-
-</div>
-
----
-
-## Supporters
-
-<div align="center">
-
-**They showed the developer their love. They keep AuraLoop free for everyone.** ❤️
-
-<table>
-<tr>
-<td align="center" valign="top" width="180"><a href="https://github.com/deimosfr"><img src="assets/sponsors/deimosfr.png" width="72" alt="Pierre Mavro"><br><b>Pierre Mavro</b></a><br><sub>AuraLoop's first sponsor.</sub></td>
-<td align="center" valign="top" width="180"><a href="https://github.com/alexblunck"><img src="assets/sponsors/alexblunck.png" width="72" alt="Alexander Blunck"><br><b>Alexander Blunck</b></a><br><sub>AuraLoop's top sponsor.</sub></td>
-<td align="center" valign="top" width="180"><a href="https://github.com/fleurscreed-gif"><img src="assets/sponsors/fleurscreed-gif.png" width="72" alt="fleurscreed-gif"><br><b>fleurscreed-gif</b></a><br><sub>AuraLoop's sponsor.</sub></td>
-</tr>
-</table>
-
-</div>
-
----
-
-## Contribute
-
-Found a bug, have an idea, or want to improve something?
-[Open an issue](../../issues) or send a pull request.
+The compiled application bundle will be created at `AuraLoop/dist/AuraLoop.app` and the standalone installer at `AuraLoop/dist/AuraLoop-*.dmg`.
 
 ---
 
 ## License
 
-AuraLoop is free for everyone to use, at home or at work. Its code is public under the
-[PolyForm Shield 1.0.0](LICENSE) license: you can read it, learn from it and send
-changes. You may not release AuraLoop, or a copy or changed version of it, as your own
-app, free or paid, without my permission. Want to build on it?
-[Open an issue](../../issues) or [email me](mailto:AvdeshJadonx@gmail.com) first.
+**Copyright © 2026 Avdesh Jadon. All Rights Reserved.**
 
-Code published before 21 September 2026, including every release up to 5.0, stays
-under the MIT license it came with.
+This software is strictly **Proprietary and Confidential**. All source code, design, artwork, trademarks, and associated materials are the exclusive property of Avdesh Jadon.
 
-The wallpaper videos are not covered by this license. Each one belongs to its
-original creator and is redistributed here under its own terms. See
-[NOTICE](NOTICE.md).
+- **No Unauthorized Use**: Unauthorized copying, running, distribution, installation, or execution of this software—whether locally, on a server, or in any other environment—is strictly prohibited without prior express written permission from the copyright owner.
+- **No Commercial Use**: Commercial exploitation, redistribution, sale, or sublicensing is strictly forbidden.
+- **No Derivative Works**: Modification, adaptation, decompilation, or reverse engineering of any part of this software is prohibited.
 
-Made by [AvdeshJadon](https://github.com/avdeshjadon).
+For licensing inquiries or written authorization, please contact [Avdesh Jadon](https://github.com/avdeshjadon).

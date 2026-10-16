@@ -8,8 +8,8 @@ set -e
 # The one place AuraLoop's version is written. The app bundle, the wallpaper
 # extension and the DMG name are all derived from these two lines, and the
 # build fails below if the app and the extension ever disagree.
-VERSION="6.3.0"
-BUILD="110"
+VERSION="6.4.0"
+BUILD="111"
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 APP="$DIR/dist/AuraLoop.app"
@@ -94,9 +94,8 @@ fi
 cp "$ICON_OUT/Assets.car" "$ICON_OUT/AuraLoopIcon.icns" "$APP/Contents/Resources/"
 cp "$DIR/Icon/InApp/AuraLoopIcon-Default.png" "$DIR/Icon/InApp/AuraLoopIcon-Light.png" \
     "$DIR/Icon/InApp/AuraLoopIcon-Dark.png" "$APP/Contents/Resources/"
-cp "$DIR/../assets/"*.svg "$APP/Contents/Resources/" 2>/dev/null || true
-cp "$DIR/THIRD_PARTY_NOTICES.md" "$APP/Contents/Resources/THIRD_PARTY_NOTICES.md"
-cp "$DIR/../assets/FeaturedWallpapers.json" "$APP/Contents/Resources/" 2>/dev/null || true
+cp "$DIR/../assets/svg/"*.svg "$APP/Contents/Resources/" 2>/dev/null || true
+cp "$DIR/../assets/data/FeaturedWallpapers.json" "$APP/Contents/Resources/" 2>/dev/null || true
 
 
 # Bundled wallpaper: "Snowfall in Forest" full 4K master + thumb, so a fresh
@@ -167,7 +166,7 @@ for arg in "$@"; do
     --dmg)
         DMG="$DIR/dist/AuraLoop-$VERSION.dmg"
         STAGING="$DIR/dist/dmg-staging"
-        BG_IMG="$DIR/../assets/dmg-background.png"
+        BG_IMG="$DIR/../assets/png/dmg-background.png"
         VOL_ICON="$DIR/Icon/AppIcon.icns"
         echo "==> building custom $DMG"
         rm -rf "$STAGING" "$DMG"

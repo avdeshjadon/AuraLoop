@@ -64,6 +64,10 @@ enum AuraLoopWordmarkCache {
             return img
         }
         let candidatePaths = [
+            "assets/svg/\(name).svg",
+            "../assets/svg/\(name).svg",
+            "AuraLoop/assets/svg/\(name).svg",
+            "/Users/avdeshjadon/AuraLoop/assets/svg/\(name).svg",
             "assets/\(name).svg",
             "../assets/\(name).svg",
             "AuraLoop/assets/\(name).svg",

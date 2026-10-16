@@ -45,6 +45,9 @@ public enum FeaturedRotationConfig {
 
         // Try local developer assets path
         for devPath in [
+            "assets/data/FeaturedWallpapers.json",
+            "../assets/data/FeaturedWallpapers.json",
+            "/Users/avdeshjadon/AuraLoop/assets/data/FeaturedWallpapers.json",
             "assets/FeaturedWallpapers.json",
             "../assets/FeaturedWallpapers.json",
             "/Users/avdeshjadon/AuraLoop/assets/FeaturedWallpapers.json"
