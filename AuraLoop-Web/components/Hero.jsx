@@ -1,15 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import InboxWindow from './InboxWindow.jsx';
-import Avatar from './Avatar.jsx';
 import { useInbox } from './useInbox.js';
-import { INCOMING, PEOPLE, SEED_CARDS } from '../data.js';
+import { INCOMING, PEOPLE } from '../data.js';
 import { face, goToWaitlist, useMedia } from '../lib.js';
 import { Bolt } from '../icons.jsx';
 import { gsap, useGSAP, MOTION_OK } from '../../../shared/gsap.js';
-
-const FEED_MS = 7500;
-const ease = [0.2, 0.7, 0.2, 1];
 
 function Tile({ side, person, tileRef, onOpen }) {
   const p = PEOPLE[person] || PEOPLE.snowfall;
@@ -35,63 +30,19 @@ function Tile({ side, person, tileRef, onOpen }) {
   );
 }
 
-function Slot({ side, card, convos, onOpen }) {
-  const c = card ? convos[card.convo] : null;
-  const show = !!c;
-  const p = c ? PEOPLE[c.person] : null;
-  return (
-    <div className={`ta-slot ta-slot--${side}`}>
-      <AnimatePresence mode="popLayout" initial={false}>
-        {show && (
-          <motion.button
-            key={card.key}
-            type="button"
-            className="ta-ncard"
-            onClick={() => onOpen(side, card)}
-            initial={{ opacity: 0, x: side === 'left' ? -40 : 40, scale: 0.98 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.97, transition: { duration: 0.28, ease } }}
-            transition={{ duration: 0.7, ease }}
-          >
-            <Avatar id={c.person} size={46} shape="rounded" eager />
-            <span className="ta-ncard__txt">
-              <strong>{p?.name || card.convo}</strong>
-              <span>{card.body}</span>
-            </span>
-            <span className="ta-ncard__side">
-              <time>{card.time}</time>
-              <span className="ta-ncard__badge">
-                4K
-                <span className="sr-only">. Open wallpaper</span>
-              </span>
-            </span>
-          </motion.button>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
 export default function Hero() {
   const [inbox, dispatch] = useInbox();
   const reduced = useMedia('(prefers-reduced-motion: reduce)');
-  const twoSlots = useMedia('(min-width: 1024px)', true);
 
   const heroRef = useRef(null);
   const stageRef = useRef(null);
   const regionRef = useRef(null);
   const tileL = useRef(null);
   const tileR = useRef(null);
-  const lastSlot = useRef('right');
-  const selectedRef = useRef(inbox.selected);
-  selectedRef.current = inbox.selected;
 
   const [paths, setPaths] = useState({ l: '', r: '' });
-  const [slots, setSlots] = useState({ left: SEED_CARDS.left, right: SEED_CARDS.right });
   const [paused, setPaused] = useState(false);
   const [fed, setFed] = useState(0);
-  const [inView, setInView] = useState(false);
-  const [docVisible, setDocVisible] = useState(true);
   const [announce, setAnnounce] = useState('');
 
   /* ---- curved connector lines: measured from layout boxes */
@@ -110,8 +61,8 @@ export default function Hero() {
     const ay = a.offsetTop + a.offsetHeight / 2;
     const bx = b.offsetLeft + b.offsetWidth / 2;
     const by = b.offsetTop + b.offsetHeight / 2;
-    const le = { x: wl + 8, y: wt + 98 };
-    const re = { x: wl + W - 8, y: wt + 84 };
+    const le = { x: wl + 16, y: wt + 92 };
+    const re = { x: wl + W - 16, y: wt + 184 };
     const dl = le.y - ay;
     const dr = re.y - by;
     const side = stageRef.current.getBoundingClientRect().left + wl;
@@ -130,48 +81,9 @@ export default function Hero() {
     return () => ro.disconnect();
   }, [measure]);
 
-  /* ---- only run feed while hero is in view */
-  useEffect(() => {
-    const io = new IntersectionObserver(([e]) => setInView(e.isIntersecting), { threshold: 0.2 });
-    io.observe(stageRef.current);
-    const vis = () => setDocVisible(document.visibilityState === 'visible');
-    document.addEventListener('visibilitychange', vis);
-    return () => {
-      io.disconnect();
-      document.removeEventListener('visibilitychange', vis);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (reduced || paused || !inView || !docVisible || fed >= INCOMING.length) return;
-    const t = setTimeout(() => {
-      const item = INCOMING[fed];
-      const key = `in-${fed}`;
-      dispatch({ type: 'incoming', id: item.convo, body: item.body, msgId: key });
-      setFed(n => n + 1);
-      if (selectedRef.current === item.convo) return;
-      setAnnounce(`Active master: ${PEOPLE[item.convo]?.name || item.convo}`);
-      setSlots(s => {
-        let side;
-        if (!twoSlots) side = 'right';
-        else if (s.left?.convo === item.convo) side = 'left';
-        else if (s.right?.convo === item.convo) side = 'right';
-        else side = lastSlot.current === 'right' ? 'left' : 'right';
-        lastSlot.current = side;
-        return { ...s, [side]: { key, convo: item.convo, time: 'Live', body: item.body } };
-      });
-    }, FEED_MS);
-    return () => clearTimeout(t);
-  }, [reduced, paused, inView, docVisible, fed, twoSlots, dispatch]);
-
   const openConvo = id => {
     dispatch({ type: 'select', id });
     regionRef.current?.focus({ preventScroll: true });
-  };
-
-  const openFromCard = (side, card) => {
-    setSlots(s => ({ ...s, [side]: null }));
-    openConvo(card.convo);
   };
 
   /* ---- motion: entrance, ambient float, pointer parallax */
@@ -187,9 +99,7 @@ export default function Hero() {
           .from('.ta-hero__cta', { y: 16, opacity: 0, duration: 0.9 }, 0.6)
           .from('.ta-win', { y: 80, opacity: 0, duration: 1.3 }, 0.7)
           .from('.ta-ftile__card, .ta-mtile img', { scale: 0.7, opacity: 0, duration: 1, stagger: 0.12 }, 0.95)
-          .from('.ta-curves path', { strokeDashoffset: 1, duration: 1.5, ease: 'power2.inOut', stagger: 0.1 }, 1.15)
-          .from('.ta-slot--left', { x: -48, opacity: 0, duration: 1 }, 1.3)
-          .from('.ta-slot--right', { x: 48, opacity: 0, duration: 1 }, 1.45);
+          .from('.ta-curves path', { strokeDashoffset: 1, duration: 1.5, ease: 'power2.inOut', stagger: 0.1 }, 1.15);
 
         gsap.to('.ta-ftile__float', {
           y: -7,
@@ -290,9 +200,6 @@ export default function Hero() {
             onToggle: () => setPaused(p => !p),
           }}
         />
-
-        <Slot side="left" card={slots.left} convos={inbox.convos} onOpen={openFromCard} />
-        <Slot side="right" card={slots.right} convos={inbox.convos} onOpen={openFromCard} />
         <p className="sr-only" aria-live="polite">
           {announce}
         </p>
