@@ -58,11 +58,11 @@ jobs:
 
       - name: Restore NuGet Packages
         run: |
-          dotnet restore AuraLoop-Win/AuraLoop-Win.sln -p:Platform=x64 -r win-x64
-          dotnet restore AuraLoop-Win/Tests/AuraLoop.Tests.csproj -p:Platform=x64 -r win-x64
+          dotnet restore AuraLoop-Win/AuraLoop-Win.sln -p:Platform=x64
+          dotnet restore AuraLoop-Win/Tests/AuraLoop.Tests.csproj
 
       - name: Run Windows Unit Tests
-        run: dotnet test AuraLoop-Win/Tests/AuraLoop.Tests.csproj -c Release -p:Platform=x64 -r win-x64
+        run: dotnet test AuraLoop-Win/Tests/AuraLoop.Tests.csproj -c Release
 
       - name: Build & Publish AuraLoop-Win (win-x64)
         shell: pwsh

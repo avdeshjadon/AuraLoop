@@ -1,17 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
-    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <TargetFramework>net8.0</TargetFramework>
     <RootNamespace>AuraLoop.Tests</RootNamespace>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
-    <Platforms>x64;ARM64</Platforms>
-    <Platform Condition="'$(Platform)' == '' or '$(Platform)' == 'AnyCPU'">x64</Platform>
-    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
-    <UseRidGraph>true</UseRidGraph>
-    <WindowsPackageType>None</WindowsPackageType>
-    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,9 +14,13 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\AuraLoop-Win.csproj" />
+    <Compile Include="..\Models\**\*.cs" Link="Models\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\Services\**\*.cs" Link="Services\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\Engine\**\*.cs" Link="Engine\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\Native\**\*.cs" Link="Native\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>
