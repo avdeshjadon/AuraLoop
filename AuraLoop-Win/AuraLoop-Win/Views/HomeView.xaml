@@ -1,0 +1,121 @@
+<UserControl
+    x:Class="AuraLoop.Views.HomeView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:AuraLoop.Models">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="24" Padding="28">
+            
+            <!-- Hero Featured Banner -->
+            <Border Style="{StaticResource GlassCardStyle}" Height="340" Padding="0" CornerRadius="18">
+                <Grid>
+                    <!-- Background Placeholder / Gradient -->
+                    <Border CornerRadius="18" Background="#0C1425">
+                        <Grid>
+                            <Image Source="/Assets/icon.png" Stretch="Uniform" Opacity="0.15" HorizontalAlignment="Right" Margin="0,0,40,0"/>
+                            <!-- Gradient overlay -->
+                            <Border CornerRadius="18">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                        <GradientStop Color="#CC090D16" Offset="0.0" />
+                                        <GradientStop Color="#660D1526" Offset="0.6" />
+                                        <GradientStop Color="#22000000" Offset="1.0" />
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
+                        </Grid>
+                    </Border>
+
+                    <!-- Hero Content -->
+                    <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="32" Spacing="14">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Border Background="#243452" CornerRadius="12" Padding="10,4">
+                                <TextBlock Text="FEATURED LIVE WALLPAPER" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AuraLoopAccentBrush}" />
+                            </Border>
+                            <Border Background="#1C283F" CornerRadius="12" Padding="10,4">
+                                <TextBlock Text="4K • 60 FPS" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AuraLoopMintBrush}" />
+                            </Border>
+                        </StackPanel>
+
+                        <TextBlock Text="Snowfall in Forest" FontSize="32" FontWeight="Bold" Foreground="{StaticResource AuraLoopInkBrush}" />
+                        <TextBlock Text="Gentle, seamless winter snow gently drifting through evergreen trees. Decoded in hardware with near-zero power draw."
+                                   FontSize="14" Foreground="{StaticResource AuraLoopMutedBrush}" TextWrapping="Wrap" MaxWidth="520" />
+
+                        <!-- Action Buttons -->
+                        <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,8,0,0">
+                            <Button Style="{StaticResource AccentPillButtonStyle}" Click="ApplyDesktop_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE768;" FontSize="14" />
+                                    <TextBlock Text="Apply to Desktop" />
+                                </StackPanel>
+                            </Button>
+
+                            <Button Style="{StaticResource GlassPillButtonStyle}" Click="Preview_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE7B3;" FontSize="14" />
+                                    <TextBlock Text="Preview Fullscreen" />
+                                </StackPanel>
+                            </Button>
+
+                            <Button Style="{StaticResource GlassPillButtonStyle}" Click="Favorite_Click">
+                                <FontIcon Glyph="&#xEB51;" FontSize="14" Foreground="{StaticResource AuraLoopAccentBrush}" />
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Quick Presets Row -->
+            <TextBlock Text="CURATED WALLPAPERS" FontSize="16" FontWeight="Bold" Foreground="{StaticResource AuraLoopInkBrush}" Margin="4,0,0,0" />
+
+            <GridView ItemsSource="{x:Bind Wallpapers}" SelectionMode="None" IsItemClickEnabled="True" ItemClick="WallpaperCard_Click">
+                <GridView.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <ItemsWrapGrid Orientation="Horizontal" MaximumRowsOrColumns="3" />
+                    </ItemsPanelTemplate>
+                </GridView.ItemsPanel>
+                <GridView.ItemTemplate>
+                    <DataTemplate x:DataType="models:WallpaperItem">
+                        <Border Style="{StaticResource GlassCardStyle}" Width="280" Height="220" Margin="0,0,16,16" Padding="0">
+                            <Grid>
+                                <!-- Thumbnail -->
+                                <Border CornerRadius="14" Background="#111827">
+                                    <Image Source="{x:Bind ThumbnailUrl}" Stretch="UniformToFill" Opacity="0.8" />
+                                </Border>
+
+                                <!-- Bottom Scrim -->
+                                <Border CornerRadius="0,0,14,14" VerticalAlignment="Bottom" Height="80">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                            <GradientStop Color="#00090D16" Offset="0" />
+                                            <GradientStop Color="#E6090D16" Offset="1" />
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+
+                                <!-- Content -->
+                                <Grid VerticalAlignment="Bottom" Padding="14">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="{x:Bind Title}" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource AuraLoopInkBrush}" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{x:Bind Author}" FontSize="12" Foreground="{StaticResource AuraLoopMutedBrush}"/>
+                                    </StackPanel>
+
+                                    <Border Grid.Column="1" Background="#243452" CornerRadius="8" Padding="8,4" VerticalAlignment="Center">
+                                        <TextBlock Text="{x:Bind Resolution}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AuraLoopAccentBrush}"/>
+                                    </Border>
+                                </Grid>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </GridView.ItemTemplate>
+            </GridView>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

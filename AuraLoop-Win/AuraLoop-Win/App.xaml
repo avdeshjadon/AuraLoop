@@ -1,0 +1,59 @@
+<Application
+    x:Class="AuraLoop.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- AuraLoop Liquid Glass & Midnight Theme Colors -->
+            <Color x:Key="AuraLoopDarkBg">#090D16</Color>
+            <Color x:Key="AuraLoopGlassCard">#131B2E</Color>
+            <Color x:Key="AuraLoopGlassStroke">#24324D</Color>
+            <Color x:Key="AuraLoopAccent">#3CC4F0</Color>
+            <Color x:Key="AuraLoopMint">#38D6A5</Color>
+            <Color x:Key="AuraLoopInk">#F2F5F8</Color>
+            <Color x:Key="AuraLoopMuted">#9AA4B2</Color>
+
+            <SolidColorBrush x:Key="AuraLoopDarkBgBrush" Color="{StaticResource AuraLoopDarkBg}" />
+            <SolidColorBrush x:Key="AuraLoopGlassCardBrush" Color="{StaticResource AuraLoopGlassCard}" Opacity="0.82" />
+            <SolidColorBrush x:Key="AuraLoopGlassStrokeBrush" Color="{StaticResource AuraLoopGlassStroke}" />
+            <SolidColorBrush x:Key="AuraLoopAccentBrush" Color="{StaticResource AuraLoopAccent}" />
+            <SolidColorBrush x:Key="AuraLoopMintBrush" Color="{StaticResource AuraLoopMint}" />
+            <SolidColorBrush x:Key="AuraLoopInkBrush" Color="{StaticResource AuraLoopInk}" />
+            <SolidColorBrush x:Key="AuraLoopMutedBrush" Color="{StaticResource AuraLoopMuted}" />
+
+            <!-- Glass Card Style -->
+            <Style x:Key="GlassCardStyle" TargetType="Border">
+                <Setter Property="Background" Value="{StaticResource AuraLoopGlassCardBrush}" />
+                <Setter Property="BorderBrush" Value="{StaticResource AuraLoopGlassStrokeBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="14" />
+                <Setter Property="Padding" Value="16" />
+            </Style>
+
+            <!-- Glass Pill Button Style -->
+            <Style x:Key="GlassPillButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="#1A243B" />
+                <Setter Property="Foreground" Value="{StaticResource AuraLoopInkBrush}" />
+                <Setter Property="BorderBrush" Value="#2D3E61" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="20" />
+                <Setter Property="Padding" Value="16,8" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+            </Style>
+
+            <!-- Accent Button Style -->
+            <Style x:Key="AccentPillButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="{StaticResource AuraLoopAccentBrush}" />
+                <Setter Property="Foreground" Value="#090D16" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="CornerRadius" Value="20" />
+                <Setter Property="Padding" Value="18,8" />
+                <Setter Property="FontWeight" Value="Bold" />
+            </Style>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

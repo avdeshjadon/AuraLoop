@@ -24,17 +24,17 @@ jobs:
           test "$(uname -m)" = "arm64" || echo "Note: Runner is $(uname -m)"
 
       - name: Swift Build (Debug)
-        run: swift build --package-path AuraLoop
+        run: swift build --package-path AuraLoop-Mac
 
       - name: Run Unit Tests
-        run: swift test --package-path AuraLoop
+        run: swift test --package-path AuraLoop-Mac
 
       - name: Swift Build (Release)
-        run: swift build -c release --package-path AuraLoop
+        run: swift build -c release --package-path AuraLoop-Mac
 
       - name: Verify Binaries
         run: |
-          BIN_DIR="AuraLoop/.build/release"
+          BIN_DIR="AuraLoop-Mac/.build/release"
           for bin in AuraLoop-app AuraLoop-engine AuraLoop-set AuraLoop-import AuraLoop-publish AuraLoop-saver-picture; do
             if [ -f "$BIN_DIR/$bin" ]; then
               echo "✓ Found $bin: $(lipo -archs "$BIN_DIR/$bin")"
@@ -45,15 +45,15 @@ jobs:
 
       - name: Verify CLI Tools Run
         run: |
-          AuraLoop/.build/release/AuraLoop-publish --help
-          AuraLoop/.build/release/AuraLoop-set --help || true
+          AuraLoop-Mac/.build/release/AuraLoop-publish --help
+          AuraLoop-Mac/.build/release/AuraLoop-set --help || true
 
       - name: Install DMG Packaging Tools
         run: brew install create-dmg
 
       - name: Build macOS App & DMG
         run: |
-          cd AuraLoop
+          cd AuraLoop-Mac
           chmod +x build-app.sh
           ./build-app.sh --dmg
 
@@ -61,7 +61,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: AuraLoop-macOS-DMG
-          path: AuraLoop/dist/*.dmg
+          path: AuraLoop-Mac/dist/*.dmg
           if-no-files-found: error
 
       - name: Create or Update GitHub Release
@@ -69,15 +69,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION=$(grep '^VERSION=' AuraLoop/build-app.sh | cut -d'"' -f2)
+          VERSION=$(grep '^VERSION=' AuraLoop-Mac/build-app.sh | cut -d'"' -f2)
           TAG="v$VERSION"
           echo "Target Release: $TAG"
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG exists, updating DMG..."
-            gh release upload "$TAG" AuraLoop/dist/*.dmg --clobber
+            gh release upload "$TAG" AuraLoop-Mac/dist/*.dmg --clobber
           else
             echo "Creating new release $TAG..."
-            gh release create "$TAG" AuraLoop/dist/*.dmg \
+            gh release create "$TAG" AuraLoop-Mac/dist/*.dmg \
               --title "AuraLoop $TAG" \
               --generate-notes
           fi

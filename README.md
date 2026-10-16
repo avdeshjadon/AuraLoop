@@ -53,11 +53,11 @@ AuraLoop is a native macOS application engineered in Swift and SwiftUI that deli
 
 ## Project Structure & Architecture
 
-The codebase follows a strictly organized, modular design:
+The codebase follows a strictly organized, multi-platform architecture:
 
 ```
 AuraLoop/
-├── assets/                          # Static branding and media assets
+├── assets/                          # Shared branding and media assets
 │   ├── png/                         # High-resolution raster images & app icons
 │   │   ├── icon.png
 │   │   ├── icon-dark.png
@@ -70,42 +70,26 @@ AuraLoop/
 │   └── data/                        # Bundled catalog metadata & configurations
 │       └── FeaturedWallpapers.json
 │
-├── AuraLoop/                        # macOS Application Package & Core Modules
+├── AuraLoop-Mac/                    # macOS Native Application (Swift 5.9 + SwiftUI)
 │   ├── Package.swift                # Swift Package Manager manifest
 │   ├── build-app.sh                 # Production compilation, signing & DMG builder
-│   │
 │   ├── Icon/                        # macOS iconsets and icon generation
-│   │   ├── AuraLoopIcon.icon/       # Asset catalogs for macOS icon compiler (actool)
-│   │   ├── InApp/                   # Multi-theme in-app icon variations
-│   │   └── AppIcon.icns             # Standalone system application icon
-│   │
 │   ├── Sources/
-│   │   ├── AuraLoopApp/             # Primary SwiftUI application
-│   │   │   ├── AuraLoopApp.swift    # Application entry point & lifecycle
-│   │   │   ├── Views/               # Screen layouts (Home, Explore, Library, Settings, etc.)
-│   │   │   ├── Components/          # Design system, Liquid Glass UI, and controls
-│   │   │   ├── Icons/               # Vector glyphs, status symbols, and branding marks
-│   │   │   ├── Controllers/         # Menu bar, lock screen, and system observers
-│   │   │   └── Models/              # Data stores, playback states, and cache engines
-│   │   │
-│   │   ├── AuraLoopKit/             # Shared framework & domain logic
-│   │   │   ├── Core/                # Versioning, release metadata, and catalog parsers
-│   │   │   ├── Aerials/             # Apple aerial catalogs and system store bindings
-│   │   │   ├── Library/             # Wallpaper manifest, playlist manager, and importers
-│   │   │   ├── Playback/            # Multi-monitor rendering logic and schedule rules
-│   │   │   ├── Media/               # Hardware transcoders, thumbnailers, and preview cache
-│   │   │   └── Engine/              # Desktop window monitors and hardware playback engine
-│   │   │
-│   │   ├── AuraLoopWallpaperExtension/ # System wallpaper app extension
-│   │   ├── AuraLoopEngine/          # Background helper process
-│   │   ├── AuraLoopImport/          # CLI utility for batch importing video files
-│   │   ├── AuraLoopSet/             # CLI utility for setting wallpaper/screensaver
-│   │   ├── AuraLoopPrepare/         # Video asset optimization and pre-processing
-│   │   ├── AuraLoopPublish/         # Cloudflare R2 / CDN catalog publisher
-│   │   └── AuraLoopSaverPicture/    # Screensaver capture utility
-│   │
-│   └── Tests/                       # Comprehensive unit and integration test suite
-│       └── AuraLoopKitTests/        # 315+ automated test cases
+│   │   ├── AuraLoopApp/             # Primary SwiftUI application (Views, Models, Controllers)
+│   │   ├── AuraLoopKit/             # Shared framework (Aerials, Playback, Media, Engine)
+│   │   └── AuraLoopWallpaperExtension/ # System wallpaper app extension
+│   └── Tests/                       # Comprehensive unit test suite (315+ automated tests)
+│
+├── AuraLoop-Win/                    # Windows Native Application (C# .NET 8 + WinUI 3)
+│   ├── AuraLoop-Win.sln             # Visual Studio Solution
+│   ├── build.cmd                    # Automated Windows build script
+│   └── AuraLoop-Win/
+│       ├── AuraLoop-Win.csproj      # Windows App SDK project manifest
+│       ├── Native/                  # Win32 interop for WorkerW desktop injection
+│       ├── Engine/                  # WallpaperEngine & auto-pause PlaybackMonitor
+│       ├── Models/                  # Wallpaper and settings data models
+│       ├── Services/                # Catalog, storage and settings services
+│       └── Views/                   # WinUI 3 Liquid Glass views (Home, Explore, Library, Settings)
 │
 ├── LICENSE                          # Proprietary software license
 └── README.md                        # Documentation
@@ -117,28 +101,28 @@ AuraLoop/
 
 > **Notice**: This software is **Proprietary & Closed Source**. Public or unauthorized compilation, redistribution, cloning, or usage is strictly forbidden. The instructions below are provided exclusively for authorized maintainers.
 
-### Prerequisites
-
-- macOS 14.0 or newer
-- Xcode 15+ / Command Line Tools with Swift 5.9+
-
-### Build & Run Tests
+### macOS (AuraLoop-Mac)
 
 ```bash
-cd AuraLoop
+cd AuraLoop-Mac
 swift build
 swift test
-```
-
-### Packaging Application & Installer DMG
-
-```bash
-cd AuraLoop
 ./build-app.sh
 ./build-app.sh --dmg
 ```
 
-The compiled application bundle will be created at `AuraLoop/dist/AuraLoop.app` and the standalone installer at `AuraLoop/dist/AuraLoop-*.dmg`.
+### Windows (AuraLoop-Win)
+
+```cmd
+cd AuraLoop-Win
+build.cmd
+```
+or via PowerShell:
+```powershell
+dotnet build AuraLoop-Win/AuraLoop-Win.csproj -c Release
+```
+
+The compiled macOS application bundle will be created at `AuraLoop-Mac/dist/AuraLoop.app` and the standalone installer at `AuraLoop-Mac/dist/AuraLoop-*.dmg`.
 
 ---
 
