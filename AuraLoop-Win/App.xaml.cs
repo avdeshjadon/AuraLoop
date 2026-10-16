@@ -26,6 +26,10 @@ namespace AuraLoop
             IntPtr viewportHwnd = WinRT.Interop.WindowNative.GetWindowHandle(ViewportWindowInstance);
             WallpaperEngine.Instance.AttachWindow(viewportHwnd, 1920, 1080);
 
+            // Wire Store application surfaces
+            Services.Store.OnSetViewportWallpaper = path => ViewportWindowInstance?.SetWallpaper(path);
+            Services.Store.OnSetLockScreenStill = url => WallpaperEngine.Instance.SetLockScreenStill(url);
+
             // 2. Start power and window auto-pause monitor
             Monitor.Start();
 

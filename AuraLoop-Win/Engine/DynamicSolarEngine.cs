@@ -16,6 +16,11 @@ namespace AuraLoop.Engine
 
         private DynamicSolarEngine() { }
 
+        public void NotifyKeyframeChanged(WallpaperItem wallpaper, DynamicKeyframe keyframe)
+        {
+            OnKeyframeChanged?.Invoke(wallpaper, keyframe);
+        }
+
         public DynamicKeyframe? GetCurrentKeyframe(WallpaperItem wallpaper)
         {
             if (!wallpaper.IsDynamic || wallpaper.DynamicKeyframes.Count == 0)

@@ -57,6 +57,8 @@ namespace AuraLoop.Services
 
         private void UpdateStartupRegistry(bool enable)
         {
+            if (!OperatingSystem.IsWindows()) return;
+
             try
             {
                 using var key = Registry.CurrentUser.OpenSubKey(RunRegistryKey, true);

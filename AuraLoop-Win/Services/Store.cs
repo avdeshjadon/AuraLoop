@@ -135,6 +135,9 @@ namespace AuraLoop.Services
             }
         }
 
+        public static Action<string>? OnSetViewportWallpaper { get; set; }
+        public static Action<string>? OnSetLockScreenStill { get; set; }
+
         public async Task ApplyWallpaperAsync(WallpaperItem item, ApplyTarget target, ApplySurface surfaces)
         {
             ActiveWallpaper = item;
@@ -153,13 +156,13 @@ namespace AuraLoop.Services
             // 1. Desktop Surface
             if (surfaces.HasFlag(ApplySurface.Desktop))
             {
-                App.ViewportWindowInstance?.SetWallpaper(pathToUse);
+                OnSetViewportWallpaper?.Invoke(pathToUse);
             }
 
             // 2. Lock Screen Surface
             if (surfaces.HasFlag(ApplySurface.LockScreen) && !string.IsNullOrEmpty(item.ThumbnailUrl))
             {
-                WallpaperEngine.Instance.SetLockScreenStill(item.ThumbnailUrl);
+                OnSetLockScreenStill?.Invoke(item.ThumbnailUrl);
             }
 
             // 3. Update Settings
