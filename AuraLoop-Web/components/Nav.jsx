@@ -57,8 +57,8 @@ export default function Nav() {
             <img
               src="/assets/svg/auraloop-wordmark-dark.svg"
               alt="AuraLoop"
-              height="20"
-              style={{ height: '20px', width: 'auto', display: 'block' }}
+              height="23"
+              style={{ height: '23px', width: 'auto', display: 'block' }}
             />
           </a>
           <nav className="ta-nav__links" aria-label="Primary">

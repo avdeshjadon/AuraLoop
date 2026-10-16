@@ -1,19 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="220" viewBox="0 0 1200 220" role="img" aria-labelledby="title desc">
   <title id="title">Auraloop wordmark (dark)</title>
-  <desc id="desc">Minimal dark Auraloop wordmark with an infinity symbol replacing the double O, on a transparent background.</desc>
-  <g fill="#0A0C10" font-family="Avenir Next, Helvetica Neue, Arial, sans-serif" font-size="112" font-weight="300" text-anchor="middle">
-    <text x="116" y="145">A</text>
-    <text x="245" y="145">U</text>
-    <text x="365" y="145">R</text>
-    <text x="485" y="145">A</text>
-    <text x="610" y="145">L</text>
-    <text x="1018" y="145">P</text>
+  <desc id="desc">Bold, solid dark Auraloop wordmark with infinity symbol matching navbar optical weight.</desc>
+  <g fill="#0A0C10" font-family="-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif" font-size="114" font-weight="600" text-anchor="middle">
+    <text x="116" y="146">A</text>
+    <text x="245" y="146">U</text>
+    <text x="365" y="146">R</text>
+    <text x="485" y="146">A</text>
+    <text x="610" y="146">L</text>
+    <text x="1018" y="146">P</text>
   </g>
   <path d="M 695,111
            C 728,61 768,61 807,111
            C 846,161 886,161 919,111
            C 886,61 846,61 807,111
            C 768,161 728,161 695,111 Z"
-        fill="none" stroke="#0A0C10" stroke-width="11"
+        fill="none" stroke="#0A0C10" stroke-width="20"
         stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
