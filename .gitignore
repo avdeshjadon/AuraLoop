@@ -1,18 +1,10 @@
 # Build output
 AuraLoop/.build/
 AuraLoop/dist/
-AuraLoop-Mac/.build/
-AuraLoop-Mac/dist/
-AuraLoop-Mac/Icon/out/
-AuraLoop-Mac/Icon/icongen
-AuraLoop-Win/bin/
-AuraLoop-Win/obj/
+AuraLoop/Icon/out/
+AuraLoop/Icon/icongen
 .build/
 dist/
-bin/
-obj/
-*.user
-*.suo
 
 # Test media and source videos — never in git. Wallpapers ship as GitHub
 # release assets and reach the app through catalog.json.

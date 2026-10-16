@@ -1,6 +1,3 @@
 # Linguistic overrides for GitHub repository statistics
-# Treat WinUI 3 XAML files as C#
-AuraLoop-Win/**/*.xaml linguist-language=C#
-
 # Vendor test files to avoid skewing production codebase language distribution
-AuraLoop-Mac/Tests/** linguist-vendored
+AuraLoop/Tests/** linguist-vendored

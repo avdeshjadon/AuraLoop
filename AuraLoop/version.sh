@@ -33,7 +33,7 @@ if [ -z "$NEW_VERSION" ] || [ -z "$NEW_BUILD" ]; then
     exit 1
 fi
 
-echo "==> Updating AuraLoop-Mac to Version: $NEW_VERSION (Build: $NEW_BUILD)"
+echo "==> Updating AuraLoop to Version: $NEW_VERSION (Build: $NEW_BUILD)"
 
 # 1. Update VERSION file
 cat > "$VERSION_FILE" <<EOF
@@ -60,4 +60,4 @@ if [ -f "$WHATSNEW_FILE" ]; then
     portable_sed "s/version: \".*\"/version: \"$NEW_VERSION\"/" "$WHATSNEW_FILE"
 fi
 
-echo "✓ Successfully updated AuraLoop-Mac to $NEW_VERSION ($NEW_BUILD) across all files!"
+echo "✓ Successfully updated AuraLoop to $NEW_VERSION ($NEW_BUILD) across all files!"

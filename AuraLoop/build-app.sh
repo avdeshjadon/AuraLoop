@@ -7,7 +7,7 @@ set -e
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# The one place AuraLoop's version is written (AuraLoop-Mac/VERSION).
+# The one place AuraLoop's version is written (AuraLoop/VERSION).
 if [ -f "$DIR/VERSION" ]; then
     source "$DIR/VERSION"
 else

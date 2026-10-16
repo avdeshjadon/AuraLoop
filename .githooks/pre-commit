@@ -1,22 +1,14 @@
 #!/bin/bash
 # Pre-commit hook for AuraLoop:
 # Automatically synchronizes versions across all platform files whenever you commit,
-# simply by editing AuraLoop-Mac/VERSION or AuraLoop-Win/VERSION!
+# simply by editing AuraLoop/VERSION!
 
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 
-# 1. Sync AuraLoop-Mac
-if [ -f "$ROOT_DIR/AuraLoop-Mac/version.sh" ] && [ -f "$ROOT_DIR/AuraLoop-Mac/VERSION" ]; then
-    bash "$ROOT_DIR/AuraLoop-Mac/version.sh" >/dev/null 2>&1 || true
-    git add "$ROOT_DIR/AuraLoop-Mac/VERSION" \
-            "$ROOT_DIR/AuraLoop-Mac/build-app.sh" \
-            "$ROOT_DIR/AuraLoop-Mac/Sources/AuraLoopApp/Views/WhatsNewView.swift" 2>/dev/null || true
-fi
-
-# 2. Sync AuraLoop-Win
-if [ -f "$ROOT_DIR/AuraLoop-Win/version.sh" ] && [ -f "$ROOT_DIR/AuraLoop-Win/VERSION" ]; then
-    bash "$ROOT_DIR/AuraLoop-Win/version.sh" >/dev/null 2>&1 || true
-    git add "$ROOT_DIR/AuraLoop-Win/VERSION" \
-            "$ROOT_DIR/AuraLoop-Win/AuraLoop-Win.csproj" \
-            "$ROOT_DIR/AuraLoop-Win/Views/SettingsView.xaml" 2>/dev/null || true
+# Sync AuraLoop
+if [ -f "$ROOT_DIR/AuraLoop/version.sh" ] && [ -f "$ROOT_DIR/AuraLoop/VERSION" ]; then
+    bash "$ROOT_DIR/AuraLoop/version.sh" >/dev/null 2>&1 || true
+    git add "$ROOT_DIR/AuraLoop/VERSION" \
+            "$ROOT_DIR/AuraLoop/build-app.sh" \
+            "$ROOT_DIR/AuraLoop/Sources/AuraLoopApp/Views/WhatsNewView.swift" 2>/dev/null || true
 fi
