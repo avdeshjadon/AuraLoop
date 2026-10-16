@@ -70,7 +70,7 @@ namespace AuraLoop.Controls
             {
                 Background = new SolidColorBrush(background),
                 CornerRadius = new CornerRadius(10),
-                Padding = new Thickness(8, 3),
+                Padding = new Thickness(8, 3, 8, 3),
                 Child = new TextBlock
                 {
                     Text = text,
