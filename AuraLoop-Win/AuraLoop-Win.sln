@@ -4,6 +4,8 @@ VisualStudioVersion = 17.8.34330.188
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AuraLoop-Win", "AuraLoop-Win.csproj", "{4B2B64B7-3E3F-4FA4-8AC8-71A37AEF1C42}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AuraLoop.Tests", "Tests\AuraLoop.Tests.csproj", "{5C3B75A8-4F4E-4FA5-9AC9-82B48BEF2D53}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
