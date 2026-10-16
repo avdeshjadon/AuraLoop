@@ -8,8 +8,8 @@ set -e
 # The one place AuraLoop's version is written. The app bundle, the wallpaper
 # extension and the DMG name are all derived from these two lines, and the
 # build fails below if the app and the extension ever disagree.
-VERSION="6.4.0"
-BUILD="111"
+VERSION="6.5.0"
+BUILD="112"
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 APP="$DIR/dist/AuraLoop.app"

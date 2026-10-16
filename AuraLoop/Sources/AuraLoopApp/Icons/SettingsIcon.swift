@@ -21,7 +21,7 @@ import AppKit
 enum SettingsIcon {
     case launchAtLogin, menuBar, dockIcon, playbackSpeed, defaultQuality, pauseAfter, audio
     case replay, screenSaver, lowPower, lowBattery, covered, desktopOnly
-    case builtInDisplay, externalDisplay, storage, downloadFolder, softwareUpdate, support
+    case builtInDisplay, externalDisplay, storage, downloadFolder, softwareUpdate
     /// Default, Light or Dark (6.0). Drawn here on the same grid and rules,
     /// like Download Folder: a circle half light and half dark.
     case appearance
@@ -49,7 +49,6 @@ enum SettingsIcon {
         case .storage: return Color(hex: 0x9AA4B2)
         case .downloadFolder: return Color(hex: 0xFFB23F)
         case .softwareUpdate: return Color(hex: 0x45D483)
-        case .support: return Color(hex: 0xFF6B8E)
         case .appearance: return Color(hex: 0xB9C2D0)
         case .menuBarIcon: return Color(hex: 0xF5C451)
         case .audio: return Color(hex: 0x3CC4F0)
@@ -77,7 +76,6 @@ enum SettingsIcon {
         case .storage: return Color(hex: 0xCCD2D8)
         case .downloadFolder: return Color(hex: 0xFFD89F)
         case .softwareUpdate: return Color(hex: 0xA2EAC1)
-        case .support: return Color(hex: 0xFFB5C6)
         case .appearance: return Color(hex: 0xDCE1E8)
         case .menuBarIcon: return Color(hex: 0xFAE1A8)
         }
@@ -95,9 +93,8 @@ enum SettingsIcon {
         }
     }
 
-    /// How strong the soft fill inside a glyph is. The heart is filled more,
-    /// so it still reads as a heart at this size.
-    var softFillOpacity: Double { self == .support ? 0.4 : 0.28 }
+    /// How strong the soft fill inside a glyph is.
+    var softFillOpacity: Double { 0.28 }
 
     fileprivate func draw(_ context: GraphicsContext, color: Color) {
         func fill(_ path: Path, soft: Bool = false) {
@@ -367,31 +364,6 @@ enum SettingsIcon {
                 p.addLine(to: pt(9, 12.25))
                 p.addLine(to: pt(11.75, 9.5))
             })
-        case .support:
-            fill(Path { p in
-                p.move(to: pt(9, 15.4))
-                p.addCurve(to: pt(2, 6.55), control1: pt(9, 15.4), control2: pt(2, 11.4))
-                p.addCurve(to: pt(5.95, 2.6), control1: pt(2, 4.35), control2: pt(3.75, 2.6))
-                p.addCurve(to: pt(9, 4.35), control1: pt(7.3, 2.6), control2: pt(8.4, 3.3))
-                p.addCurve(to: pt(12.05, 2.6), control1: pt(9.6, 3.3), control2: pt(10.7, 2.6))
-                p.addCurve(to: pt(16, 6.55), control1: pt(14.25, 2.6), control2: pt(16, 4.35))
-                p.addCurve(to: pt(9, 15.4), control1: pt(16, 11.4), control2: pt(9, 15.4))
-                p.closeSubpath()
-            }, soft: true)
-            stroke(Path { p in
-                p.move(to: pt(9, 15.4))
-                p.addCurve(to: pt(2, 6.55), control1: pt(9, 15.4), control2: pt(2, 11.4))
-                p.addCurve(to: pt(5.95, 2.6), control1: pt(2, 4.35), control2: pt(3.75, 2.6))
-                p.addCurve(to: pt(9, 4.35), control1: pt(7.3, 2.6), control2: pt(8.4, 3.3))
-                p.addCurve(to: pt(12.05, 2.6), control1: pt(9.6, 3.3), control2: pt(10.7, 2.6))
-                p.addCurve(to: pt(16, 6.55), control1: pt(14.25, 2.6), control2: pt(16, 4.35))
-                p.addCurve(to: pt(9, 15.4), control1: pt(16, 11.4), control2: pt(9, 15.4))
-                p.closeSubpath()
-            })
-            stroke(Path { p in
-                p.move(to: pt(4.9, 6.2))
-                p.addCurve(to: pt(6.35, 4.75), control1: pt(5, 5.35), control2: pt(5.55, 4.85))
-            }, width: 1.1, opacity: 0.8)
         case .appearance:
             // The left half soft, the right half solid; 3.728 is the radius,
             // 6.75, times 0.5523 for a quarter circle.
@@ -444,7 +416,6 @@ enum SettingsIcon {
         case .storage: return "internaldrive.fill"
         case .downloadFolder: return "folder.fill"
         case .softwareUpdate: return "arrow.triangle.2.circlepath.circle.fill"
-        case .support: return "heart.fill"
         case .audio: return "speaker.wave.2.fill"
         }
     }

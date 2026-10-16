@@ -34,28 +34,20 @@ AuraLoop is a native macOS application engineered in Swift and SwiftUI that deli
 
 ## Key Features
 
-- 🌙 **Seamless Video Wallpapers** — Smooth, continuous looping on every connected display simultaneously.
-- 🔒 **Lock Screen Support** — Play distinct or synchronized live wallpapers on your macOS lock screen.
-- 🖥️ **Screen Saver Engine** — Run high-definition live video as your native macOS screen saver with customizable idle delays.
-- 🍎 **Curated Apple Aerials** — Browse and enjoy Apple's Aerials, Dynamic Wallpapers, and system aerial screen savers in 4K.
-- 🪶 **Hardware-Accelerated Efficiency** — Hardware-decoded HEVC/H.265 playback via AVFoundation ensures virtually zero CPU overhead.
-- 😴 **Smart Power Management** — Automatically pauses during fullscreen applications, display sleep, low power mode, and battery thresholds.
-- 🖱️ **Desktop Awareness** — Option to pause during active work and resume playback when the desktop is revealed.
-- ⚡ **Adaptive Frame Rates** — Switch between native high frame rate and energy-efficient 30 fps per wallpaper.
-- 🖼️ **Explore & Preview Catalog** — Fullscreen interactive preview with on-demand download management.
-- 📃 **Custom Playlists & Automation** — Timed rotations, randomized shuffling, and full 24-hour day/night schedules.
-- 📥 **Universal Importer** — Drag-and-drop support for custom video files (auto-transcoded to optimized HEVC) and `.saver` bundles.
-- 🎛️ **Menu Bar Controller** — Instant playback control, track skipping, and preset selection from the system menu bar.
+- **Seamless Video Wallpapers** — Smooth, continuous looping on every connected display simultaneously.
+- **Lock Screen Support** — Play distinct or synchronized live wallpapers on your macOS lock screen.
+- **Screen Saver Engine** — Run high-definition live video as your native macOS screen saver with customizable idle delays.
+- **Curated Apple Aerials** — Browse and enjoy Apple's Aerials, Dynamic Wallpapers, and system aerial screen savers in 4K.
+- **Hardware-Accelerated Efficiency** — Hardware-decoded HEVC/H.265 playback via AVFoundation ensures virtually zero CPU overhead.
+- **Smart Power Management** — Automatically pauses during fullscreen applications, display sleep, low power mode, and battery thresholds.
+- **Desktop Awareness** — Option to pause during active work and resume playback when the desktop is revealed.
+- **Adaptive Frame Rates** — Switch between native high frame rate and energy-efficient 30 fps per wallpaper.
+- **Explore & Preview Catalog** — Fullscreen interactive preview with on-demand download management.
+- **Custom Playlists & Automation** — Timed rotations, randomized shuffling, and full 24-hour day/night schedules.
+- **Universal Importer** — Drag-and-drop support for custom video files (auto-transcoded to optimized HEVC) and `.saver` bundles.
+- **Menu Bar Controller** — Instant playback control, track skipping, and preset selection from the system menu bar.
 
 > **System Requirements**: macOS 14.0 (Sonoma) or newer. Universal binary compiled for Apple Silicon and Intel architectures. Lock screen and screen saver features require macOS 15 / 26+.
-
----
-
-## Visual Showcase
-
-<p align="center">
-  <img src="screenshots/AuraLoop-6-demo.gif" width="820" alt="AuraLoop interactive gallery demonstration">
-</p>
 
 ---
 
@@ -115,7 +107,6 @@ AuraLoop/
 │   └── Tests/                       # Comprehensive unit and integration test suite
 │       └── AuraLoopKitTests/        # 315+ automated test cases
 │
-├── screenshots/                     # Preview images and animated GIFs
 ├── LICENSE                          # Proprietary software license
 └── README.md                        # Documentation
 ```
@@ -134,13 +125,8 @@ AuraLoop/
 ### Build & Run Tests
 
 ```bash
-# Navigate to the Swift package directory
 cd AuraLoop
-
-# Compile the project
 swift build
-
-# Run the automated test suite
 swift test
 ```
 
@@ -148,11 +134,7 @@ swift test
 
 ```bash
 cd AuraLoop
-
-# Build the complete universal application bundle
 ./build-app.sh
-
-# Build and assemble the release DMG package
 ./build-app.sh --dmg
 ```
 
