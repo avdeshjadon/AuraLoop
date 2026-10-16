@@ -40,7 +40,7 @@ namespace AuraLoop.Controls
             {
                 Content = stack,
                 CornerRadius = new CornerRadius(18),
-                Padding = new Thickness(16, 7),
+                Padding = new Thickness(16, 7, 16, 7),
                 Background = isAccent ? new SolidColorBrush(GlassKit.AccentElectricBlue) : new SolidColorBrush(Color.FromArgb(255, 26, 36, 59)),
                 BorderBrush = isAccent ? null : new SolidColorBrush(GlassKit.GlassBorderStroke),
                 BorderThickness = isAccent ? new Thickness(0) : new Thickness(1)
