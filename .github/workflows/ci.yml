@@ -60,7 +60,7 @@ jobs:
         run: dotnet restore AuraLoop-Win/AuraLoop-Win.sln -p:Platform=x64
 
       - name: Run Windows Unit Tests
-        run: dotnet test AuraLoop-Win/Tests/AuraLoop.Tests.csproj -c Release -p:Platform=x64 -p:RuntimeIdentifier=win-x64
+        run: dotnet test AuraLoop-Win/Tests/AuraLoop.Tests.csproj -c Release -p:Platform=x64 -r win-x64
 
       - name: Build & Publish AuraLoop-Win (win-x64)
         shell: pwsh
