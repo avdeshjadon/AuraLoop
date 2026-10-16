@@ -201,12 +201,14 @@
   filter: saturate(0.8);
 }
 .ta-btn--ink {
-  color: #fff;
+  color: #ffffff !important;
   background: linear-gradient(180deg, #2f2824 0%, #17130f 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 1px 2px rgba(23, 19, 15, 0.3), 0 8px 18px -8px rgba(23, 19, 15, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 3px rgba(23, 19, 15, 0.4), 0 8px 18px -8px rgba(23, 19, 15, 0.5);
 }
 .ta-btn--ink:hover {
-  background: linear-gradient(180deg, #3b332d 0%, #1d1814 100%);
+  color: #ffffff !important;
+  background: linear-gradient(180deg, #3d342f 0%, #1f1a15 100%);
 }
 .ta-btn--ghost {
   height: 40px;

@@ -70,9 +70,6 @@ export default function AuraLoopWeb() {
   return (
     <MotionConfig reducedMotion="user">
       <div className="ta" ref={rootRef} onClick={onAnchorClick}>
-        <a className="skip-link" href="#main">
-          Skip to content
-        </a>
         <Nav />
         <main id="main" tabIndex={-1}>
           <Hero />

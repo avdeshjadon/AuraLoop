@@ -1,570 +1,631 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { GROUPS, PEOPLE } from '../data.js';
 import * as I from '../icons.jsx';
 
-const SOLAR_PRESETS = [
-  { id: 'dawn', label: 'Dawn', time: '06:45', elev: '+4.2°', filter: 'sepia(0.2) saturate(1.15) brightness(0.94)' },
-  { id: 'noon', label: 'Solar Noon', time: '12:30', elev: '+62.8°', filter: 'brightness(1.05) contrast(1.02)' },
-  { id: 'dusk', label: 'Sunset & Dusk', time: '18:15', elev: '+1.5°', filter: 'hue-rotate(-18deg) saturate(1.35) brightness(0.9)' },
-  { id: 'night', label: 'Astronomical Night', time: '23:00', elev: '-24.0°', filter: 'hue-rotate(185deg) contrast(1.18) brightness(0.65)' },
+export const APP_WALLPAPERS = [
+  {
+    id: 'waterfall',
+    title: 'Waterfall Behind the Pines',
+    category: 'Nature',
+    res: '3840×2160',
+    duration: '0:02',
+    size: '2 MB',
+    fps: 25,
+    photo: '1432401990419-f50e835c415b',
+  },
+  {
+    id: 'moonlit',
+    title: 'Moonlit Night Lake',
+    category: 'Minimalist',
+    res: '3840×2160',
+    duration: '0:03',
+    size: '3 MB',
+    fps: 60,
+    photo: '1507525428034-b723cf961d3e',
+  },
+  {
+    id: 'aurora',
+    title: 'Aurora Reflections',
+    category: 'Dynamic Solar',
+    res: '3840×2160',
+    duration: '0:04',
+    size: '4 MB',
+    fps: 60,
+    photo: '1531366936337-7c912a4589a7',
+  },
+  {
+    id: 'patagonia',
+    title: 'Mountain Lake & Clouds',
+    category: 'Aerial',
+    res: '3840×2160',
+    duration: '0:05',
+    size: '5 MB',
+    fps: 60,
+    photo: '1464822759023-fed622ff2c3b',
+  },
+  {
+    id: 'sakura',
+    title: 'Sakura Blossoms',
+    category: 'Nature',
+    res: '3840×2160',
+    duration: '0:03',
+    size: '3 MB',
+    fps: 60,
+    photo: '1522383225653-ed111181a951',
+  },
+  {
+    id: 'cabin',
+    title: 'Starry Night Cabin',
+    category: 'Night',
+    res: '3840×2160',
+    duration: '0:04',
+    size: '4 MB',
+    fps: 30,
+    photo: '1518241353330-0f7941c2d9b5',
+  },
+  {
+    id: 'fireplace',
+    title: 'Forest Balcony Fireplace',
+    category: 'Cozy',
+    res: '3840×2160',
+    duration: '0:03',
+    size: '3 MB',
+    fps: 30,
+    photo: '1542314831-068cd1dbfeeb',
+  },
+  {
+    id: 'ocean',
+    title: 'Ocean Sunset Surf',
+    category: 'Cinematic',
+    res: '3840×2160',
+    duration: '0:02',
+    size: '2 MB',
+    fps: 60,
+    photo: '1509316975850-ff9c5deb0cd9',
+  },
+  {
+    id: 'snowfall',
+    title: 'Snowy Mountain Peaks',
+    category: 'Alpine',
+    res: '3840×2160',
+    duration: '0:05',
+    size: '4 MB',
+    fps: 60,
+    photo: '1517299321609-52687d1bc55a',
+  },
+  {
+    id: 'fuji',
+    title: 'Milky Way Over Fuji',
+    category: 'Liquid Retina XDR',
+    res: '3840×2160',
+    duration: '0:04',
+    size: '3 MB',
+    fps: 60,
+    photo: '1578637387939-43c525550085',
+  },
 ];
 
 const TABS = [
-  { id: 'home', label: 'Home', icon: I.Inbox },
-  { id: 'explore', label: 'Explore', icon: I.Compass },
-  { id: 'favorites', label: 'Favorites', icon: I.Heart },
-  { id: 'library', label: 'Library', icon: I.Layers },
+  { id: 'home', label: 'Home' },
+  { id: 'explore', label: 'Explore' },
+  { id: 'favorites', label: 'Favorites' },
+  { id: 'library', label: 'Library' },
 ];
 
-export default function InboxWindow({ inbox, dispatch, regionRef }) {
-  const { convos, order, selected, collapsed } = inbox;
-  const current = selected ? convos[selected] : convos.snowfall || convos[order[0]];
-  const person = current ? PEOPLE[current.person] : PEOPLE.snowfall;
+export default function InboxWindow({ inbox, regionRef }) {
+  const [activeTab, setActiveTab] = useState('home');
+  const [selectedId, setSelectedId] = useState('waterfall');
+  const [favorite, setFavorite] = useState(false);
+  const [appliedToast, setAppliedToast] = useState(false);
 
-  const [tab, setTab] = useState('home');
-  const [solar, setSolar] = useState('noon');
-  const [applied, setApplied] = useState(false);
-  const [screensaver, setScreensaver] = useState(false);
-  const [audio, setAudio] = useState(false);
-  const [displayTarget, setDisplayTarget] = useState('main'); // 'main' | 'dual'
+  // Sync with Hero floating card clicks if matched
+  const selectedFromInbox = inbox?.selected;
+  useEffect(() => {
+    if (selectedFromInbox) {
+      const match = APP_WALLPAPERS.find(w => w.id === selectedFromInbox);
+      if (match) setSelectedId(match.id);
+    }
+  }, [selectedFromInbox]);
 
-  const activeSolar = SOLAR_PRESETS.find(s => s.id === solar) || SOLAR_PRESETS[1];
+  const current = APP_WALLPAPERS.find(w => w.id === selectedId) || APP_WALLPAPERS[0];
 
   const handleApply = () => {
-    setApplied(true);
-    setTimeout(() => setApplied(false), 3800);
+    setAppliedToast(true);
+    setTimeout(() => setAppliedToast(false), 3200);
   };
 
-  const handleScreensaver = () => {
-    setScreensaver(true);
-    setTimeout(() => setScreensaver(false), 3800);
-  };
-
-  const groups = GROUPS.map(g => ({
-    ...g,
-    items: order.filter(id => convos[id].group === g.id),
-  }));
-
-  const bgUrl = person?.photo
-    ? `https://images.unsplash.com/photo-${person.photo}?auto=format&fit=crop&w=1280&q=85`
-    : '/assets/png/icon.png';
+  const bgUrl = `https://images.unsplash.com/photo-${current.photo}?auto=format&fit=crop&w=1400&q=85`;
 
   return (
     <div
       className="ta-win"
       ref={regionRef}
       role="region"
-      aria-label="AuraLoop Native macOS Player"
+      aria-label="AuraLoop macOS Native Application"
       tabIndex={0}
       style={{
-        display: 'grid',
-        gridTemplateRows: '38px minmax(0, 1fr) 30px',
-        height: '630px',
-        background: '#181412',
-        border: '1px solid rgba(255, 255, 255, 0.12)',
-        boxShadow: '0 30px 90px -20px rgba(0, 0, 0, 0.65), 0 0 1px 1px rgba(255, 255, 255, 0.1)',
+        display: 'flex',
+        flexDirection: 'column',
+        height: '670px',
+        borderRadius: '18px',
+        overflow: 'hidden',
+        background: '#0a0d12',
+        border: '1px solid rgba(255, 255, 255, 0.14)',
+        boxShadow:
+          '0 32px 100px -20px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 60px -10px rgba(23, 30, 42, 0.6)',
+        position: 'relative',
+        userSelect: 'none',
+        textAlign: 'left',
       }}
     >
-      {/* ---------------- macOS Window Titlebar ---------------- */}
+      {/* ---------------- Top macOS Chrome Header ---------------- */}
       <div
-        className="ta-win__bar"
         style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 10,
+          height: '52px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 14px',
-          background: 'linear-gradient(180deg, #2a2420 0%, #1e1916 100%)',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-          color: '#fff',
+          padding: '0 20px',
+          background: 'linear-gradient(180deg, rgba(10, 13, 18, 0.75) 0%, rgba(10, 13, 18, 0) 100%)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
         }}
       >
-        {/* Left: macOS Stoplights */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, width: '120px' }}>
-          <span style={{ width: 11, height: 11, borderRadius: '50%', background: '#ff5f56', border: '1px solid #e0443e', display: 'inline-block' }} />
-          <span style={{ width: 11, height: 11, borderRadius: '50%', background: '#ffbd2e', border: '1px solid #dea123', display: 'inline-block' }} />
-          <span style={{ width: 11, height: 11, borderRadius: '50%', background: '#27c93f', border: '1px solid #1aab29', display: 'inline-block' }} />
+        {/* Left: macOS Stoplights & App Squircle + Wordmark */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          {/* Traffic Lights */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <span style={{ width: 11, height: 11, borderRadius: '50%', background: '#ff5f56', border: '1px solid #e0443e', display: 'inline-block' }} />
+            <span style={{ width: 11, height: 11, borderRadius: '50%', background: '#ffbd2e', border: '1px solid #dea123', display: 'inline-block' }} />
+            <span style={{ width: 11, height: 11, borderRadius: '50%', background: '#27c93f', border: '1px solid #1aab29', display: 'inline-block' }} />
+          </div>
+
+          {/* Squircle App Icon + Wordmark */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginLeft: 8 }}>
+            <div
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: 7,
+                background: 'linear-gradient(145deg, #253347 0%, #101824 100%)',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25), 0 2px 5px rgba(0,0,0,0.4)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                display: 'grid',
+                placeItems: 'center',
+              }}
+            >
+              <img
+                src="/assets/svg/auraloop.svg"
+                alt=""
+                width="16"
+                height="9"
+                style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))' }}
+              />
+            </div>
+            <img
+              src="/assets/svg/auraloop-wordmark.svg"
+              alt="AuraLoop"
+              height="11"
+              style={{ height: '11px', width: 'auto', opacity: 0.9, letterSpacing: '0.1em' }}
+            />
+          </div>
         </div>
 
-        {/* Center: App Tabs */}
-        <nav style={{ display: 'inline-flex', background: 'rgba(0,0,0,0.3)', padding: 2, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)' }}>
+        {/* Center: Glass Pill Segmented Control */}
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            padding: '3px',
+            borderRadius: 999,
+            background: 'rgba(255, 255, 255, 0.08)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            backdropFilter: 'blur(16px)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 12px rgba(0,0,0,0.25)',
+          }}
+        >
           {TABS.map(t => {
-            const Icon = t.icon;
-            const on = tab === t.id;
+            const on = activeTab === t.id;
             return (
               <button
                 key={t.id}
                 type="button"
-                onClick={() => setTab(t.id)}
+                onClick={() => setActiveTab(t.id)}
                 style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 5,
-                  padding: '4px 11px',
-                  borderRadius: 6,
-                  fontSize: '12px',
-                  fontWeight: 500,
                   border: 'none',
+                  borderRadius: 999,
+                  padding: '5px 16px',
+                  fontSize: '12.5px',
+                  fontWeight: on ? 600 : 500,
                   cursor: 'pointer',
-                  color: on ? '#fff' : 'rgba(255, 255, 255, 0.55)',
-                  background: on ? 'rgba(255, 255, 255, 0.16)' : 'transparent',
-                  boxShadow: on ? '0 1px 3px rgba(0,0,0,0.4)' : 'none',
-                  transition: 'all 0.18s',
+                  color: on ? '#0c0f14' : 'rgba(255, 255, 255, 0.7)',
+                  background: on ? '#ffffff' : 'transparent',
+                  boxShadow: on ? '0 2px 8px rgba(0,0,0,0.35)' : 'none',
+                  transition: 'all 0.2s cubic-bezier(0.2, 0.7, 0.2, 1)',
                 }}
               >
-                <Icon size={12} />
-                <span>{t.label}</span>
+                {t.label}
               </button>
             );
           })}
-        </nav>
+        </div>
 
-        {/* Right: Hardware Telemetry Pill */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '3px 9px',
-              borderRadius: 999,
-              background: 'rgba(40, 200, 64, 0.12)',
-              border: '1px solid rgba(40, 200, 64, 0.25)',
-              color: '#4ade80',
-              fontSize: '11px',
-              fontFamily: 'var(--ta-mono)',
-              fontWeight: 500,
-            }}
-          >
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 6px #4ade80' }} />
-            AVFoundation · 0.28% CPU
-          </span>
-          <button
-            type="button"
-            onClick={() => setAudio(!audio)}
-            title={audio ? 'Ambient Audio On' : 'Ambient Audio Muted'}
-            style={{
-              border: 'none',
-              background: audio ? 'rgba(228, 87, 46, 0.25)' : 'rgba(255, 255, 255, 0.08)',
-              color: audio ? '#f97316' : 'rgba(255, 255, 255, 0.6)',
-              borderRadius: 6,
-              width: 24,
-              height: 24,
-              display: 'grid',
-              placeItems: 'center',
-              cursor: 'pointer',
-            }}
-          >
-            {audio ? <I.Volume size={13} /> : <I.VolumeX size={13} />}
-          </button>
+        {/* Right: Glass Circle Action Buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {[
+            { id: 'search', icon: '🔍', title: 'Search Catalog' },
+            { id: 'sun', icon: '☀️', title: 'Appearance / Solar' },
+            { id: 'plus', icon: '＋', title: 'Import Wallpaper' },
+            { id: 'gear', icon: '⚙️', title: 'Preferences' },
+          ].map(btn => (
+            <button
+              key={btn.id}
+              type="button"
+              title={btn.title}
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: '50%',
+                border: '1px solid rgba(255, 255, 255, 0.14)',
+                background: 'rgba(255, 255, 255, 0.09)',
+                color: 'rgba(255, 255, 255, 0.85)',
+                fontSize: '12px',
+                display: 'grid',
+                placeItems: 'center',
+                cursor: 'pointer',
+                backdropFilter: 'blur(8px)',
+                transition: 'background 0.2s',
+              }}
+            >
+              <span>{btn.icon}</span>
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* ---------------- Window Body ---------------- */}
+      {/* ---------------- Main Content Body ---------------- */}
       <div
-        className="ta-win__body"
         style={{
-          display: 'grid',
-          gridTemplateColumns: '46px 210px minmax(0, 1fr)',
-          minHeight: 0,
-          background: '#15110f',
+          position: 'relative',
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          overflow: 'hidden',
+          paddingTop: '60px',
         }}
       >
-        {/* Left Icon Rail */}
+        {/* Full-bleed Wallpaper Hero Background */}
         <div
           style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 12,
-            paddingTop: 12,
-            background: '#1a1614',
-            borderRight: '1px solid rgba(255, 255, 255, 0.06)',
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: `url(${bgUrl})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center 40%',
+            transition: 'background-image 0.5s ease',
           }}
-        >
-          <span style={{ width: 30, height: 30, borderRadius: 7, display: 'grid', placeItems: 'center', background: 'rgba(228,87,46,0.2)', color: '#f97316' }}>
-            <I.Monitor size={15} />
-          </span>
-          <span style={{ width: 30, height: 30, borderRadius: 7, display: 'grid', placeItems: 'center', background: 'transparent', color: 'rgba(255,255,255,0.4)' }}>
-            <I.Sun size={15} />
-          </span>
-          <span style={{ width: 30, height: 30, borderRadius: 7, display: 'grid', placeItems: 'center', background: 'transparent', color: 'rgba(255,255,255,0.4)' }}>
-            <I.Shield size={15} />
-          </span>
-          <span style={{ width: 30, height: 30, borderRadius: 7, display: 'grid', placeItems: 'center', background: 'transparent', color: 'rgba(255,255,255,0.4)' }}>
-            <I.Sliders size={15} />
-          </span>
-        </div>
+        />
 
-        {/* Sidebar: Wallpaper Library */}
-        <nav
+        {/* Film Vignette & Gradient Overlays (exact fade curve from macOS app) */}
+        <div
           style={{
-            minHeight: 0,
-            overflowY: 'auto',
-            padding: '12px 8px',
-            background: 'linear-gradient(180deg, #1f1a17 0%, #171311 100%)',
-            borderRight: '1px solid rgba(255, 255, 255, 0.06)',
-            scrollbarWidth: 'none',
+            position: 'absolute',
+            inset: 0,
+            background:
+              'linear-gradient(180deg, rgba(8,11,16,0.35) 0%, rgba(8,11,16,0) 30%, rgba(8,11,16,0.5) 65%, rgba(8,11,16,0.92) 88%, #080b10 100%)',
           }}
-          aria-label="Wallpapers Catalog"
-        >
-          <div style={{ marginBottom: 10, padding: '0 4px' }}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '4px 8px',
-                borderRadius: 6,
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                color: 'rgba(255, 255, 255, 0.45)',
-                fontSize: '11px',
-              }}
-            >
-              <span>🔍</span>
-              <span>Search 4K Library…</span>
-            </div>
-          </div>
+        />
 
-          {groups.map(g => {
-            const isOpen = !collapsed[g.id];
-            return (
-              <div key={g.id} style={{ marginBottom: 12 }}>
-                <button
-                  type="button"
-                  onClick={() => dispatch({ type: 'toggle', group: g.id })}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    width: '100%',
-                    padding: '4px 6px',
-                    border: 'none',
-                    background: 'transparent',
-                    color: 'rgba(255, 255, 255, 0.45)',
-                    fontSize: '10.5px',
-                    fontWeight: 600,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <span>{g.label}</span>
-                  <I.Chevron size={11} style={{ transform: isOpen ? 'rotate(0)' : 'rotate(-90deg)', transition: 'transform 0.2s' }} />
-                </button>
-
-                {isOpen && (
-                  <ul style={{ listStyle: 'none', padding: 0, margin: '3px 0 0 0', display: 'grid', gap: 2 }}>
-                    {g.items.map(id => {
-                      const c = convos[id];
-                      const p = PEOPLE[c.person];
-                      const on = id === (selected || 'snowfall');
-                      const thumbUrl = p.photo
-                        ? `https://images.unsplash.com/photo-${p.photo}?auto=format&fit=crop&w=80&q=75`
-                        : '';
-                      return (
-                        <li key={id}>
-                          <button
-                            type="button"
-                            onClick={() => dispatch({ type: 'select', id })}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 8,
-                              width: '100%',
-                              padding: '5px 7px',
-                              borderRadius: 7,
-                              border: 'none',
-                              textAlign: 'left',
-                              cursor: 'pointer',
-                              background: on ? 'rgba(228, 87, 46, 0.22)' : 'transparent',
-                              borderLeft: on ? '2px solid #e4572e' : '2px solid transparent',
-                              color: on ? '#fff' : 'rgba(255, 255, 255, 0.75)',
-                              transition: 'background 0.15s',
-                            }}
-                          >
-                            <img
-                              src={thumbUrl}
-                              alt=""
-                              style={{ width: 22, height: 22, borderRadius: 4, objectFit: 'cover' }}
-                            />
-                            <span style={{ flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', fontSize: '12px', fontWeight: on ? 550 : 450 }}>
-                              {p.name}
-                            </span>
-                            {on && (
-                              <span style={{ fontSize: '9px', fontWeight: 600, padding: '1px 4px', borderRadius: 3, background: '#e4572e', color: '#fff' }}>
-                                LIVE
-                              </span>
-                            )}
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </div>
-            );
-          })}
-        </nav>
-
-        {/* Main Stage: 4K Live Wallpaper Viewport & Controls */}
+        {/* Hero Content Overlay: FEATURED, Title, Meta, Buttons */}
         <div
           style={{
             position: 'relative',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            overflow: 'hidden',
-            padding: 16,
+            zIndex: 4,
+            padding: '24px 44px 0',
           }}
         >
-          {/* Background Wallpaper Image with Solar Atmosphere Grade */}
+          {/* Eyebrow */}
           <div
             style={{
-              position: 'absolute',
-              inset: 0,
-              backgroundImage: `url(${bgUrl})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              filter: activeSolar.filter,
-              transition: 'filter 0.8s ease',
-              transform: 'scale(1.03)',
+              fontSize: '11px',
+              fontWeight: 600,
+              letterSpacing: '0.18em',
+              color: '#38bdf8',
+              textTransform: 'uppercase',
+              textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+              marginBottom: 8,
             }}
-          />
-          {/* Subtle Ambient Vignette / Scrim */}
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background: 'linear-gradient(180deg, rgba(15,12,10,0.65) 0%, rgba(15,12,10,0.1) 40%, rgba(15,12,10,0.75) 100%)',
-            }}
-          />
+          >
+            FEATURED
+          </div>
 
-          {/* Top HUD: Wallpaper Title, Metadata, Multi-Display Pill */}
+          {/* Heading */}
+          <h2
+            style={{
+              margin: '0 0 10px 0',
+              color: '#ffffff',
+              fontSize: '38px',
+              fontWeight: 700,
+              letterSpacing: '-0.025em',
+              lineHeight: 1.1,
+              textShadow: '0 2px 10px rgba(0,0,0,0.8)',
+            }}
+          >
+            {current.title}
+          </h2>
+
+          {/* Meta line & Chips */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
+            <span style={{ fontSize: '12.5px', color: 'rgba(255, 255, 255, 0.75)', textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}>
+              {current.category} · {current.res} · {current.duration} · {current.size}
+            </span>
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: 600,
+                padding: '2px 8px',
+                borderRadius: 999,
+                background: 'rgba(255, 255, 255, 0.18)',
+                border: '1px solid rgba(255, 255, 255, 0.25)',
+                color: '#ffffff',
+                backdropFilter: 'blur(8px)',
+              }}
+            >
+              4K · {current.fps}
+            </span>
+          </div>
+
+          {/* Action Buttons: View Wallpaper & Heart */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button
+              type="button"
+              onClick={handleApply}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '10px 22px',
+                borderRadius: 999,
+                border: '1px solid rgba(255, 255, 255, 0.22)',
+                background: 'rgba(0, 0, 0, 0.45)',
+                backdropFilter: 'blur(16px)',
+                color: '#ffffff',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.35)',
+                transition: 'all 0.2s',
+              }}
+            >
+              <span>View Wallpaper</span>
+              <span style={{ fontSize: '11px' }}>↗</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFavorite(f => !f)}
+              aria-label="Add to Favorites"
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: '50%',
+                border: '1px solid rgba(255, 255, 255, 0.22)',
+                background: favorite ? 'rgba(239, 68, 68, 0.28)' : 'rgba(0, 0, 0, 0.45)',
+                backdropFilter: 'blur(16px)',
+                color: favorite ? '#ef4444' : '#ffffff',
+                display: 'grid',
+                placeItems: 'center',
+                fontSize: '16px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+            >
+              <span>{favorite ? '♥' : '♡'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Applied Toast alert */}
+        <AnimatePresence>
+          {appliedToast && (
+            <motion.div
+              initial={{ opacity: 0, y: -8, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.95 }}
+              style={{
+                position: 'absolute',
+                top: '190px',
+                left: '44px',
+                zIndex: 20,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '8px 16px',
+                borderRadius: 10,
+                background: 'rgba(12, 16, 22, 0.9)',
+                border: '1px solid rgba(74, 222, 128, 0.3)',
+                color: '#4ade80',
+                fontSize: '12.5px',
+                fontWeight: 600,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+                backdropFilter: 'blur(16px)',
+              }}
+            >
+              <I.Check size={14} />
+              <span>Applied "{current.title}" to Desktop Displays</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ---------------- Bottom Carousel & Shelf ---------------- */}
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 4,
+            padding: '0 44px 20px',
+            background: 'linear-gradient(180deg, rgba(8,11,16,0) 0%, rgba(8,11,16,0.92) 28%, #080b10 100%)',
+          }}
+        >
+          {/* Horizontal Wallpaper Thumbnails Strip (10 items) */}
           <div
             style={{
-              position: 'relative',
-              zIndex: 2,
               display: 'flex',
-              alignItems: 'flex-start',
+              gap: 9,
+              overflowX: 'auto',
+              paddingBottom: 16,
+              scrollbarWidth: 'none',
+            }}
+          >
+            {APP_WALLPAPERS.map(wp => {
+              const on = wp.id === selectedId;
+              const thumb = `https://images.unsplash.com/photo-${wp.photo}?auto=format&fit=crop&w=180&q=75`;
+              return (
+                <button
+                  key={wp.id}
+                  type="button"
+                  onClick={() => setSelectedId(wp.id)}
+                  style={{
+                    flex: '0 0 68px',
+                    height: '42px',
+                    borderRadius: 7,
+                    overflow: 'hidden',
+                    border: on ? '2px solid #ffffff' : '1px solid rgba(255, 255, 255, 0.12)',
+                    boxShadow: on ? '0 0 14px rgba(255, 255, 255, 0.5), 0 2px 8px rgba(0,0,0,0.8)' : 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    background: '#151a22',
+                    transition: 'all 0.2s',
+                    position: 'relative',
+                  }}
+                  title={wp.title}
+                >
+                  <img
+                    src={thumb}
+                    alt={wp.title}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      display: 'block',
+                      filter: on ? 'brightness(1.08)' : 'brightness(0.85)',
+                    }}
+                  />
+                </button>
+              );
+            })}
+          </div>
+
+          {/* New Live Wallpapers Shelf Header */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'flex-end',
               justifyContent: 'space-between',
-              gap: 12,
+              marginBottom: 12,
             }}
           >
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <h3 style={{ margin: 0, color: '#fff', fontSize: '18px', fontWeight: 600, letterSpacing: '-0.02em', textShadow: '0 2px 4px rgba(0,0,0,0.6)' }}>
-                  {person.name}
-                </h3>
-                <span
-                  style={{
-                    padding: '2px 7px',
-                    borderRadius: 4,
-                    background: 'rgba(0,0,0,0.5)',
-                    backdropFilter: 'blur(8px)',
-                    border: '1px solid rgba(255,255,255,0.15)',
-                    color: '#ffc107',
-                    fontSize: '10.5px',
-                    fontWeight: 600,
-                  }}
-                >
-                  4K 60FPS
-                </span>
-              </div>
-              <p style={{ margin: 0, color: 'rgba(255,255,255,0.7)', fontSize: '12px', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
-                {person.role} · AVFoundation Zero-Copy GPU Decode
+              <h3
+                style={{
+                  margin: '0 0 2px 0',
+                  color: '#ffffff',
+                  fontSize: '17px',
+                  fontWeight: 700,
+                  letterSpacing: '-0.015em',
+                }}
+              >
+                New Live Wallpapers
+              </h3>
+              <p style={{ margin: 0, color: 'rgba(255, 255, 255, 0.48)', fontSize: '11.5px' }}>
+                The latest wallpapers added to the catalog
               </p>
             </div>
 
-            {/* Display Target Selector */}
+            {/* Paging Arrow Buttons (< >) */}
             <div style={{ display: 'flex', gap: 6 }}>
               <button
                 type="button"
-                onClick={() => setDisplayTarget(d => (d === 'main' ? 'dual' : 'main'))}
+                aria-label="Previous batch"
                 style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 5,
-                  padding: '5px 10px',
-                  borderRadius: 6,
-                  background: 'rgba(0,0,0,0.5)',
-                  backdropFilter: 'blur(8px)',
-                  border: '1px solid rgba(255,255,255,0.15)',
-                  color: '#fff',
-                  fontSize: '11.5px',
+                  width: 28,
+                  height: 28,
+                  borderRadius: '50%',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  display: 'grid',
+                  placeItems: 'center',
+                  fontSize: '11px',
                   cursor: 'pointer',
                 }}
               >
-                <I.Monitor size={12} />
-                <span>{displayTarget === 'main' ? 'Pro Display XDR (Primary)' : 'Spanned Dual Displays'}</span>
-                <I.Chevron size={11} />
+                <span>❮</span>
+              </button>
+              <button
+                type="button"
+                aria-label="Next batch"
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: '50%',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  display: 'grid',
+                  placeItems: 'center',
+                  fontSize: '11px',
+                  cursor: 'pointer',
+                }}
+              >
+                <span>❯</span>
               </button>
             </div>
           </div>
 
-          {/* Toast / Notification when action triggered */}
-          <AnimatePresence>
-            {(applied || screensaver) && (
-              <motion.div
-                initial={{ opacity: 0, y: -8, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -8, scale: 0.96 }}
-                style={{
-                  position: 'relative',
-                  zIndex: 4,
-                  alignSelf: 'center',
-                  padding: '8px 16px',
-                  borderRadius: 8,
-                  background: 'rgba(20, 20, 20, 0.88)',
-                  backdropFilter: 'blur(12px)',
-                  border: '1px solid rgba(255,255,255,0.18)',
-                  color: '#4ade80',
-                  fontSize: '13px',
-                  fontWeight: 550,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-                }}
-              >
-                <I.Check size={14} />
-                <span>
-                  {applied
-                    ? `Set "${person.name}" as active desktop wallpaper!`
-                    : `Synchronized "${person.name}" with Lock Screen & Screensaver!`}
-                </span>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Bottom Controls HUD */}
-          <div
-            style={{
-              position: 'relative',
-              zIndex: 2,
-              background: 'rgba(18, 14, 12, 0.75)',
-              backdropFilter: 'blur(16px)',
-              padding: '12px 14px',
-              borderRadius: 12,
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 10,
-            }}
-          >
-            {/* Top row: 24h Solar Scrubber */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 550 }}>
-                <I.Sun size={12} style={{ color: '#f97316' }} />
-                <span>SOLAR EPHEMERIS:</span>
-                <span style={{ color: '#fff', fontFamily: 'var(--ta-mono)' }}>{activeSolar.time} ({activeSolar.elev})</span>
-              </div>
-              <div style={{ display: 'flex', gap: 4 }}>
-                {SOLAR_PRESETS.map(s => {
-                  const on = solar === s.id;
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => setSolar(s.id)}
-                      style={{
-                        padding: '3px 8px',
-                        borderRadius: 5,
-                        fontSize: '11px',
-                        border: 'none',
-                        cursor: 'pointer',
-                        background: on ? '#e4572e' : 'rgba(255,255,255,0.08)',
-                        color: on ? '#fff' : 'rgba(255,255,255,0.65)',
-                        fontWeight: on ? 600 : 450,
-                        transition: 'all 0.15s',
-                      }}
-                    >
-                      {s.label}
-                    </button>
-                  );
-                })}
+          {/* Two Shelf Preview Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div
+              style={{
+                height: '76px',
+                borderRadius: 10,
+                overflow: 'hidden',
+                position: 'relative',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                backgroundImage: 'url(https://images.unsplash.com/photo-1513542789411-b6a5d4f31634?auto=format&fit=crop&w=600&q=80)',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }}
+            >
+              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.7) 100%)' }} />
+              <div style={{ position: 'absolute', bottom: 8, left: 12, color: '#fff', fontSize: '11.5px', fontWeight: 600 }}>
+                Cozy Hearth Glow · 4K 60fps
               </div>
             </div>
 
-            {/* Bottom row: Primary Action Buttons */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingTop: 4, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  type="button"
-                  onClick={handleApply}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    height: 32,
-                    padding: '0 14px',
-                    borderRadius: 7,
-                    border: 'none',
-                    background: '#e4572e',
-                    color: '#fff',
-                    fontSize: '12.5px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 6px rgba(228,87,46,0.4)',
-                  }}
-                >
-                  <I.Check size={13} />
-                  <span>Set as Desktop Wallpaper</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleScreensaver}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    height: 32,
-                    padding: '0 12px',
-                    borderRadius: 7,
-                    border: '1px solid rgba(255,255,255,0.15)',
-                    background: 'rgba(255,255,255,0.08)',
-                    color: '#fff',
-                    fontSize: '12px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                  }}
-                >
-                  <I.Layers size={13} />
-                  <span>Sync with Screensaver</span>
-                </button>
-              </div>
-
-              <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)', fontFamily: 'var(--ta-mono)' }}>
-                ExtensionKit Sandbox: Active
+            <div
+              style={{
+                height: '76px',
+                borderRadius: 10,
+                overflow: 'hidden',
+                position: 'relative',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                backgroundImage: 'url(https://images.unsplash.com/photo-1514565131-fce0801e5785?auto=format&fit=crop&w=600&q=80)',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }}
+            >
+              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.7) 100%)' }} />
+              <div style={{ position: 'absolute', bottom: 8, left: 12, color: '#fff', fontSize: '11.5px', fontWeight: 600 }}>
+                Tokyo Rain Reflections · Dynamic 24h
               </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* ---------------- Window Telemetry Footer ---------------- */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 14px',
-          background: '#120f0d',
-          borderTop: '1px solid rgba(255, 255, 255, 0.06)',
-          fontSize: '10.5px',
-          color: 'rgba(255, 255, 255, 0.5)',
-          fontFamily: 'var(--ta-mono)',
-        }}
-      >
-        <div style={{ display: 'flex', gap: 14 }}>
-          <span>● Engine: VideoToolbox Hardware Decoder</span>
-          <span>● Occlusion Sentry: Standby</span>
-          <span>● Lock Screen: Synchronized</span>
-        </div>
-        <div>
-          <span>CPU: 0.28% · Memory: 42 MB · Fan: 0 RPM</span>
         </div>
       </div>
     </div>

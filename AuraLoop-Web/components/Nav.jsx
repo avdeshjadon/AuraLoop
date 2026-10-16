@@ -53,8 +53,13 @@ export default function Nav() {
     <header className={`ta-nav${scrolled ? ' is-scrolled' : ''}${open ? ' is-open' : ''}`}>
       <div className="ta-nav__ring" ref={ringRef}>
         <div className="ta-nav__bar">
-          <a href="#top" className="ta-wordmark" aria-label="AuraLoop, back to top">
-            auraloop
+          <a href="#top" className="ta-wordmark" aria-label="AuraLoop, back to top" style={{ display: 'inline-flex', alignItems: 'center' }}>
+            <img
+              src="/assets/svg/auraloop-wordmark-dark.svg"
+              alt="AuraLoop"
+              height="20"
+              style={{ height: '20px', width: 'auto', display: 'block' }}
+            />
           </a>
           <nav className="ta-nav__links" aria-label="Primary">
             <a href="#wallpapers">Wallpapers</a>
@@ -62,10 +67,22 @@ export default function Nav() {
             <a href="#workflows">Automation</a>
             <a href="#manifesto">Architecture</a>
           </nav>
-          <a href="#waitlist" className="ta-btn ta-btn--ink ta-nav__cta" onClick={early}>
-            <span className="ta-nav__cta-long">Download .DMG</span>
-            <span className="ta-nav__cta-short">Download</span>
-            <Bolt size={13} />
+          <a
+            href="#waitlist"
+            className="ta-btn ta-btn--ink ta-nav__cta"
+            onClick={early}
+            style={{
+              color: '#ffffff',
+              fontWeight: 600,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+            }}
+          >
+            <span className="ta-nav__cta-long" style={{ color: '#ffffff' }}>Download .DMG</span>
+            <span className="ta-nav__cta-short" style={{ color: '#ffffff' }}>Download</span>
+            <Bolt size={13} style={{ color: '#ffffff' }} />
           </a>
           <button
             type="button"
