@@ -57,7 +57,9 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Restore NuGet Packages
-        run: dotnet restore AuraLoop-Win/AuraLoop-Win.sln -p:Platform=x64
+        run: |
+          dotnet restore AuraLoop-Win/AuraLoop-Win.sln -p:Platform=x64 -r win-x64
+          dotnet restore AuraLoop-Win/Tests/AuraLoop.Tests.csproj -p:Platform=x64 -r win-x64
 
       - name: Run Windows Unit Tests
         run: dotnet test AuraLoop-Win/Tests/AuraLoop.Tests.csproj -c Release -p:Platform=x64 -r win-x64
