@@ -54,12 +54,31 @@ export default function Nav() {
       <div className="ta-nav__ring" ref={ringRef}>
         <div className="ta-nav__bar">
           <a href="#top" className="ta-wordmark" aria-label="AuraLoop, back to top" style={{ display: 'inline-flex', alignItems: 'center' }}>
-            <img
-              src="/assets/svg/auraloop-wordmark-dark.svg"
-              alt="AuraLoop"
-              height="23"
-              style={{ height: '23px', width: 'auto', display: 'block' }}
-            />
+            <svg
+              width="130"
+              height="24"
+              viewBox="0 0 1200 220"
+              role="img"
+              aria-label="AuraLoop"
+              style={{ display: 'block', height: '24px', width: 'auto' }}
+            >
+              <g fill="#0A0C10" fontFamily="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', Roboto, sans-serif" fontSize="128" fontWeight="700" letterSpacing="0.08em" textAnchor="middle">
+                <text x="110" y="152">A</text>
+                <text x="240" y="152">U</text>
+                <text x="360" y="152">R</text>
+                <text x="480" y="152">A</text>
+                <text x="605" y="152">L</text>
+                <text x="1015" y="152">P</text>
+              </g>
+              <path
+                d="M 695,111 C 728,58 768,58 807,111 C 846,164 886,164 919,111 C 886,58 846,58 807,111 C 768,164 728,164 695,111 Z"
+                fill="none"
+                stroke="#0A0C10"
+                strokeWidth="26"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </a>
           <nav className="ta-nav__links" aria-label="Primary">
             <a href="#wallpapers">Wallpapers</a>

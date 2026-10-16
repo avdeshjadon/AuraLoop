@@ -11,7 +11,6 @@ import PeopleSection from './components/PeopleSection.jsx';
 import Features from './components/Features.jsx';
 import Workflows from './components/Workflows.jsx';
 import Manifesto from './components/Manifesto.jsx';
-import Waitlist from './components/Waitlist.jsx';
 import Footer from './components/Footer.jsx';
 
 export default function AuraLoopWeb() {
@@ -77,7 +76,6 @@ export default function AuraLoopWeb() {
           <Features />
           <Workflows />
           <Manifesto />
-          <Waitlist />
         </main>
         <Footer />
       </div>

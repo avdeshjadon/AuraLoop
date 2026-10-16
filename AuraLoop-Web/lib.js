@@ -29,19 +29,9 @@ export function useMedia(query, initial = false) {
  */
 export function goToWaitlist(event) {
   event?.preventDefault?.();
-  const section = document.getElementById('waitlist');
-  if (!section) return;
-  const form = document.getElementById('ta-ea-form');
-  const target = document.getElementById('ta-ea-email') || document.getElementById('ta-ea-done');
-  section.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' });
-  target?.focus({ preventScroll: true });
-  if (form) {
-    form.classList.remove('is-flash');
-    void form.offsetWidth; // restart the highlight animation
-    form.classList.add('is-flash');
-    window.clearTimeout(goToWaitlist.t);
-    goToWaitlist.t = window.setTimeout(() => form.classList.remove('is-flash'), 1900);
-  }
+  // Direct download link to GitHub Releases DMG
+  const releaseUrl = 'https://github.com/avdeshjadon/AuraLoop/releases/latest';
+  window.open(releaseUrl, '_blank', 'noopener,noreferrer');
 }
 
 export const isMac = () =>
