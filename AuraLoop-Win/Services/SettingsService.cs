@@ -47,12 +47,20 @@ namespace AuraLoop.Services
         {
             try
             {
+                string? dir = Path.GetDirectoryName(_settingsFilePath);
+                if (!string.IsNullOrEmpty(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
                 string json = JsonSerializer.Serialize(Current, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(_settingsFilePath, json);
-                OnSettingsChanged?.Invoke(Current);
                 UpdateStartupRegistry(Current.LaunchAtStartup);
             }
             catch { }
+            finally
+            {
+                OnSettingsChanged?.Invoke(Current);
+            }
         }
 
         private void UpdateStartupRegistry(bool enable)
