@@ -134,7 +134,7 @@
                 <Border Style="{StaticResource GlassCardStyle}">
                     <StackPanel Spacing="10">
                         <TextBlock Text="AuraLoop for Windows" FontSize="16" FontWeight="Bold" Foreground="{StaticResource AuraLoopInkBrush}" />
-                        <TextBlock Text="Version 6.5.0 (Build 112) • High-Performance Native Live Wallpapers" FontSize="12" Foreground="{StaticResource AuraLoopMutedBrush}" />
+                        <TextBlock Text="Version 6.6.0 (Build 113) • High-Performance Native Live Wallpapers" FontSize="12" Foreground="{StaticResource AuraLoopMutedBrush}" />
                         <TextBlock Text="Copyright © 2026 Avdesh Jadon. All Rights Reserved. Strictly Proprietary." FontSize="11" Foreground="{StaticResource AuraLoopMutedBrush}" />
                     </StackPanel>
                 </Border>

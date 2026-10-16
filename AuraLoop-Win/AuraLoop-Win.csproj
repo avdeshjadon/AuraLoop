@@ -10,17 +10,21 @@
     <Platforms>x64;ARM64</Platforms>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <UseRidGraph>true</UseRidGraph>
-    <PublishProfile>win-$(Platform).pubxml</PublishProfile>
     <UseWinUI>true</UseWinUI>
     <EnableMsixTooling>true</EnableMsixTooling>
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>6.5.0</Version>
-    <AssemblyVersion>6.5.0.112</AssemblyVersion>
-    <FileVersion>6.5.0.112</FileVersion>
+    <Version>6.6.0</Version>
+    <AssemblyVersion>6.6.0.113</AssemblyVersion>
+    <FileVersion>6.6.0.113</FileVersion>
     <Company>AvdeshJadon</Company>
     <Product>AuraLoop</Product>
     <Copyright>Copyright © 2026 Avdesh Jadon. All Rights Reserved.</Copyright>

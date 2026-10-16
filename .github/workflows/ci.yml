@@ -74,17 +74,35 @@ jobs:
             --self-contained true `
             -p:WindowsPackageType=None `
             -p:WindowsAppSDKSelfContained=true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:IncludeAllContentForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
             -o ./dist-win
 
       - name: Prepare Windows Artifacts
         shell: pwsh
         run: |
-          Get-ChildItem -Path ./dist-win -Recurse
-          $exe = Get-ChildItem -Path ./dist-win -Filter *.exe | Select-Object -First 1
+          Get-ChildItem -Path ./dist-win
+          $exe = Get-ChildItem -Path ./dist-win -Filter AuraLoop.exe | Select-Object -First 1
+          if (-not $exe) {
+            $exe = Get-ChildItem -Path ./dist-win -Filter *.exe | Select-Object -First 1
+          }
           if ($exe) {
-            Copy-Item $exe.FullName -Destination "./AuraLoop-Win-x64.exe"
+            Write-Host "Found standalone single-file executable: $($exe.FullName) (Size: $([math]::Round($exe.Length / 1MB, 2)) MB)"
+            Copy-Item $exe.FullName -Destination "./AuraLoop-Win-x64.exe" -Force
           }
           Compress-Archive -Path ./dist-win/* -DestinationPath ./AuraLoop-Windows-x64.zip -Force
+
+          # Build Inno Setup Installer if ISCC is present
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (Test-Path $iscc) {
+            Write-Host "Compiling Windows Installer with Inno Setup..."
+            & $iscc "./AuraLoop-Win/Installer/installer.iss" /O"."
+            if (Test-Path "./AuraLoop-Win-x64-Setup.exe") {
+              Write-Host "Windows Installer generated successfully!"
+            }
+          }
 
       - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4
@@ -93,7 +111,8 @@ jobs:
           path: |
             AuraLoop-Windows-x64.zip
             AuraLoop-Win-x64.exe
-          if-no-files-found: error
+            AuraLoop-Win-x64-Setup.exe
+          if-no-files-found: warn
 
   release:
     name: Publish Combined Release

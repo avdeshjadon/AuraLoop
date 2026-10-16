@@ -106,7 +106,7 @@ AuraLoop/
 ```bash
 cd AuraLoop-Mac
 # Update version across all Mac files and build metadata:
-./version.sh 6.5.0 112
+./version.sh 6.6.0 113
 
 # Build & test:
 swift build
@@ -120,8 +120,8 @@ swift test
 ```cmd
 cd AuraLoop-Win
 # Update version across all Windows project files (.csproj, XAML, metadata):
-version.cmd 6.5.0 112
-:: or via bash: ./version.sh 6.5.0 112
+version.cmd 6.6.0 113
+:: or via bash: ./version.sh 6.6.0 113
 
 # Build & publish:
 build.cmd
