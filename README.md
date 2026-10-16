@@ -14,13 +14,16 @@
   <img src="assets/svg/auraloop-wordmark.svg" width="320" alt="AuraLoop">
 </picture>
 
-### High-Performance Native Live Wallpapers & Screensavers for macOS
+### High-Performance Native Live Wallpapers & Screensavers for macOS & Windows
 
 [![macOS](https://img.shields.io/badge/macOS-14%2B-black?logo=apple)](https://apple.com/macos)
 [![Universal](https://img.shields.io/badge/Universal-Apple_Silicon_%2B_Intel-black?logo=apple)](https://apple.com)
+[![Windows](https://img.shields.io/badge/Windows-10%2F11%20x64-0078D4?logo=windows&logoColor=white)](https://microsoft.com/windows)
+[![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com)
+[![WinUI 3](https://img.shields.io/badge/WinUI-3.0-0078D4?logo=windows&logoColor=white)](https://microsoft.com)
 [![Status](https://img.shields.io/badge/Source-Proprietary%20%2F%20Closed-critical)](#license)
-[![License](https://img.shields.io/badge/License-All_Rights_Reserved-red)](LICENSE)
-[![Swift](https://img.shields.io/badge/Swift-5.9%2B-FA7343?logo=swift&logoColor=white)](https://swift.org)
+[![License](https://img.shields.io/badge/License-All_Rights_Reserved-red)](#license)
+[![Release](https://img.shields.io/github/v/release/avdeshjadon/AuraLoop?color=success&label=Release)](https://github.com/avdeshjadon/AuraLoop/releases)
 
 </div>
 
@@ -28,114 +31,128 @@
 
 ## Overview
 
-AuraLoop is a native macOS application engineered in Swift and SwiftUI that delivers smooth, looping video wallpapers and screen savers across all connected displays with near-zero CPU and memory footprint. By delegating video decoding directly to macOS hardware media engines, AuraLoop keeps system resource consumption minimal and automatically pauses during fullscreen apps, low power mode, or display sleep.
+**AuraLoop** is a native, cross-platform live wallpaper and screen saver engine built specifically for **macOS** (Swift / SwiftUI) and **Windows** (C# / .NET 8 / WinUI 3). It renders stunning, ultra-smooth looping video wallpapers across all connected displays with near-zero CPU and memory overhead.
+
+By utilizing hardware-accelerated media decoders on each operating system (AVFoundation on macOS and Media Foundation / DirectComposition on Windows), AuraLoop operates completely silently in the background and intelligently pauses during fullscreen applications, battery saver modes, and display sleep.
+
+---
+
+## Downloads & Installation
+
+Pre-compiled, signed production packages are available on the [Releases](https://github.com/avdeshjadon/AuraLoop/releases) page:
+
+### macOS
+* **`AuraLoop-6.6.0.dmg`** — Drag-and-drop installer disk image. Universal binary compiled natively for both **Apple Silicon (M1/M2/M3/M4)** and **Intel** Macs.
+  * *Installation:* Open the `.dmg`, drag `AuraLoop.app` to your `/Applications` folder, and launch from Spotlight or Launchpad.
+
+### Windows
+* **`AuraLoop-Win-x64-Setup.exe` (Recommended)** — Full Windows installer built with Inno Setup.
+  * *Features:* Installs to `Program Files`, creates Desktop and Start Menu shortcuts, registers Windows startup integration, and provides a clean uninstaller in Windows Settings.
+* **`AuraLoop-Win-x64.exe`** — Standalone, self-contained single-file portable executable (~65 MB).
+  * *Features:* Zero-installation, fully portable. Double-click to launch directly from any directory or removable drive.
+* **`AuraLoop-Windows-x64.zip`** — Portable archive containing the complete application bundle and assets.
 
 ---
 
 ## Key Features
 
-- **Seamless Video Wallpapers** — Smooth, continuous looping on every connected display simultaneously.
-- **Lock Screen Support** — Play distinct or synchronized live wallpapers on your macOS lock screen.
-- **Screen Saver Engine** — Run high-definition live video as your native macOS screen saver with customizable idle delays.
-- **Curated Apple Aerials** — Browse and enjoy Apple's Aerials, Dynamic Wallpapers, and system aerial screen savers in 4K.
-- **Hardware-Accelerated Efficiency** — Hardware-decoded HEVC/H.265 playback via AVFoundation ensures virtually zero CPU overhead.
-- **Smart Power Management** — Automatically pauses during fullscreen applications, display sleep, low power mode, and battery thresholds.
-- **Desktop Awareness** — Option to pause during active work and resume playback when the desktop is revealed.
-- **Adaptive Frame Rates** — Switch between native high frame rate and energy-efficient 30 fps per wallpaper.
-- **Explore & Preview Catalog** — Fullscreen interactive preview with on-demand download management.
-- **Custom Playlists & Automation** — Timed rotations, randomized shuffling, and full 24-hour day/night schedules.
-- **Universal Importer** — Drag-and-drop support for custom video files (auto-transcoded to optimized HEVC) and `.saver` bundles.
-- **Menu Bar Controller** — Instant playback control, track skipping, and preset selection from the system menu bar.
+- **Multi-Monitor Live Video Wallpapers** — Smooth, continuous playback spanning single or multiple displays with individual or synchronized configurations.
+- **Lock Screen & Screen Saver Synchronization** — Display matching high-definition stills and videos on macOS lock screens and Windows login backgrounds.
+- **Hardware-Decoded Efficiency** — Zero-copy GPU decoding (HEVC/H.265 & VP9) ensures negligible CPU impact and whisper-quiet fans.
+- **Intelligent Power & Resource Monitor** — Automatically pauses playback when applications run fullscreen, when the desktop is occluded, or on battery-saver thresholds.
+- **Curated 4K Apple Aerials** — Browse and download the complete catalog of Apple Aerial videos, landscape flyovers, underwater captures, and cosmic footage.
+- **Dynamic Solar Engine** — Calculate astronomical solar elevation and automatically transition through 24-hour day/twilight/night dynamic keyframes.
+- **Universal Importer** — Drag and drop your own MP4, MOV, or animated wallpaper files directly into your personal offline library.
+- **System Tray & Menu Bar Controls** — Instant playback pausing, track changing, playlist shuffling, and settings management from the system menu bar (macOS) or taskbar notification area (Windows).
 
-> **System Requirements**: macOS 14.0 (Sonoma) or newer. Universal binary compiled for Apple Silicon and Intel architectures. Lock screen and screen saver features require macOS 15 / 26+.
+---
+
+## System Requirements
+
+| Platform | Minimum OS Version | Architecture | Required Frameworks |
+| :--- | :--- | :--- | :--- |
+| **macOS** | macOS 14.0 (Sonoma) or later | Apple Silicon (`arm64`) & Intel (`x86_64`) | None (Native App + ExtensionKit) |
+| **Windows** | Windows 10 (1809+ / Build 17763) or Windows 11 | 64-bit (`x64`) | None (Self-contained .NET 8 & Windows App SDK) |
 
 ---
 
 ## Project Structure & Architecture
 
-The codebase follows a strictly organized, multi-platform architecture:
-
 ```
 AuraLoop/
-├── assets/                          # Shared branding and media assets
+├── assets/                          # Shared branding, metadata, and media resources
+│   ├── AppIcon.ico                  # Multi-resolution Windows application icon (16-256px)
 │   ├── png/                         # High-resolution raster images & app icons
 │   │   ├── icon.png
 │   │   ├── icon-dark.png
 │   │   └── dmg-background.png
 │   ├── svg/                         # Scalable vector graphics and wordmarks
-│   │   ├── auraloop.svg
-│   │   ├── auraloop-dark.svg
-│   │   ├── auraloop-wordmark.svg
-│   │   └── auraloop-wordmark-dark.svg
-│   └── data/                        # Bundled catalog metadata & configurations
+│   └── data/                        # Bundled catalog metadata & configuration files
 │       └── FeaturedWallpapers.json
 │
 ├── AuraLoop-Mac/                    # macOS Native Application (Swift 5.9 + SwiftUI)
 │   ├── Package.swift                # Swift Package Manager manifest
 │   ├── build-app.sh                 # Production compilation, signing & DMG builder
-│   ├── Icon/                        # macOS iconsets and icon generation
+│   ├── version.sh                   # Version synchronization utility
+│   ├── Icon/                        # macOS master icons and iconsets
 │   ├── Sources/
 │   │   ├── AuraLoopApp/             # Primary SwiftUI application (Views, Models, Controllers)
 │   │   ├── AuraLoopKit/             # Shared framework (Aerials, Playback, Media, Engine)
-│   │   └── AuraLoopWallpaperExtension/ # System wallpaper app extension
-│   └── Tests/                       # Comprehensive unit test suite (315+ automated tests)
+│   │   └── AuraLoopWallpaperExtension/ # ExtensionKit desktop wallpaper service
+│   └── Tests/                       # Comprehensive automated test suite (315+ unit tests)
 │
 ├── AuraLoop-Win/                    # Windows Native Application (C# .NET 8 + WinUI 3)
 │   ├── AuraLoop-Win.sln             # Visual Studio Solution
-│   ├── build.cmd                    # Automated Windows build script
-│   └── AuraLoop-Win/
-│       ├── AuraLoop-Win.csproj      # Windows App SDK project manifest
-│       ├── Native/                  # Win32 interop for WorkerW desktop injection
-│       ├── Engine/                  # WallpaperEngine & auto-pause PlaybackMonitor
-│       ├── Models/                  # Wallpaper and settings data models
-│       ├── Services/                # Catalog, storage and settings services
-│       └── Views/                   # WinUI 3 Liquid Glass views (Home, Explore, Library, Settings)
+│   ├── AuraLoop-Win.csproj          # Windows App SDK project manifest (Single-File enabled)
+│   ├── version.sh / version.cmd     # Windows version synchronization utilities
+│   ├── Assets/                      # Embedded Windows application icons
+│   ├── Installer/                   # Inno Setup wizard branding, images & installer script
+│   ├── Native/                      # Win32 interop for WorkerW desktop injection
+│   ├── Engine/                      # WallpaperEngine, PlaybackMonitor & DynamicSolarEngine
+│   ├── Models/                      # Wallpaper, settings, and display geometry models
+│   ├── Services/                    # Catalog, store, library, and settings services
+│   ├── Views/                       # WinUI 3 Fluent Liquid Glass views (Home, Explore, Library, Settings)
+│   └── Tests/                       # Automated xUnit test suite (18 unit tests)
 │
+├── .github/workflows/ci.yml         # Automated multi-platform CI/CD (DMG + Single-File EXE + Inno Setup)
 ├── LICENSE                          # Proprietary software license
-└── README.md                        # Documentation
+└── README.md                        # Project documentation
 ```
 
 ---
 
-## Development & Build Guide (Authorized / Internal Only)
+## Internal Development & Verification (Authorized Maintainers Only)
 
-> **Notice**: This software is **Proprietary & Closed Source**. Public or unauthorized compilation, redistribution, cloning, or usage is strictly forbidden. The instructions below are provided exclusively for authorized maintainers.
+> **Notice**: This software is **Proprietary & Closed Source**. Public or unauthorized compilation, redistribution, cloning, or usage is strictly forbidden.
 
-### macOS (AuraLoop-Mac)
+### Building & Testing macOS (`AuraLoop-Mac`)
 
 ```bash
 cd AuraLoop-Mac
-# Update version across all Mac files and build metadata:
-./version.sh 6.6.0 113
 
-# Build & test:
-swift build
+# Run automated Swift test suite (315 tests):
 swift test
+
+# Build production Universal binary (.app) and signed disk image (.dmg):
 ./build-app.sh
 ./build-app.sh --dmg
 ```
 
-### Windows (AuraLoop-Win)
+### Building & Testing Windows (`AuraLoop-Win`)
 
-```cmd
+```bash
 cd AuraLoop-Win
-# Update version across all Windows project files (.csproj, XAML, metadata):
-version.cmd 6.6.0 113
-:: or via bash: ./version.sh 6.6.0 113
 
-# Build & publish:
-build.cmd
-```
-or via PowerShell:
-```powershell
-dotnet publish AuraLoop-Win/AuraLoop-Win.csproj -c Release -r win-x64 --self-contained true
-```
+# Run automated xUnit test suite:
+dotnet test Tests/AuraLoop.Tests.csproj -c Release
 
-The compiled macOS application bundle is created at `AuraLoop-Mac/dist/AuraLoop.app` (and `dist/AuraLoop-*.dmg`). The Windows build and executable package are produced under `AuraLoop-Win/dist/`.
+# Publish self-contained single-file executable:
+dotnet publish AuraLoop-Win.csproj -c Release -r win-x64 --self-contained true
+```
 
 ---
 
-## License
+## License & Ownership
 
 **Copyright © 2026 Avdesh Jadon. All Rights Reserved.**
 
@@ -145,4 +162,4 @@ This software is strictly **Proprietary and Confidential**. All source code, des
 - **No Commercial Use**: Commercial exploitation, redistribution, sale, or sublicensing is strictly forbidden.
 - **No Derivative Works**: Modification, adaptation, decompilation, or reverse engineering of any part of this software is prohibited.
 
-For licensing inquiries or written authorization, please contact [Avdesh Jadon](https://github.com/avdeshjadon).
+For inquiries or written authorization, please contact [Avdesh Jadon](https://github.com/avdeshjadon).
