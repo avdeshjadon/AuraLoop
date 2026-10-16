@@ -53,9 +53,8 @@ export default function Nav() {
     <header className={`ta-nav${scrolled ? ' is-scrolled' : ''}${open ? ' is-open' : ''}`}>
       <div className="ta-nav__ring" ref={ringRef}>
         <div className="ta-nav__bar">
-          <a href="#top" className="ta-wordmark" aria-label="AuraLoop, back to top" style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-            <img src="/assets/svg/auraloop-dark.svg" alt="" width="26" height="14" style={{ filter: 'brightness(0.2)' }} />
-            <span style={{ fontWeight: 600, letterSpacing: '-0.02em', fontSize: '18px' }}>AuraLoop</span>
+          <a href="#top" className="ta-wordmark" aria-label="AuraLoop, back to top">
+            auraloop
           </a>
           <nav className="ta-nav__links" aria-label="Primary">
             <a href="#wallpapers">Wallpapers</a>

@@ -247,10 +247,7 @@ export default function Hero() {
           <img src={mr.src} srcSet={mr.srcSet} width="64" height="64" alt="" decoding="async" />
         </span>
 
-        <p className="ta-badge">
-          <Bolt filled={false} size={14} />
-          Native macOS 14+ Sonoma &amp; Sequoia · Universal Binary
-        </p>
+
         <h1 id="ta-hero-title" className="ta-h1">
           <span className="ta-h1__line">
             <span className="ta-h1__w">Live</span>{' '}

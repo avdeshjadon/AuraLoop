@@ -1,505 +1,571 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import Avatar from './Avatar.jsx';
-import { GROUPS, PEOPLE, SUGGESTED } from '../data.js';
-import { isMac, shortAt } from '../lib.js';
+import { GROUPS, PEOPLE } from '../data.js';
 import * as I from '../icons.jsx';
 
-const GROUP_ICON = { teammates: I.Smile, people: I.Users, notifications: I.Bell };
-const uid = () => `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
-const spring = { type: 'spring', bounce: 0, duration: 0.42 };
-const ease = [0.2, 0.7, 0.2, 1];
+const SOLAR_PRESETS = [
+  { id: 'dawn', label: 'Dawn', time: '06:45', elev: '+4.2°', filter: 'sepia(0.2) saturate(1.15) brightness(0.94)' },
+  { id: 'noon', label: 'Solar Noon', time: '12:30', elev: '+62.8°', filter: 'brightness(1.05) contrast(1.02)' },
+  { id: 'dusk', label: 'Sunset & Dusk', time: '18:15', elev: '+1.5°', filter: 'hue-rotate(-18deg) saturate(1.35) brightness(0.9)' },
+  { id: 'night', label: 'Astronomical Night', time: '23:00', elev: '-24.0°', filter: 'hue-rotate(185deg) contrast(1.18) brightness(0.65)' },
+];
 
-export default function InboxWindow({ inbox, dispatch, live, regionRef, reduced }) {
+const TABS = [
+  { id: 'home', label: 'Home', icon: I.Inbox },
+  { id: 'explore', label: 'Explore', icon: I.Compass },
+  { id: 'favorites', label: 'Favorites', icon: I.Heart },
+  { id: 'library', label: 'Library', icon: I.Layers },
+];
+
+export default function InboxWindow({ inbox, dispatch, regionRef }) {
   const { convos, order, selected, collapsed } = inbox;
-  const current = selected ? convos[selected] : null;
-  const person = current ? PEOPLE[current.person] : null;
+  const current = selected ? convos[selected] : convos.snowfall || convos[order[0]];
+  const person = current ? PEOPLE[current.person] : PEOPLE.snowfall;
 
-  const [focusWithin, setFocusWithin] = useState(false);
-  const [drafts, setDrafts] = useState({});
-  const [expanded, setExpanded] = useState({});
-  const [toast, setToast] = useState(null);
-  const [writing, setWriting] = useState(false);
-  const [note, setNote] = useState('');
-  const [flash, setFlash] = useState('');
-  const [mod, setMod] = useState('Ctrl');
+  const [tab, setTab] = useState('home');
+  const [solar, setSolar] = useState('noon');
+  const [applied, setApplied] = useState(false);
+  const [screensaver, setScreensaver] = useState(false);
+  const [audio, setAudio] = useState(false);
+  const [displayTarget, setDisplayTarget] = useState('main'); // 'main' | 'dual'
 
-  const textareaRef = useRef(null);
-  const threadRef = useRef(null);
-  const rowRefs = useRef({});
-  const typer = useRef(null);
-  const flashT = useRef(null);
+  const activeSolar = SOLAR_PRESETS.find(s => s.id === solar) || SOLAR_PRESETS[1];
 
-  useEffect(() => setMod(isMac() ? '⌘' : 'Ctrl'), []);
-
-  const stopTyping = useCallback(() => {
-    cancelAnimationFrame(typer.current);
-    typer.current = null;
-    setWriting(false);
-  }, []);
-  useEffect(() => () => {
-    cancelAnimationFrame(typer.current);
-    clearTimeout(flashT.current);
-  }, []);
-
-  // Switching conversation: stop any typewriter, reset the status line, follow keyboard focus.
-  useEffect(() => {
-    stopTyping();
-    setNote('');
-    const active = document.activeElement;
-    if (selected && active?.dataset?.row && active.dataset.row !== selected) {
-      rowRefs.current[selected]?.focus({ preventScroll: true });
-    }
-  }, [selected, stopTyping]);
-
-  // Keep the newest message in view when the thread grows.
-  const count = current?.messages.length ?? 0;
-  const prevCount = useRef({ id: selected, count });
-  useLayoutEffect(() => {
-    const el = threadRef.current;
-    if (!el) return;
-    const prev = prevCount.current;
-    if (prev.id === selected && count > prev.count) {
-      el.scrollTo({ top: el.scrollHeight, behavior: reduced ? 'auto' : 'smooth' });
-    } else if (prev.id !== selected) {
-      el.scrollTop = 0;
-    }
-    prevCount.current = { id: selected, count };
-  }, [selected, count, reduced]);
-
-  // Toast auto-dismiss.
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 5000);
-    return () => clearTimeout(t);
-  }, [toast]);
-
-  const pressKey = k => {
-    setFlash(k);
-    clearTimeout(flashT.current);
-    flashT.current = setTimeout(() => setFlash(''), 220);
+  const handleApply = () => {
+    setApplied(true);
+    setTimeout(() => setApplied(false), 3800);
   };
 
-  const draft = (selected && drafts[selected]) || '';
-  const setDraftFor = (id, value) => setDrafts(d => ({ ...d, [id]: value }));
-
-  const markDone = () => {
-    if (!current) return;
-    dispatch({ type: 'done', id: current.id });
-    setToast({ key: uid(), name: person.name });
-  };
-
-  const undo = () => {
-    dispatch({ type: 'undo' });
-    setToast(null);
-  };
-
-  const focusReply = () => textareaRef.current?.focus();
-
-  const suggest = () => {
-    if (!current) return;
-    const id = current.id;
-    const text = SUGGESTED[id] || 'Thank you, I’ll read this properly today and come back to you.';
-    stopTyping();
-    setNote('');
-    if (reduced) {
-      setDraftFor(id, text);
-      textareaRef.current?.focus();
-      return;
-    }
-    // Time-based typewriter (~110 characters a second), so slow frames never stall it.
-    const start = performance.now();
-    setWriting(true);
-    setDraftFor(id, '');
-    const tick = now => {
-      const i = Math.min(text.length, Math.ceil((now - start) / 9));
-      setDraftFor(id, text.slice(0, i));
-      if (i >= text.length) {
-        stopTyping();
-        textareaRef.current?.focus();
-      } else {
-        typer.current = requestAnimationFrame(tick);
-      }
-    };
-    typer.current = requestAnimationFrame(tick);
-  };
-
-  const send = () => {
-    if (!current) return;
-    const body = draft.trim();
-    if (!body) {
-      setNote('Type a reply first, or use Draft a reply.');
-      textareaRef.current?.focus();
-      return;
-    }
-    stopTyping();
-    dispatch({ type: 'send', id: current.id, body, msgId: uid() });
-    setDraftFor(current.id, '');
-    setNote('Added in this demo only. No email was sent.');
-  };
-
-  const onRegionKey = e => {
-    if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
-    if (e.target.closest('textarea, input, select, [contenteditable="true"]')) return;
-    const k = e.key.toLowerCase();
-    if (k === 'j' || k === 'k') {
-      e.preventDefault();
-      dispatch({ type: 'move', dir: k === 'j' ? 1 : -1 });
-      pressKey(k);
-    } else if (k === 'e') {
-      e.preventDefault();
-      markDone();
-      pressKey('e');
-    } else if (k === 'r') {
-      e.preventDefault();
-      focusReply();
-      pressKey('r');
-    }
-  };
-
-  const onComposerKey = e => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      pressKey('send');
-      send();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      regionRef.current?.focus();
-    }
+  const handleScreensaver = () => {
+    setScreensaver(true);
+    setTimeout(() => setScreensaver(false), 3800);
   };
 
   const groups = GROUPS.map(g => ({
     ...g,
-    items: order.filter(id => convos[id].group === g.id && !convos[id].done),
+    items: order.filter(id => convos[id].group === g.id),
   }));
-  const openList = groups.flatMap(g => g.items);
 
-  const msgs = current?.messages ?? [];
-  const showAll = current && expanded[current.id];
-  const hidden = showAll ? 0 : Math.max(0, msgs.length - 2);
-  const visible = msgs.slice(hidden);
-  const participants = current ? [...new Set(['you', current.person, ...current.cc])] : [];
-  const lastAt = msgs.length ? msgs[msgs.length - 1].at : '';
-  const groupShort = current ? GROUPS.find(g => g.id === current.group).short : '';
+  const bgUrl = person?.photo
+    ? `https://images.unsplash.com/photo-${person.photo}?auto=format&fit=crop&w=1280&q=85`
+    : '/assets/png/icon.png';
 
   return (
     <div
-      className={`ta-win${focusWithin ? ' is-focus' : ''}`}
+      className="ta-win"
       ref={regionRef}
       role="region"
-      aria-label="Interactive AuraLoop 4K wallpaper player demo"
-      aria-describedby="ta-win-hints"
+      aria-label="AuraLoop Native macOS Player"
       tabIndex={0}
-      onKeyDown={onRegionKey}
-      onFocus={() => setFocusWithin(true)}
-      onBlur={e => {
-        if (!e.currentTarget.contains(e.relatedTarget)) setFocusWithin(false);
+      style={{
+        display: 'grid',
+        gridTemplateRows: '38px minmax(0, 1fr) 30px',
+        height: '630px',
+        background: '#181412',
+        border: '1px solid rgba(255, 255, 255, 0.12)',
+        boxShadow: '0 30px 90px -20px rgba(0, 0, 0, 0.65), 0 0 1px 1px rgba(255, 255, 255, 0.1)',
       }}
     >
-      {/* ---- title bar */}
-      <div className="ta-win__bar">
-        <span className="ta-win__lights" aria-hidden="true">
-          <i />
-          <i />
-          <i />
-        </span>
-        <span className="ta-win__baricon" aria-hidden="true">
-          <I.Sidebar size={15} />
-        </span>
-        {live.show &&
-          (live.finished ? (
-            <span className="ta-live is-done">Hardware stream active</span>
-          ) : (
-            <button
-              type="button"
-              className={`ta-live${live.paused ? ' is-paused' : ''}`}
-              onClick={live.onToggle}
-              aria-pressed={!live.paused}
-              aria-label={live.paused ? 'Resume live wallpaper simulation' : 'Pause live wallpaper simulation'}
-            >
-              <span className="ta-live__dot" aria-hidden="true" />
-              <span>{live.paused ? 'Hardware feed paused' : 'Hardware decoder live'}</span>
-              {live.paused ? <I.Play size={12} /> : <I.Pause size={12} />}
-            </button>
-          ))}
-      </div>
-
-      <div className="ta-win__body">
-        {/* ---- left rail (decorative chrome) */}
-        <div className="ta-rail" aria-hidden="true">
-          <span className="is-on">
-            <I.Inbox size={15} />
-          </span>
-          <span>
-            <I.CheckDouble size={15} />
-          </span>
+      {/* ---------------- macOS Window Titlebar ---------------- */}
+      <div
+        className="ta-win__bar"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 14px',
+          background: 'linear-gradient(180deg, #2a2420 0%, #1e1916 100%)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          color: '#fff',
+        }}
+      >
+        {/* Left: macOS Stoplights */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, width: '120px' }}>
+          <span style={{ width: 11, height: 11, borderRadius: '50%', background: '#ff5f56', border: '1px solid #e0443e', display: 'inline-block' }} />
+          <span style={{ width: 11, height: 11, borderRadius: '50%', background: '#ffbd2e', border: '1px solid #dea123', display: 'inline-block' }} />
+          <span style={{ width: 11, height: 11, borderRadius: '50%', background: '#27c93f', border: '1px solid #1aab29', display: 'inline-block' }} />
         </div>
 
-        {/* ---- sidebar (desktop / tablet) */}
-        <nav className="ta-side" aria-label="Conversations">
-          {groups.map(g => {
-            const GIcon = GROUP_ICON[g.id];
-            const isOpen = !collapsed[g.id];
+        {/* Center: App Tabs */}
+        <nav style={{ display: 'inline-flex', background: 'rgba(0,0,0,0.3)', padding: 2, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)' }}>
+          {TABS.map(t => {
+            const Icon = t.icon;
+            const on = tab === t.id;
             return (
-              <motion.div layout="position" transition={spring} className="ta-side__group" key={g.id}>
-                <button
-                  type="button"
-                  className="ta-side__head"
-                  aria-expanded={isOpen}
-                  aria-controls={`ta-grp-${g.id}`}
-                  onClick={() => dispatch({ type: 'toggle', group: g.id })}
-                >
-                  <GIcon size={14} />
-                  <span>{g.label}</span>
-                  <I.Chevron size={13} className="ta-side__chev" />
-                </button>
-                <ul id={`ta-grp-${g.id}`} className="ta-side__list" role="list" hidden={!isOpen}>
-                  <AnimatePresence initial={false} mode="popLayout">
-                    {g.items.map(id => {
-                      const c = convos[id];
-                      const p = PEOPLE[c.person];
-                      const on = id === selected;
-                      return (
-                        <motion.li
-                          key={id}
-                          layout="position"
-                          transition={spring}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: -28, transition: { duration: 0.24, ease } }}
-                        >
-                          <button
-                            type="button"
-                            ref={el => (rowRefs.current[id] = el)}
-                            data-row={id}
-                            className={`ta-row${on ? ' is-on' : ''}${c.unread ? ' is-unread' : ''}`}
-                            aria-current={on ? 'true' : undefined}
-                            onClick={() => dispatch({ type: 'select', id })}
-                          >
-                            {on && <motion.span layoutId="ta-row-hl" className="ta-row__hl" transition={spring} />}
-                            <Avatar id={c.person} size={18} shape="square" letter={g.id !== 'teammates'} eager />
-                            <span className="ta-row__name">{p.name}</span>
-                            {c.unread > 0 && (
-                              <span className="ta-row__count">
-                                {c.unread}
-                                <span className="sr-only"> unread</span>
-                              </span>
-                            )}
-                          </button>
-                        </motion.li>
-                      );
-                    })}
-                  </AnimatePresence>
-                </ul>
-              </motion.div>
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTab(t.id)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '4px 11px',
+                  borderRadius: 6,
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: on ? '#fff' : 'rgba(255, 255, 255, 0.55)',
+                  background: on ? 'rgba(255, 255, 255, 0.16)' : 'transparent',
+                  boxShadow: on ? '0 1px 3px rgba(0,0,0,0.4)' : 'none',
+                  transition: 'all 0.18s',
+                }}
+              >
+                <Icon size={12} />
+                <span>{t.label}</span>
+              </button>
             );
           })}
         </nav>
 
-        {/* ---- people strip (mobile) */}
-        <div className="ta-strip" role="group" aria-label="Conversations">
-          {openList.map(id => {
-            const c = convos[id];
-            const p = PEOPLE[c.person];
-            const on = id === selected;
-            return (
-              <button
-                type="button"
-                key={id}
-                className={`ta-strip__item${on ? ' is-on' : ''}`}
-                aria-current={on ? 'true' : undefined}
-                onClick={() => dispatch({ type: 'select', id })}
-              >
-                <span className="ta-strip__av">
-                  <Avatar id={c.person} size={40} />
-                  {c.unread > 0 && (
-                    <span className="ta-strip__count">
-                      {c.unread}
-                      <span className="sr-only"> unread</span>
-                    </span>
-                  )}
-                </span>
-                <span className="ta-strip__name">{p.name.split(' ')[0]}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* ---- conversation */}
-        <div className="ta-main" aria-label={current ? `Conversation with ${person.name}` : 'Conversation'} role="group">
-          {current ? (
-            <>
-              <div className="ta-main__head">
-                <p className="ta-main__title">
-                  <strong>{person.name}</strong>
-                  <span className="ta-main__lane">{groupShort}</span>
-                </p>
-                <div className="ta-main__actions">
-                  <button type="button" className="ta-iconbtn" onClick={markDone} aria-label="Apply to desktop (E)" title="Apply to desktop (E)">
-                    <I.CheckDouble size={16} />
-                  </button>
-                  <button type="button" className="ta-iconbtn" onClick={focusReply} aria-label="Configure display (R)" title="Configure display (R)">
-                    <I.Compose size={15} />
-                  </button>
-                </div>
-              </div>
-
-              <div className="ta-thread" ref={threadRef}>
-                <motion.div
-                  key={current.id}
-                  initial={reduced ? false : { opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.32, ease }}
-                >
-                  <p className="ta-thread__subject">{current.subject}</p>
-                  <div className="ta-thread__meta">
-                    <span className="ta-stack" aria-hidden="true">
-                      {participants.map(pid => (
-                        <Avatar key={pid} id={pid} size={20} shape="square" letter={pid === 'you'} />
-                      ))}
-                    </span>
-                    <span>
-                      {msgs.length} {msgs.length === 1 ? 'diagnostic' : 'diagnostics'}
-                    </span>
-                    <span aria-hidden="true">·</span>
-                    <span>{lastAt}</span>
-                  </div>
-
-                  {hidden > 0 && (
-                    <button
-                      type="button"
-                      className="ta-earlier"
-                      onClick={() => setExpanded(x => ({ ...x, [current.id]: true }))}
-                    >
-                      <span>
-                        {hidden} earlier {hidden === 1 ? 'event' : 'events'}, show all
-                      </span>
-                    </button>
-                  )}
-
-                  <ol className="ta-msgs" role="list">
-                    {visible.map(m => {
-                      const from = PEOPLE[m.from];
-                      const you = m.from === 'you';
-                      return (
-                        <motion.li
-                          key={m.id}
-                          className={`ta-msg${you ? ' is-you' : ''}`}
-                          initial={m.fresh && !reduced ? { opacity: 0, y: 12 } : false}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.45, ease }}
-                        >
-                          <Avatar id={m.from} size={26} letter={you} />
-                          <div className="ta-msg__main">
-                            <p className="ta-msg__head">
-                              <strong>{you ? 'Your Mac' : from.name}</strong>
-                              <time>{shortAt(m.at)}</time>
-                              {m.demo && <span className="ta-msg__demo">Live · log</span>}
-                            </p>
-                            <p className="ta-msg__text">{m.body}</p>
-                          </div>
-                        </motion.li>
-                      );
-                    })}
-                  </ol>
-                </motion.div>
-              </div>
-
-              <form
-                className="ta-composer"
-                onSubmit={e => {
-                  e.preventDefault();
-                  send();
-                }}
-              >
-                <label htmlFor="ta-reply" className="sr-only">
-                  Command for {person.name}
-                </label>
-                <textarea
-                  id="ta-reply"
-                  ref={textareaRef}
-                  rows={2}
-                  value={draft}
-                  placeholder={`Command or note for ${person.name.split(' ')[0]}…`}
-                  aria-describedby="ta-reply-note"
-                  onChange={e => {
-                    stopTyping();
-                    setNote('');
-                    setDraftFor(current.id, e.target.value);
-                  }}
-                  onKeyDown={onComposerKey}
-                />
-                <div className="ta-composer__bar">
-                  <button type="button" className="ta-ghost" onClick={suggest} disabled={writing}>
-                    <I.Compose size={13} />
-                    {writing ? 'Simulating…' : 'Quick Apply'}
-                  </button>
-                  <span id="ta-reply-note" className="ta-composer__note" aria-live="polite">
-                    {note}
-                  </span>
-                  <button type="submit" className={`ta-send${flash === 'send' ? ' is-pressed' : ''}`}>
-                    <span>Apply</span>
-                    <kbd>{mod} ↵</kbd>
-                  </button>
-                </div>
-              </form>
-            </>
-          ) : (
-            <div className="ta-empty">
-              <p className="ta-empty__title">All atmospheres previewed.</p>
-              <p className="ta-empty__text">Every sample display configuration has been tested.</p>
-              <button type="button" className="ta-ghost" onClick={() => dispatch({ type: 'restoreAll' })}>
-                <I.Undo size={13} /> Restore catalog
-              </button>
-            </div>
-          )}
-
-          <AnimatePresence>
-            {toast && (
-              <motion.div
-                key={toast.key}
-                className="ta-toast"
-                role="status"
-                initial={{ opacity: 0, y: 14, x: '-50%' }}
-                animate={{ opacity: 1, y: 0, x: '-50%' }}
-                exit={{ opacity: 0, y: 8, x: '-50%' }}
-                transition={{ duration: 0.3, ease }}
-              >
-                <I.Check size={14} />
-                <span>
-                  Applied to Desktop <span className="ta-toast__who">· {toast.name}</span>
-                </span>
-                <button type="button" onClick={undo}>
-                  Undo
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
+        {/* Right: Hardware Telemetry Pill */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '3px 9px',
+              borderRadius: 999,
+              background: 'rgba(40, 200, 64, 0.12)',
+              border: '1px solid rgba(40, 200, 64, 0.25)',
+              color: '#4ade80',
+              fontSize: '11px',
+              fontFamily: 'var(--ta-mono)',
+              fontWeight: 500,
+            }}
+          >
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 6px #4ade80' }} />
+            AVFoundation · 0.28% CPU
+          </span>
+          <button
+            type="button"
+            onClick={() => setAudio(!audio)}
+            title={audio ? 'Ambient Audio On' : 'Ambient Audio Muted'}
+            style={{
+              border: 'none',
+              background: audio ? 'rgba(228, 87, 46, 0.25)' : 'rgba(255, 255, 255, 0.08)',
+              color: audio ? '#f97316' : 'rgba(255, 255, 255, 0.6)',
+              borderRadius: 6,
+              width: 24,
+              height: 24,
+              display: 'grid',
+              placeItems: 'center',
+              cursor: 'pointer',
+            }}
+          >
+            {audio ? <I.Volume size={13} /> : <I.VolumeX size={13} />}
+          </button>
         </div>
       </div>
 
-      {/* ---- shortcut hint bar */}
-      <div className="ta-hints" id="ta-win-hints">
-        <span className="ta-hints__state">
-          <span className="ta-hints__dot" aria-hidden="true" />
-          {focusWithin ? 'Keyboard hotkeys active' : 'Click inside player to use hotkeys'}
-        </span>
-        <span className="ta-hints__keys">
-          <span>
-            <kbd className={flash === 'j' ? 'is-pressed' : ''}>J</kbd>
-            <kbd className={flash === 'k' ? 'is-pressed' : ''}>K</kbd> next/prev
+      {/* ---------------- Window Body ---------------- */}
+      <div
+        className="ta-win__body"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '46px 210px minmax(0, 1fr)',
+          minHeight: 0,
+          background: '#15110f',
+        }}
+      >
+        {/* Left Icon Rail */}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 12,
+            paddingTop: 12,
+            background: '#1a1614',
+            borderRight: '1px solid rgba(255, 255, 255, 0.06)',
+          }}
+        >
+          <span style={{ width: 30, height: 30, borderRadius: 7, display: 'grid', placeItems: 'center', background: 'rgba(228,87,46,0.2)', color: '#f97316' }}>
+            <I.Monitor size={15} />
           </span>
-          <span>
-            <kbd className={flash === 'e' ? 'is-pressed' : ''}>E</kbd> apply
+          <span style={{ width: 30, height: 30, borderRadius: 7, display: 'grid', placeItems: 'center', background: 'transparent', color: 'rgba(255,255,255,0.4)' }}>
+            <I.Sun size={15} />
           </span>
-          <span>
-            <kbd className={flash === 'r' ? 'is-pressed' : ''}>R</kbd> config
+          <span style={{ width: 30, height: 30, borderRadius: 7, display: 'grid', placeItems: 'center', background: 'transparent', color: 'rgba(255,255,255,0.4)' }}>
+            <I.Shield size={15} />
           </span>
-          <span>
-            <kbd className={flash === 'send' ? 'is-pressed' : ''}>{mod}</kbd>
-            <kbd className={flash === 'send' ? 'is-pressed' : ''}>↵</kbd> apply
+          <span style={{ width: 30, height: 30, borderRadius: 7, display: 'grid', placeItems: 'center', background: 'transparent', color: 'rgba(255,255,255,0.4)' }}>
+            <I.Sliders size={15} />
           </span>
-        </span>
+        </div>
+
+        {/* Sidebar: Wallpaper Library */}
+        <nav
+          style={{
+            minHeight: 0,
+            overflowY: 'auto',
+            padding: '12px 8px',
+            background: 'linear-gradient(180deg, #1f1a17 0%, #171311 100%)',
+            borderRight: '1px solid rgba(255, 255, 255, 0.06)',
+            scrollbarWidth: 'none',
+          }}
+          aria-label="Wallpapers Catalog"
+        >
+          <div style={{ marginBottom: 10, padding: '0 4px' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '4px 8px',
+                borderRadius: 6,
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                color: 'rgba(255, 255, 255, 0.45)',
+                fontSize: '11px',
+              }}
+            >
+              <span>🔍</span>
+              <span>Search 4K Library…</span>
+            </div>
+          </div>
+
+          {groups.map(g => {
+            const isOpen = !collapsed[g.id];
+            return (
+              <div key={g.id} style={{ marginBottom: 12 }}>
+                <button
+                  type="button"
+                  onClick={() => dispatch({ type: 'toggle', group: g.id })}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    width: '100%',
+                    padding: '4px 6px',
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'rgba(255, 255, 255, 0.45)',
+                    fontSize: '10.5px',
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span>{g.label}</span>
+                  <I.Chevron size={11} style={{ transform: isOpen ? 'rotate(0)' : 'rotate(-90deg)', transition: 'transform 0.2s' }} />
+                </button>
+
+                {isOpen && (
+                  <ul style={{ listStyle: 'none', padding: 0, margin: '3px 0 0 0', display: 'grid', gap: 2 }}>
+                    {g.items.map(id => {
+                      const c = convos[id];
+                      const p = PEOPLE[c.person];
+                      const on = id === (selected || 'snowfall');
+                      const thumbUrl = p.photo
+                        ? `https://images.unsplash.com/photo-${p.photo}?auto=format&fit=crop&w=80&q=75`
+                        : '';
+                      return (
+                        <li key={id}>
+                          <button
+                            type="button"
+                            onClick={() => dispatch({ type: 'select', id })}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              width: '100%',
+                              padding: '5px 7px',
+                              borderRadius: 7,
+                              border: 'none',
+                              textAlign: 'left',
+                              cursor: 'pointer',
+                              background: on ? 'rgba(228, 87, 46, 0.22)' : 'transparent',
+                              borderLeft: on ? '2px solid #e4572e' : '2px solid transparent',
+                              color: on ? '#fff' : 'rgba(255, 255, 255, 0.75)',
+                              transition: 'background 0.15s',
+                            }}
+                          >
+                            <img
+                              src={thumbUrl}
+                              alt=""
+                              style={{ width: 22, height: 22, borderRadius: 4, objectFit: 'cover' }}
+                            />
+                            <span style={{ flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', fontSize: '12px', fontWeight: on ? 550 : 450 }}>
+                              {p.name}
+                            </span>
+                            {on && (
+                              <span style={{ fontSize: '9px', fontWeight: 600, padding: '1px 4px', borderRadius: 3, background: '#e4572e', color: '#fff' }}>
+                                LIVE
+                              </span>
+                            )}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
+        </nav>
+
+        {/* Main Stage: 4K Live Wallpaper Viewport & Controls */}
+        <div
+          style={{
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            overflow: 'hidden',
+            padding: 16,
+          }}
+        >
+          {/* Background Wallpaper Image with Solar Atmosphere Grade */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: `url(${bgUrl})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              filter: activeSolar.filter,
+              transition: 'filter 0.8s ease',
+              transform: 'scale(1.03)',
+            }}
+          />
+          {/* Subtle Ambient Vignette / Scrim */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'linear-gradient(180deg, rgba(15,12,10,0.65) 0%, rgba(15,12,10,0.1) 40%, rgba(15,12,10,0.75) 100%)',
+            }}
+          />
+
+          {/* Top HUD: Wallpaper Title, Metadata, Multi-Display Pill */}
+          <div
+            style={{
+              position: 'relative',
+              zIndex: 2,
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: 12,
+            }}
+          >
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <h3 style={{ margin: 0, color: '#fff', fontSize: '18px', fontWeight: 600, letterSpacing: '-0.02em', textShadow: '0 2px 4px rgba(0,0,0,0.6)' }}>
+                  {person.name}
+                </h3>
+                <span
+                  style={{
+                    padding: '2px 7px',
+                    borderRadius: 4,
+                    background: 'rgba(0,0,0,0.5)',
+                    backdropFilter: 'blur(8px)',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    color: '#ffc107',
+                    fontSize: '10.5px',
+                    fontWeight: 600,
+                  }}
+                >
+                  4K 60FPS
+                </span>
+              </div>
+              <p style={{ margin: 0, color: 'rgba(255,255,255,0.7)', fontSize: '12px', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
+                {person.role} · AVFoundation Zero-Copy GPU Decode
+              </p>
+            </div>
+
+            {/* Display Target Selector */}
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                type="button"
+                onClick={() => setDisplayTarget(d => (d === 'main' ? 'dual' : 'main'))}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '5px 10px',
+                  borderRadius: 6,
+                  background: 'rgba(0,0,0,0.5)',
+                  backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  color: '#fff',
+                  fontSize: '11.5px',
+                  cursor: 'pointer',
+                }}
+              >
+                <I.Monitor size={12} />
+                <span>{displayTarget === 'main' ? 'Pro Display XDR (Primary)' : 'Spanned Dual Displays'}</span>
+                <I.Chevron size={11} />
+              </button>
+            </div>
+          </div>
+
+          {/* Toast / Notification when action triggered */}
+          <AnimatePresence>
+            {(applied || screensaver) && (
+              <motion.div
+                initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                style={{
+                  position: 'relative',
+                  zIndex: 4,
+                  alignSelf: 'center',
+                  padding: '8px 16px',
+                  borderRadius: 8,
+                  background: 'rgba(20, 20, 20, 0.88)',
+                  backdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(255,255,255,0.18)',
+                  color: '#4ade80',
+                  fontSize: '13px',
+                  fontWeight: 550,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                }}
+              >
+                <I.Check size={14} />
+                <span>
+                  {applied
+                    ? `Set "${person.name}" as active desktop wallpaper!`
+                    : `Synchronized "${person.name}" with Lock Screen & Screensaver!`}
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Bottom Controls HUD */}
+          <div
+            style={{
+              position: 'relative',
+              zIndex: 2,
+              background: 'rgba(18, 14, 12, 0.75)',
+              backdropFilter: 'blur(16px)',
+              padding: '12px 14px',
+              borderRadius: 12,
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 10,
+            }}
+          >
+            {/* Top row: 24h Solar Scrubber */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 550 }}>
+                <I.Sun size={12} style={{ color: '#f97316' }} />
+                <span>SOLAR EPHEMERIS:</span>
+                <span style={{ color: '#fff', fontFamily: 'var(--ta-mono)' }}>{activeSolar.time} ({activeSolar.elev})</span>
+              </div>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {SOLAR_PRESETS.map(s => {
+                  const on = solar === s.id;
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setSolar(s.id)}
+                      style={{
+                        padding: '3px 8px',
+                        borderRadius: 5,
+                        fontSize: '11px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        background: on ? '#e4572e' : 'rgba(255,255,255,0.08)',
+                        color: on ? '#fff' : 'rgba(255,255,255,0.65)',
+                        fontWeight: on ? 600 : 450,
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {s.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Bottom row: Primary Action Buttons */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingTop: 4, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={handleApply}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    height: 32,
+                    padding: '0 14px',
+                    borderRadius: 7,
+                    border: 'none',
+                    background: '#e4572e',
+                    color: '#fff',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 6px rgba(228,87,46,0.4)',
+                  }}
+                >
+                  <I.Check size={13} />
+                  <span>Set as Desktop Wallpaper</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleScreensaver}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    height: 32,
+                    padding: '0 12px',
+                    borderRadius: 7,
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    background: 'rgba(255,255,255,0.08)',
+                    color: '#fff',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <I.Layers size={13} />
+                  <span>Sync with Screensaver</span>
+                </button>
+              </div>
+
+              <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)', fontFamily: 'var(--ta-mono)' }}>
+                ExtensionKit Sandbox: Active
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ---------------- Window Telemetry Footer ---------------- */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 14px',
+          background: '#120f0d',
+          borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+          fontSize: '10.5px',
+          color: 'rgba(255, 255, 255, 0.5)',
+          fontFamily: 'var(--ta-mono)',
+        }}
+      >
+        <div style={{ display: 'flex', gap: 14 }}>
+          <span>● Engine: VideoToolbox Hardware Decoder</span>
+          <span>● Occlusion Sentry: Standby</span>
+          <span>● Lock Screen: Synchronized</span>
+        </div>
+        <div>
+          <span>CPU: 0.28% · Memory: 42 MB · Fan: 0 RPM</span>
+        </div>
       </div>
     </div>
   );

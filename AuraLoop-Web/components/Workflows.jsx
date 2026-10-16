@@ -18,7 +18,9 @@ function Case({ c, i, open, onToggle }) {
             <small>{c.who}</small>
           </span>
           <span className="ta-case__metric">
-            <span className="ta-tag">Benchmarked</span>
+            <span className="ta-tag" style={{ background: 'rgba(228,87,46,0.1)', color: '#e4572e', border: '1px solid rgba(228,87,46,0.2)' }}>
+              {c.chip || 'Apple Silicon'}
+            </span>
             <span className="ta-case__fromto">
               <s>{c.metric.from}</s>
               <span aria-hidden="true">→</span>
@@ -36,13 +38,17 @@ function Case({ c, i, open, onToggle }) {
         {open && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, ease }}>
             <dl className="ta-case__ba">
-              <div>
-                <dt>Standard Wallpaper</dt>
-                <dd>{c.before}</dd>
+              <div style={{ background: 'rgba(239, 68, 68, 0.04)', borderLeft: '3px solid #ef4444', padding: '12px 16px', borderRadius: '0 8px 8px 0' }}>
+                <dt style={{ color: '#dc2626', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Standard Wallpaper / Web-Based Engines
+                </dt>
+                <dd style={{ marginTop: 4, color: 'var(--ta-ink)' }}>{c.before}</dd>
               </div>
-              <div>
-                <dt>With AuraLoop</dt>
-                <dd>{c.after}</dd>
+              <div style={{ background: 'rgba(34, 197, 94, 0.05)', borderLeft: '3px solid #22c55e', padding: '12px 16px', borderRadius: '0 8px 8px 0' }}>
+                <dt style={{ color: '#16a34a', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  With AuraLoop Native AVFoundation
+                </dt>
+                <dd style={{ marginTop: 4, color: 'var(--ta-ink)', fontWeight: 500 }}>{c.after}</dd>
               </div>
             </dl>
             <ol className="ta-case__steps" role="list">

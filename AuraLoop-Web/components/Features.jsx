@@ -19,17 +19,17 @@ function Screener() {
     setWhere(w => ({ ...w, [s.id]: to }));
     setSaid(
       to === 'allowed'
-        ? `${name(s)} is engaged. Hardware video decoder streaming directly.`
+        ? `${name(s)} is active. Desktop is visible, streaming at 60 fps.`
         : to === 'blocked'
-          ? `${name(s)} is paused. Occlusion sentry conserved system power.`
-          : `${name(s)} is back in the pipeline inspect queue.`
+          ? `${name(s)} is occluded. Windows cover desktop, decoding paused.`
+          : `${name(s)} is back in monitoring state.`
     );
   };
 
   const waiting = list('waiting');
   const decided = [
-    { key: 'allowed', label: 'Engaged', note: 'Hardware decoded via AVFoundation', items: list('allowed') },
-    { key: 'blocked', label: 'Paused', note: 'Occluded or power-saving standby', items: list('blocked') },
+    { key: 'allowed', label: 'Streaming', note: 'Desktop visible · 60 fps', items: list('allowed') },
+    { key: 'blocked', label: 'Auto-Paused', note: 'Desktop covered · 0% GPU', items: list('blocked') },
   ];
 
   return (
@@ -39,20 +39,20 @@ function Screener() {
           <I.Shield size={15} /> Occlusion Sentry
         </p>
         <h3 id="ta-f-screener" className="ta-h3">
-          Zero wasted cycles when windows cover the desktop.
+          Automatic GPU pause when windows cover the desktop.
         </h3>
         <p className="ta-feat__body">
-          Every video feed passes through the Occlusion Sentry. If Safari or Xcode covers your desktop,
-          decoding pauses instantly to save 100% of GPU compute and protect MacBook battery life.
+          The millisecond Safari, Xcode, or a terminal window covers your screen, AuraLoop halts Metal texture blitting.
+          Zero GPU cycles are wasted rendering hidden frames behind your active work.
         </p>
-        <p className="ta-feat__hint">Try it: engage a feed, pause for occlusion, or reset to queue.</p>
+        <p className="ta-feat__hint">Interactive test: switch a display between Desktop Visible and Covered states.</p>
       </div>
 
       <LayoutGroup id="ta-screener">
         <div className="ta-scr">
           <div className="ta-scr__col ta-scr__col--wait">
             <p className="ta-scr__label">
-              Decoder Queue <span>{waiting.length}</span>
+              Monitored Displays <span>{waiting.length}</span>
             </p>
             <ul className="ta-scr__list" role="list">
               <AnimatePresence initial={false} mode="popLayout">
@@ -78,18 +78,18 @@ function Screener() {
                       <span className="ta-scr__subj">{s.subject}</span>
                     </span>
                     <span className="ta-scr__actions">
-                      <button type="button" className="ta-pillbtn ta-pillbtn--yes" onClick={() => moveTo(s, 'allowed')} aria-label={`Engage ${name(s)}`}>
-                        <I.Check size={13} /> Engage
+                      <button type="button" className="ta-pillbtn ta-pillbtn--yes" onClick={() => moveTo(s, 'allowed')} aria-label={`Show ${name(s)}`}>
+                        <I.Check size={13} /> Reveal
                       </button>
-                      <button type="button" className="ta-pillbtn" onClick={() => moveTo(s, 'blocked')} aria-label={`Pause ${name(s)}`}>
-                        <I.Ban size={13} /> Pause
+                      <button type="button" className="ta-pillbtn" onClick={() => moveTo(s, 'blocked')} aria-label={`Cover ${name(s)}`}>
+                        <I.Ban size={13} /> Cover
                       </button>
                     </span>
                   </motion.li>
                 ))}
               </AnimatePresence>
               {waiting.length === 0 && (
-                <li className="ta-scr__empty">All streams running smoothly in hardware.</li>
+                <li className="ta-scr__empty">All connected displays active.</li>
               )}
             </ul>
           </div>
@@ -123,13 +123,13 @@ function Screener() {
                           <Avatar person={{ name: s.name, service: true }} size={22} />
                         )}
                         <span>{name(s)}</span>
-                        <button type="button" onClick={() => moveTo(s, 'waiting')} aria-label={`Undo, send ${name(s)} back to queue`}>
+                        <button type="button" onClick={() => moveTo(s, 'waiting')} aria-label={`Reset ${name(s)}`}>
                           <I.Undo size={13} />
                         </button>
                       </motion.li>
                     ))}
                   </AnimatePresence>
-                  {d.items.length === 0 && <li className="ta-scr__none">No streams assigned</li>}
+                  {d.items.length === 0 && <li className="ta-scr__none">No displays in this state</li>}
                 </ul>
               </div>
             ))}
