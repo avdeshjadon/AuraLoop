@@ -10,6 +10,8 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
+cd /d "%~dp0"
+if exist "version.cmd" call version.cmd
 cd /d "%~dp0\AuraLoop-Win"
 dotnet build AuraLoop-Win.csproj -c Release
 if %ERRORLEVEL% neq 0 (
