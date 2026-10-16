@@ -57,20 +57,15 @@ final class AuraLoopAppDelegate: NSObject, NSApplicationDelegate {
         // menu bar icon and nothing else would read as an app that failed to
         // start.
         if Self.isFirstEverLaunch() {
-            NSApp.activate(ignoringOtherApps: true)
-            // A new install starts with both battery savers on. They were off
-            // until someone found them in Settings, which is the opposite of
-            // what an app promising very low CPU should do by default (full
-            // check, 2026-10-01). Only here, so nothing changes for anyone
-            // who already has AuraLoop: their choice, or the old default, stays.
             AppStore.shared.setAutoPauseLowPower(true)
             AppStore.shared.setAutoPauseBattery(true)
-        } else {
-            // No time limit. Any request for the gallery ends this
-            // immediately, and a launch that is slow to put the window up must
-            // not outlast the thing watching for it.
+        }
+
+        if Self.launchedAsLoginItem() {
             GalleryLaunchSuppressor.shared.start()
             mainWindow?.orderOut(nil)
+        } else {
+            showMainWindow()
         }
     }
 
