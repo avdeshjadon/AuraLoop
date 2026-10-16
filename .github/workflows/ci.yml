@@ -98,7 +98,8 @@ jobs:
           $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
           if (Test-Path $iscc) {
             Write-Host "Compiling Windows Installer with Inno Setup..."
-            & $iscc "./AuraLoop-Win/Installer/installer.iss" /O"."
+            $distPath = (Resolve-Path "./dist-win").Path
+            & $iscc "/DSourceDir=$distPath" "./AuraLoop-Win/Installer/installer.iss" /O"."
             if (Test-Path "./AuraLoop-Win-x64-Setup.exe") {
               Write-Host "Windows Installer generated successfully!"
             }
