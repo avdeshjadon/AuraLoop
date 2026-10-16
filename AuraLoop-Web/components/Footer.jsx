@@ -101,7 +101,7 @@ export default function Footer() {
             </a>
             <p>High-performance native live wallpapers & screensavers for macOS.</p>
             <svg className="ta-footer__stage" aria-hidden="true" focusable="false">
-              <path className="ta-rope" pathLength="1" d="M 0 0" />
+              <path className="ta-rope" d="M 0 0" />
               <line className="ta-floor" x1="0" y1="0" x2="0" y2="0" />
             </svg>
           </div>

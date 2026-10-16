@@ -2816,9 +2816,8 @@ button.ta-live:hover {
   fill: none;
   stroke: var(--ta-ink-3);
   stroke-linecap: round;
+  stroke-linejoin: round;
   opacity: 0;
-  stroke-dasharray: 1 1;
-  stroke-dashoffset: 1;
 }
 .ta-floor {
   stroke: var(--ta-line);

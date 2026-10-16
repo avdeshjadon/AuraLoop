@@ -3,21 +3,24 @@
  *
  * A scroll-triggered GSAP/ScrollTrigger choreography that lives entirely inside
  * the existing footer wordmark. The two lowercase "o" glyphs wake up; the right
- * "o" detaches, leaps and falls into the clear space to the right of the
- * tagline, grows limbs, catches a rope hanging from the "p", climbs it, shimmies
- * over to the "p", then releases and settles back into its exact original
- * typographic position.
+ * "o" leaps out of the wordmark (vaulting over the "p"), falls into the clear
+ * corridor to the right of the tagline, grows arms and legs, spins a rope above
+ * its head like a whip and throws it upward — the rope's top end shoots to the
+ * top of the stage and anchors there. The character then grabs the rope, climbs
+ * it hand-over-hand, and at the top vaults back over the "p" to land precisely in
+ * its original typographic slot, settling perfectly into place.
  *
  * Everything is driven by a single plain-object proxy rendered on every timeline
  * update, so playback/reversal is fully deterministic and nothing can desync.
- * All coordinates are measured at runtime from the rendered wordmark (no
- * hard-coded viewport assumptions) and re-measured on resize / font load.
+ * All coordinates are measured at runtime from the rendered wordmark (no hard-
+ * coded viewport assumptions) and re-measured on resize / font load.
  *
  * Layout constraints handled by construction:
- *  - the tagline is an inline text block under the wordmark; a keep-out band is
- *    measured from its text run and the flight/climb path is routed around it,
+ *  - the tagline text run and the "p" glyph are keep-out regions; the climb and
+ *    the play corridor live to the right of the tagline, and the exit/return
+ *    vault over the "p" while staying above it,
  *  - the footer divider bounds the "floor",
- *  - the character never covers the "p" or any other glyph.
+ *  - the character never rests on top of another glyph.
  */
 
 import { gsap, ScrollTrigger, prefersReducedMotion } from '../../shared/gsap.js';
@@ -45,6 +48,7 @@ const LEG = { l1: 118, l2: 104 };
 const BEND = { arm: [-1, 1], leg: [-1, 1] };
 
 const canvas = document.createElement('canvas').getContext('2d');
+const ROPE_N = 30; // points sampled along the rope each frame
 
 /* -------------------------------------------------------------------------- */
 /* helpers                                                                    */
@@ -102,7 +106,7 @@ function measureTextSpan(el) {
     inkCx,
     inkCy: baseline - (inkAsc - inkDesc) / 2,
     inkAsc,
-    inkLeft: -m.actualBoundingBoxLeft, // offset from glyph origin to ink's left edge
+    inkLeft: -m.actualBoundingBoxLeft,
     inkRight: m.actualBoundingBoxRight,
   };
 }
@@ -136,6 +140,32 @@ function textRunRect(el, base) {
   };
 }
 
+/** Resample a polyline to N points evenly spaced by arc length. */
+function resample(points, N) {
+  if (points.length === 1) return Array.from({ length: N }, () => ({ ...points[0] }));
+  const segs = [];
+  let total = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    const d = Math.hypot(points[i + 1].x - points[i].x, points[i + 1].y - points[i].y);
+    segs.push(d);
+    total += d;
+  }
+  const out = [];
+  for (let k = 0; k < N; k++) {
+    const target = total === 0 ? 0 : (k / (N - 1)) * total;
+    let acc = 0;
+    for (let i = 0; i < segs.length; i++) {
+      if (acc + segs[i] >= target || i === segs.length - 1) {
+        const t = segs[i] > 0 ? clamp((target - acc) / segs[i], 0, 1) : 0;
+        out.push({ x: lerp(points[i].x, points[i + 1].x, t), y: lerp(points[i].y, points[i + 1].y, t) });
+        break;
+      }
+      acc += segs[i];
+    }
+  }
+  return out;
+}
+
 /* -------------------------------------------------------------------------- */
 /* init                                                                       */
 /* -------------------------------------------------------------------------- */
@@ -167,6 +197,16 @@ export function initFooterLogoAnimation(footer) {
   let geo = null;
   let s = null;
 
+  // stage-space positions of the character's hands/feet, refreshed each frame
+  const hand = [
+    { x: 0, y: 0 },
+    { x: 0, y: 0 },
+  ];
+  const foot = [
+    { x: 0, y: 0 },
+    { x: 0, y: 0 },
+  ];
+
   /* ---------------------------- measurement ------------------------------ */
 
   function measure() {
@@ -189,6 +229,8 @@ export function initFooterLogoAnimation(footer) {
       baseline: rect.y + g.baseline,
       inkH: g.inkH,
       fs: g.fs,
+      inkTop: rect.y + g.baseline - g.inkAsc,
+      inkBottom: rect.y + g.baseline + g.inkDesc,
     });
 
     const a = toStage(gA, oARect);
@@ -200,36 +242,29 @@ export function initFooterLogoAnimation(footer) {
     const rigSize = 1000 * pxPerUnit;
     const r = D / 2;
 
-    // rope is tied to the top of the p's stem (left edge of the p, x-height top)
-    const ropeAnchor = {
-      x: pRect.x + gP.inkLeft + 0.11 * gP.fs,
-      y: p.baseline - 0.97 * gA.inkAsc,
-    };
-    const pInkRight = pRect.x + gP.inkRight;
+    const feetExt = 0.66 * D;
+    const whipR = 1.15 * D;
 
-    /* ---- keep-out band: the tagline's text run (inflated a little) ---- */
-    const keep = {
-      x0: -1e4,
-      x1: tag.right + 10,
-      y0: tag.y - 6,
-      y1: tag.bottom + 6,
-    };
+    // climb / play corridor: right of BOTH the tagline and the p, with room for the whip loop
+    const corridorX = clamp(
+      Math.max(tag.right + whipR + 12, pRect.right + whipR + 16),
+      r + 8,
+      brandW - r - 8
+    );
 
-    /* ---- landing spot: clear corridor to the right of the tagline ---- */
-    const feetExt = 0.72 * D; // feet below body centre when standing
-    const maxY = bot.y - 8 - feetExt; // feet must stay above the divider
-    const minY = Math.max(tag.bottom + r + 8, keep.y1 + r + 4); // glyph top below text
-    let landY = clamp(minY, minY, Math.max(minY, maxY));
-    const tooTight = maxY < minY;
-    if (tooTight) landY = minY - 2; // extremely short footers: stay as high as possible
-    let landX = Math.max(tag.right + 2.7 * r, wm.right + 2.1 * r);
-    landX = Math.min(landX, brandW - r - 6);
-    if (landX < pInkRight + r + 8) landX = Math.min(pInkRight + r + 8, brandW - r - 6);
-    const floorY = landY + feetExt;
+    // rope anchor: top of the designated area (the stage), directly over the corridor
+    const attachY = 6;
+    const attach = { x: corridorX, y: attachY };
 
-    /* ---- climb destination: hanging beside the p at x-height ---- */
-    const destX = Math.min(pInkRight + r + 12, brandW - r - 8);
-    const destY = p.baseline - 0.5 * gA.inkAsc;
+    // floor + standing position, below the tagline and above the divider
+    const floorY = clamp(tag.bottom + (bot.y - tag.bottom) * 0.5, tag.bottom + 24, bot.y - 14);
+    const landCY = floorY - feetExt;
+
+    // where the climb ends: high enough that the top hand reaches the anchor
+    const climbEndCY = attachY + 0.95 * D;
+
+    // keep-out band: the tagline text run (inflated a little)
+    const keep = { x0: -1e4, x1: tag.right + 8, y0: tag.y - 6, y1: tag.bottom + 6 };
 
     geo = {
       brandW,
@@ -239,19 +274,20 @@ export function initFooterLogoAnimation(footer) {
       D,
       r,
       pxPerUnit,
+      feetExt,
+      whipR,
       a: { ...a, origin: `${gA.inkCx}px ${gA.inkCy}px` },
       b: { ...b, origin: `${gB.inkCx}px ${gB.inkCy}px`, pxPerUnit },
       p,
-      pInkRight,
-      ropeAnchor,
-      landX,
-      landY,
-      landYFloor: floorY,
+      pRect,
+      pInkTop: p.inkTop,
+      oSlot: { x: b.cx, y: b.cy },
+      corridorX,
+      attach,
+      attachY,
       floorY,
-      destX,
-      destY,
-      tooTight,
-      feetExt,
+      landCY,
+      climbEndCY,
     };
 
     // align rig overlays exactly over each glyph's ink box
@@ -266,8 +302,8 @@ export function initFooterLogoAnimation(footer) {
     });
 
     ropePath.style.strokeWidth = `${clamp(b.fs * 0.05, 2, 5)}px`;
-    floorLine.setAttribute('x1', landX - 0.9 * D);
-    floorLine.setAttribute('x2', landX + 0.9 * D);
+    floorLine.setAttribute('x1', corridorX - 0.9 * D);
+    floorLine.setAttribute('x2', corridorX + 0.9 * D);
     floorLine.setAttribute('y1', floorY);
     floorLine.setAttribute('y2', floorY);
     floorLine.style.strokeWidth = `${clamp(b.fs * 0.018, 1, 1.6)}px`;
@@ -280,25 +316,25 @@ export function initFooterLogoAnimation(footer) {
       a: { x: 0, y: 0, rot: 0, sx: 1, sy: 1, face: 0, blink: 1, eyeW: 1, px: 0, py: 0 },
       b: { x: 0, y: 0, rot: 0, sx: 1, sy: 1, face: 0, blink: 1, eyeW: 1, px: 0, py: 0 },
       floor: { op: 0 },
-      rope: { op: 0, dash: 1, swing: 0, tailLen: 0.42 * geo.D },
+      rope: {
+        op: 0,
+        whip: 0, // 0 = rope not spinning, 1 = fully spinning overhead
+        spin: 0, // accumulated spin angle (radians)
+        throw: 0, // 0 = hand-held, 1 = anchored at the top
+        swing: 0,
+        tailLen: 0.4 * geo.D,
+        grip: [0, 0], // how firmly each hand holds the rope (for rope routing)
+      },
       limbs: {
-        armOp: { l: 0, r: 0 },
-        legOp: { l: 0, r: 0 },
-        hOff: [
+        armOp: [0, 0],
+        legOp: [0, 0],
+        handOff: [
           { x: 0, y: 0 },
           { x: 0, y: 0 },
         ],
-        fOff: [
+        footOff: [
           { x: 0, y: 0 },
           { x: 0, y: 0 },
-        ],
-        hAbs: [
-          { x: 0, y: 0, w: 0 },
-          { x: 0, y: 0, w: 0 },
-        ],
-        fAbs: [
-          { x: 0, y: 0, w: 0 },
-          { x: 0, y: 0, w: 0 },
         ],
       },
     };
@@ -345,25 +381,23 @@ export function initFooterLogoAnimation(footer) {
     const L = s.limbs;
     const cx = geo.b.cx + s.b.x;
     const cy = geo.b.cy + s.b.y;
-    const armOp = [L.armOp.l, L.armOp.r];
-    const legOp = [L.legOp.l, L.legOp.r];
-    const limbs = rig.querySelectorAll('.ta-rig-limb');
 
+    for (let i = 0; i < 2; i++) {
+      hand[i].x = cx + L.handOff[i].x;
+      hand[i].y = cy + L.handOff[i].y;
+      foot[i].x = cx + L.footOff[i].x;
+      foot[i].y = cy + L.footOff[i].y;
+    }
+
+    const limbs = rig.querySelectorAll('.ta-rig-limb');
     for (let i = 0; i < 2; i++) {
       const arm = limbs[i];
       const leg = limbs[i + 2];
-      arm.style.opacity = armOp[i];
-      leg.style.opacity = legOp[i];
+      arm.style.opacity = L.armOp[i];
+      leg.style.opacity = L.legOp[i];
 
-      const blend = (off, abs) => ({
-        x: cx + off.x + (abs.x - (cx + off.x)) * abs.w,
-        y: cy + off.y + (abs.y - (cy + off.y)) * abs.w,
-      });
-      const h = blend(L.hOff[i], L.hAbs[i]);
-      const f = blend(L.fOff[i], L.fAbs[i]);
-
-      const hr = stageToRig(h.x, h.y);
-      const fr = stageToRig(f.x, f.y);
+      const hr = stageToRig(hand[i].x, hand[i].y);
+      const fr = stageToRig(foot[i].x, foot[i].y);
       const armIK = solveIK(SHOULDER[i].x, SHOULDER[i].y, hr.x, hr.y, ARM.l1, ARM.l2, BEND.arm[i]);
       const legIK = solveIK(HIP[i].x, HIP[i].y, fr.x, fr.y, LEG.l1, LEG.l2, BEND.leg[i]);
 
@@ -383,61 +417,70 @@ export function initFooterLogoAnimation(footer) {
   }
 
   /**
-   * Rope model: tied at the p's stem top, straight (taut) to the highest active
-   * hand grip, then hanging straight down below the lowest active grip.
-   * When nothing is held it's a short tail hanging from the anchor.
+   * Rope model.
+   *
+   *  - whip:  a spinning loop held in the character's hand (a rotating arc),
+   *  - throw: that loop morphs into a straight line that races up to the anchor
+   *           and hangs down to the free end,
+   *  - hang:  a straight line from the anchor through the gripping hands to a
+   *           dangling tail below the lowest grip,
+   *  - release: the anchor holds while the free end recoils, then it fades.
    */
-  function renderRope() {
-    const A = geo.ropeAnchor;
-    const L = s.limbs;
-    const D = geo.D;
-    const cx = geo.b.cx + s.b.x;
-    const cy = geo.b.cy + s.b.y;
+  function computeRopePoints() {
+    const R = s.rope;
+    const A = geo.attach;
 
-    ropePath.style.opacity = s.rope.op;
-    ropePath.style.strokeDashoffset = s.rope.dash;
+    // anchor end
+    const anchored = R.throw;
+    const topX = lerp(hand[1].x, A.x, anchored);
+    const topY = lerp(hand[1].y, A.y, anchored);
 
+    // gripping hands (highest first)
     const grips = [];
     for (let i = 0; i < 2; i++) {
-      const h = L.hAbs[i];
-      if (h.w > 0.02) {
-        grips.push({
-          x: cx + L.hOff[i].x + (h.x - (cx + L.hOff[i].x)) * h.w,
-          y: cy + L.hOff[i].y + (h.y - (cy + L.hOff[i].y)) * h.w,
-          w: h.w,
-        });
-      }
+      if (R.grip[i] > 0.5) grips.push({ x: hand[i].x, y: hand[i].y });
     }
     grips.sort((p, q) => p.y - q.y);
 
-    const tailLen = s.rope.tailLen;
-    const swing = s.rope.swing;
+    // bottom / free end
+    const lowest = grips.length ? grips[grips.length - 1] : { x: topX, y: topY };
+    const endX = lowest.x + R.swing;
+    const endY = lowest.y + R.tailLen;
 
-    let d;
-    if (grips.length) {
-      const low = grips[grips.length - 1];
-      const end = { x: low.x + swing, y: low.y + tailLen };
-      const nodes = [A, ...grips, end];
-      d = `M ${A.x.toFixed(1)} ${A.y.toFixed(1)}`;
-      for (let i = 0; i < nodes.length - 1; i++) {
-        const p0 = nodes[i];
-        const p1 = nodes[i + 1];
-        if (p0.w !== undefined && p0.w < 0.98) {
-          // blend an inactive grip back onto the straight A -> end line
-          const t = clamp((p0.y - A.y) / Math.max(1, end.y - A.y), 0, 1);
-          p0.x = lerp(lerp(A.x, end.x, t), p0.x, p0.w);
-          p0.y = lerp(lerp(A.y, end.y, t), p0.y, p0.w);
-        }
-        d += ` L ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`;
-      }
-    } else {
-      const ex = A.x + swing;
-      const ey = A.y + tailLen;
-      const mx = (A.x + ex) / 2 + swing * 0.5;
-      const my = lerp(A.y, ey, 0.55);
-      d = `M ${A.x.toFixed(1)} ${A.y.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)}`;
+    const hang = resample([{ x: topX, y: topY }, ...grips, { x: endX, y: endY }], ROPE_N);
+
+    // spinning loop held in the right hand
+    const wr = geo.whipR;
+    const h = hand[1];
+    const cx = h.x;
+    const cy = h.y - wr * 0.3;
+    const arcSpan = Math.PI * 1.75;
+    const M = 18;
+    const loop = [];
+    for (let i = 0; i < M; i++) {
+      const ang = R.spin - arcSpan * (i / (M - 1));
+      loop.push({ x: cx + wr * Math.cos(ang), y: cy + wr * Math.sin(ang) * 0.72 });
     }
-    void D;
+    const spin = resample([{ x: h.x, y: h.y }, ...loop], ROPE_N);
+
+    if (anchored <= 0.001) return R.whip > 0.001 ? spin : hang;
+    if (anchored >= 0.999) return hang;
+
+    // blend the spinning loop into the hanging rope as the throw travels up
+    const t = anchored;
+    const pts = [];
+    for (let i = 0; i < ROPE_N; i++) {
+      pts.push({ x: lerp(spin[i].x, hang[i].x, t), y: lerp(spin[i].y, hang[i].y, t) });
+    }
+    return pts;
+  }
+
+  function renderRope() {
+    const R = s.rope;
+    ropePath.style.opacity = R.op;
+    const pts = computeRopePoints();
+    let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+    for (let i = 1; i < pts.length; i++) d += ` L ${pts[i].x.toFixed(1)} ${pts[i].y.toFixed(1)}`;
     ropePath.setAttribute('d', d);
   }
 
@@ -469,34 +512,27 @@ export function initFooterLogoAnimation(footer) {
 
   function buildTimeline() {
     const D = geo.D;
-    const A = geo.ropeAnchor;
+    const A = geo.attach;
+    const oSlot = geo.oSlot;
+    const corridorX = geo.corridorX;
+    const landCY = geo.landCY;
+    const climbEndCY = geo.climbEndCY;
+    const floorY = geo.floorY;
+    const feetExt = geo.feetExt;
+    const pTop = Math.min(geo.pInkTop, oSlot.y);
+
     const restCX = geo.b.cx;
     const restCY = geo.b.cy;
-    const landX = geo.landX;
-    const landY = geo.landY;
-    const floorY = geo.floorY;
-    const destX = geo.destX;
-    const destY = geo.destY;
-    const offX = v => v - restCX;
-    const offY = v => v - restCY;
+    const toX = v => v - restCX; // stage x -> body x offset
+    const toY = v => v - restCY;
 
-    // climb geometry
-    const climbDist = landY - destY; // px the body rises
-    const step = Math.max(D * 0.5, 1);
-    const cycles = clamp(Math.round(climbDist / step), 1, 5);
-    const stepY = climbDist / (cycles + 0.35);
     const L = s.limbs;
 
-    const pose = {
-      hL: { x: -0.7 * D, y: 0.3 * D },
-      hR: { x: 0.7 * D, y: 0.3 * D },
-      fL: { x: -0.34 * D, y: geo.feetExt },
-      fR: { x: 0.34 * D, y: geo.feetExt },
-    };
-    L.hOff[0] = { ...pose.hL };
-    L.hOff[1] = { ...pose.hR };
-    L.fOff[0] = { ...pose.fL };
-    L.fOff[1] = { ...pose.fR };
+    // body position helper: move the body to a stage coordinate
+    const at = (px, py) => ({ x: toX(px), y: toY(py) });
+
+    // vault apex above the p so the body clears its ink
+    const apexY = pTop - 0.62 * D;
 
     const tl = gsap.timeline({ paused: true, defaults: { ease: 'power2.inOut' }, onUpdate: render });
 
@@ -522,230 +558,200 @@ export function initFooterLogoAnimation(footer) {
 
     tl.to(s.a, { px: 0.7, py: -0.35, duration: 0.3, ease: 'power2.out' }, 1.9);
     tl.to(s.a, { px: -0.2, py: 0.3, duration: 0.28, ease: 'power1.inOut' }, 2.2);
-    tl.to(s.a, { px: 0, py: 0, duration: 0.25, ease: 'power1.inOut' }, 2.45);
     tl.to(s.b, { px: -0.6, py: 0.2, duration: 0.3, ease: 'power2.out' }, 2.0);
     tl.to(s.b, { px: 0.1, py: -0.2, duration: 0.25, ease: 'power1.inOut' }, 2.3);
+    blink(s.b, 2.7, 0.3);
 
-    tl.to(s.a, { y: -5, duration: 0.18, ease: 'power2.out' }, 2.35);
-    tl.to(s.a, { y: 0, duration: 0.22, ease: 'power2.in' }, 2.53);
-    tl.to(s.b, { y: -6, duration: 0.2, ease: 'power2.out' }, 2.45);
-    tl.to(s.b, { y: 0, duration: 0.24, ease: 'power2.in' }, 2.65);
-    tl.to(s.b, { sy: 0.92, sx: 1.06, y: 3, duration: 0.15, ease: 'power2.out' }, 2.88);
-    tl.to(s.b, { sy: 1, sx: 1, y: 0, duration: 0.3, ease: 'back.out(2)' }, 3.03);
+    tl.to(s.a, { px: 0.95, py: 0.1, duration: 0.32, ease: 'power2.out' }, 3.05);
+    tl.to(s.b, { px: -0.95, py: 0.1, duration: 0.32, ease: 'power2.out' }, 3.19);
+    blink(s.a, 3.6, 0.3);
 
-    tl.to(s.a, { px: 0.95, py: 0.1, duration: 0.32, ease: 'power2.out' }, 3.15);
-    tl.to(s.b, { px: -0.95, py: 0.1, duration: 0.32, ease: 'power2.out' }, 3.29);
-    blink(s.b, 3.75, 0.3);
-    blink(s.b, 4.0, 0.28);
+    /* ---------------- Scene B: detach, vault out, fall -------------------- */
 
-    /* ---------------- Scene B: detach, leap, fall ------------------------- */
+    const tB = 3.9;
+    // anticipation squash
+    tl.to(s.b, { sy: 0.8, sx: 1.14, y: 7, duration: 0.28, ease: 'power2.out' }, tB);
+    tl.to(s.a, { px: 0.5, py: -0.4, eyeW: 1.12, duration: 0.3, ease: 'power1.out' }, tB + 0.04);
+    // rise straight up out of the slot
+    tl.to(s.b, { sy: 1.12, sx: 0.92, ...at(oSlot.x, apexY + 0.2 * D), duration: 0.34, ease: 'power2.out' }, tB + 0.28);
+    tl.to(s.b, { eyeW: 1.28, duration: 0.2 }, tB + 0.3);
+    // vault right over the p
+    tl.to(s.b, { ...at(lerp(oSlot.x, corridorX, 0.55), apexY), rot: 12, duration: 0.34, ease: 'power1.out' }, tB + 0.62);
+    tl.to(s.b, { ...at(corridorX, apexY + 0.25 * D), rot: 18, duration: 0.3, ease: 'power1.in' }, tB + 0.96);
+    // gravity: fall into the corridor
+    tl.to(s.b, { ...at(corridorX, landCY), rot: 6, sy: 1.06, sx: 0.97, duration: 0.6, ease: 'power2.in' }, tB + 1.26);
+    tl.to(s.floor, { op: 1, duration: 0.3 }, tB + 1.4);
+    tl.to(s.b, { eyeW: 1.05, duration: 0.1 }, tB + 1.76);
 
-    const tB = 4.35;
-    const apexY = restCY - 1.08 * D; // clears the p's ink while flying over it
-    const apexX = lerp(restCX, landX, 0.62);
-
-    tl.to(s.b, { sy: 0.8, sx: 1.14, y: 7, duration: 0.3, ease: 'power2.out' }, tB);
-    tl.to(s.a, { px: 0.5, py: -0.4, eyeW: 1.12, duration: 0.3, ease: 'power1.out' }, tB + 0.05);
-    // leap up and outward
-    tl.to(s.b, { sy: 1.1, sx: 0.93, y: offY(apexY), duration: 0.34, ease: 'power2.out' }, tB + 0.3);
-    tl.to(s.b, { x: offX(apexX), rot: -12, duration: 0.34, ease: 'power1.out' }, tB + 0.3);
-    tl.to(s.b, { eyeW: 1.28, duration: 0.2 }, tB + 0.32);
-    // gravity
-    tl.to(s.b, {
-      y: offY(landY),
-      x: offX(landX),
-      rot: 16,
-      sy: 1.06,
-      sx: 0.97,
-      duration: 0.6,
-      ease: 'power2.in',
-    }, tB + 0.64);
-    tl.to(s.a, { px: 0.85, py: 0.75, duration: 0.6, ease: 'power1.inOut' }, tB + 0.64);
-    tl.to(s.floor, { op: 1, duration: 0.3 }, tB + 0.8);
-    tl.to(s.b, { eyeW: 1.05, duration: 0.1 }, tB + 1.14);
-
-    // impact + bounce
-    const tI = tB + 1.24;
-    const sq = 0.5 * D * (1 - 0.6);
-    tl.to(s.b, { sy: 0.6, sx: 1.32, y: `+=${sq}`, duration: 0.12, ease: 'power3.out' }, tI);
+    // impact squash + settle (net vertical offset stays zero so the body rests at landCY)
+    const tI = tB + 1.86;
+    const sq = 0.18 * D;
+    const bounce = 0.12 * D;
+    tl.to(s.b, { sy: 0.58, sx: 1.34, y: `+=${sq}`, rot: 8, duration: 0.12, ease: 'power3.out' }, tI);
     tl.to(s.b, { eyeW: 1.2, duration: 0.08 }, tI);
     blink(s.b, tI, 0.26);
     blink(s.a, tI + 0.06, 0.3);
     tl.to(s.b, { eyeW: 1, duration: 0.3 }, tI + 0.2);
-    tl.to(s.b, { sy: 1.06, sx: 0.96, y: `-=${0.4 * D}`, rot: 6, duration: 0.26, ease: 'power2.out' }, tI + 0.12);
-    tl.to(s.b, { y: `+=${0.4 * D}`, duration: 0.24, ease: 'power2.in' }, tI + 0.38);
-    tl.to(s.b, { sy: 0.82, sx: 1.14, y: `+=${0.5 * D * 0.18}`, duration: 0.1, ease: 'power2.out' }, tI + 0.62);
-    tl.to(s.b, { sy: 1, sx: 1, y: `-=${0.5 * D * 0.18}`, rot: 0, duration: 0.42, ease: 'back.out(2.6)' }, tI + 0.74);
+    tl.to(s.b, { sy: 1.07, sx: 0.95, y: `-=${sq + bounce}`, rot: -4, duration: 0.26, ease: 'power2.out' }, tI + 0.14);
+    tl.to(s.b, { sy: 1, sx: 1, y: `+=${bounce}`, rot: 0, duration: 0.5, ease: 'back.out(2.6)' }, tI + 0.4);
     tl.to(s.a, { px: 0.3, py: 0.15, eyeW: 1, duration: 0.5, ease: 'power1.inOut' }, tI + 0.5);
 
     /* ---------------- Scene C: limbs emerge ------------------------------- */
 
     const tC = tI + 1.25;
-    tl.to(s.b, { rot: -5, duration: 0.22, ease: 'power1.inOut' }, tC);
-    tl.to(s.b, { rot: 4, duration: 0.24, ease: 'power1.inOut' }, tC + 0.22);
-    tl.to(s.b, { rot: 0, duration: 0.3, ease: 'power1.inOut' }, tC + 0.46);
+    // arms
+    tl.to(L.armOp, { 0: 1, duration: 0.4, ease: 'power1.out' }, tC + 0.05);
+    tl.to(L.armOp, { 1: 1, duration: 0.4, ease: 'power1.out' }, tC + 0.17);
+    // legs plant
+    tl.to(L.legOp, { 0: 1, duration: 0.4, ease: 'power1.out' }, tC + 0.37);
+    tl.to(L.legOp, { 1: 1, duration: 0.4, ease: 'power1.out' }, tC + 0.47);
+    // stand taller as the feet take weight; arms come to the sides
+    tl.to(L.handOff[0], { x: -0.55 * D, y: 0.12 * D, duration: 0.5, ease: 'power2.out' }, tC + 0.3);
+    tl.to(L.handOff[1], { x: 0.55 * D, y: 0.12 * D, duration: 0.5, ease: 'power2.out' }, tC + 0.36);
+    tl.to(L.footOff[0], { x: -0.3 * D, y: feetExt, duration: 0.5, ease: 'power2.out' }, tC + 0.4);
+    tl.to(L.footOff[1], { x: 0.3 * D, y: feetExt, duration: 0.5, ease: 'power2.out' }, tC + 0.46);
+    // little weight shift
+    tl.to(s.b, { x: `+=${0.12 * D}`, duration: 0.24, ease: 'power2.out' }, tC + 0.85);
+    tl.to(s.b, { x: `-=${0.12 * D}`, duration: 0.3, ease: 'power2.inOut' }, tC + 1.09);
+    blink(s.b, tC + 1.3);
 
-    tl.to(L.armOp, { l: 1, duration: 0.4, ease: 'power1.out' }, tC + 0.1);
-    tl.to(L.armOp, { r: 1, duration: 0.4, ease: 'power1.out' }, tC + 0.22);
-    tl.to(L.legOp, { l: 1, duration: 0.4, ease: 'power1.out' }, tC + 0.42);
-    tl.to(L.legOp, { r: 1, duration: 0.4, ease: 'power1.out' }, tC + 0.52);
-    // stand taller as the feet plant
-    tl.to(s.b, { y: `-=${geo.feetExt - 0.5 * D}`, duration: 0.55, ease: 'power2.out' }, tC + 0.45);
-    tl.to(s.b, { x: `+=${0.1 * D}`, duration: 0.22, ease: 'power2.out' }, tC + 0.8);
-    tl.to(s.b, { x: `-=${0.1 * D}`, duration: 0.3, ease: 'power2.inOut' }, tC + 1.02);
-    blink(s.b, tC + 1.35);
+    // look up, notice the space above, ready the rope
+    const tL = tC + 1.5;
+    tl.to(s.b, { px: 0.4, py: -0.9, eyeW: 1.14, duration: 0.36, ease: 'power2.out' }, tL);
+    tl.to(s.b, { rot: -3, duration: 0.4, ease: 'power1.inOut' }, tL + 0.1);
+    blink(s.a, tL + 0.5);
 
-    // look around, then notice the rope up to the left
-    const tL = tC + 1.55;
-    tl.to(s.b, { px: 0.85, py: 0.1, duration: 0.3, ease: 'power2.out' }, tL);
-    tl.to(s.b, { px: -0.5, duration: 0.3, ease: 'power1.inOut' }, tL + 0.34);
-    tl.to(s.b, { px: -0.5, py: -0.92, eyeW: 1.14, duration: 0.36, ease: 'power2.out' }, tL + 0.7);
-    tl.to(s.b, { rot: 3, duration: 0.4, ease: 'power1.inOut' }, tL + 0.75);
-    blink(s.a, tL + 0.6);
-    blink(s.b, tL + 1.25);
+    /* ---------------- Scene D: whip + throw ------------------------------- */
 
-    /* ---------------- Scene D: rope + grab -------------------------------- */
+    const tD = tL + 0.9;
+    // reach both hands overhead to ready the rope
+    tl.to(L.handOff[0], { x: -0.16 * D, y: -0.86 * D, duration: 0.42, ease: 'power2.out' }, tD);
+    tl.to(L.handOff[1], { x: 0.16 * D, y: -0.9 * D, duration: 0.42, ease: 'power2.out' }, tD + 0.06);
+    tl.to(s.b, { sy: 1.05, duration: 0.3, ease: 'power2.out' }, tD);
+    // rope appears in hand and begins to spin, accelerating
+    tl.to(s.rope, { op: 1, whip: 1, duration: 0.3, ease: 'power1.out' }, tD + 0.3);
+    tl.to(s.rope, { tailLen: 0.28 * D, duration: 0.3 }, tD + 0.3);
+    tl.to(s.rope, { spin: Math.PI * 15, duration: 2.4, ease: 'power2.in' }, tD + 0.3);
+    // a little crouch and stretch as it winds up
+    tl.to(s.b, { sy: 0.94, duration: 0.5, ease: 'power2.inOut' }, tD + 0.6);
+    tl.to(s.b, { sy: 1.02, duration: 0.5, ease: 'power2.inOut' }, tD + 1.1);
+    tl.to(s.b, { sy: 0.96, duration: 0.4, ease: 'power2.inOut' }, tD + 1.6);
+    blink(s.b, tD + 1.2, 0.3);
 
-    const standY = landY - (geo.feetExt - 0.5 * D); // body centre once standing
-    const grabY = standY - 0.86 * D; // hands reach to here on the rope
-    const grabX = landX;
+    // the throw: launch the rope upward, it races to the anchor and hangs
+    const tT = tD + 2.75;
+    tl.to(s.b, { sy: 1.1, sx: 0.94, duration: 0.18, ease: 'power2.out' }, tT);
+    tl.to(L.handOff[1], { x: 0.05 * D, y: -1.02 * D, duration: 0.3, ease: 'power2.out' }, tT);
+    tl.to(s.rope, { throw: 1, duration: 0.42, ease: 'power2.out' }, tT + 0.04);
+    tl.to(s.rope, { whip: 0, duration: 0.4, ease: 'power1.inOut' }, tT + 0.06);
+    tl.to(s.b, { sy: 1, sx: 1, duration: 0.3, ease: 'power2.inOut' }, tT + 0.2);
+    // rope settles into a hanging line with a light sway and a dangling tail
+    tl.to(s.rope, { tailLen: 0.55 * D, duration: 0.5, ease: 'power2.out' }, tT + 0.4);
+    tl.to(s.rope, { swing: 0.06 * D, duration: 0.4, ease: 'sine.inOut' }, tT + 0.5);
+    tl.to(s.rope, { swing: -0.04 * D, duration: 0.6, ease: 'sine.inOut' }, tT + 0.9);
+    tl.to(s.b, { px: -0.3, py: -0.85, duration: 0.4, ease: 'power2.out' }, tT + 0.3);
+    blink(s.a, tT + 0.6, 0.3);
 
-    const tD = tL + 1.6;
-    L.hAbs[1].x = grabX;
-    L.hAbs[1].y = grabY;
-    L.hAbs[0].x = grabX;
-    L.hAbs[0].y = grabY + 0.42 * D;
-    tl.to(s.rope, { op: 1, duration: 0.2 }, tD);
-    tl.to(L.hAbs[1], { w: 1, duration: 0.5, ease: 'power2.out' }, tD + 0.35);
-    tl.to(s.rope, { dash: 0, duration: 0.8, ease: 'power2.inOut' }, tD + 0.35);
-    tl.to(L.hAbs[0], { w: 1, duration: 0.45, ease: 'power2.out' }, tD + 0.85);
-    // weight shifts onto the rope
-    tl.to(s.b, { x: `+=${-0.05 * D}`, rot: -4, duration: 0.5, ease: 'power2.inOut' }, tD + 0.95);
-    tl.to(s.b, { y: `-=${0.28 * D}`, duration: 0.5, ease: 'power2.inOut' }, tD + 1.05);
-    tl.to(s.b, { rot: 0, duration: 0.4, ease: 'power1.inOut' }, tD + 1.45);
-    tl.to(s.rope, { tailLen: 0.55 * D, duration: 0.5, ease: 'power2.out' }, tD + 1.0);
+    /* ---------------- Scene E: grab + climb ------------------------------- */
 
-    /* ---------------- Scene E: the climb ---------------------------------- */
+    const tG = tT + 1.55;
+    // reach up and take hold
+    tl.to(L.handOff[1], { x: 0.02 * D, y: -0.92 * D, duration: 0.3, ease: 'power2.out' }, tG);
+    tl.to(s.rope.grip, { 1: 1, duration: 0.25, ease: 'power2.out' }, tG + 0.1);
+    // weight shifts onto the rope; feet leave the floor
+    tl.to(s.b, { y: `-=${0.24 * D}`, duration: 0.5, ease: 'power2.inOut' }, tG + 0.3);
+    tl.to(L.footOff[0], { x: -0.18 * D, y: 0.5 * D, duration: 0.4, ease: 'power2.out' }, tG + 0.35);
+    tl.to(L.footOff[1], { x: 0.16 * D, y: 0.58 * D, duration: 0.4, ease: 'power2.out' }, tG + 0.42);
+    tl.to(L.handOff[0], { x: -0.02 * D, y: -0.5 * D, duration: 0.4, ease: 'power2.out' }, tG + 0.4);
+    tl.to(s.rope.grip, { 0: 1, duration: 0.25, ease: 'power2.out' }, tG + 0.5);
+    tl.to(s.rope, { tailLen: 0.5 * D, duration: 0.5 }, tG + 0.4);
 
-    let t = tD + 1.7;
-    let bodyY = standY - 0.28 * D;
-    let bodyX = landX - 0.05 * D;
+    // hand-over-hand climb: body rises, hands alternate reaching up the rope
+    const climbDist = landCY - 0.24 * D - climbEndCY;
+    const cycles = clamp(Math.round(climbDist / (0.55 * D)), 2, 5);
+    const stepY = climbDist / cycles;
+    let cy = landCY - 0.24 * D;
+    let t = tG + 0.95;
 
     for (let i = 0; i < cycles; i++) {
-      const lead = i % 2 === 0 ? 1 : 0;
+      const lead = i % 2;
       const stay = 1 - lead;
-      const tCyc = t;
-      const ncy = bodyY - stepY;
-      const ncx = bodyX + (i % 2 === 0 ? 1 : -1) * 0.06 * D;
-
-      // lead hand releases, swings up, re-grips higher
-      tl.to(L.hAbs[lead], { w: 0, duration: 0.12, ease: 'power1.in' }, tCyc);
-      tl.to(L.hAbs[lead], { x: ncx, y: ncy - 1.05 * D, duration: 0.26, ease: 'power1.inOut' }, tCyc + 0.1);
-      tl.to(L.hAbs[lead], { w: 1, duration: 0.16, ease: 'power2.out' }, tCyc + 0.36);
-      // rope tension pulse
-      tl.to(s.rope, { swing: 0.05 * D, duration: 0.16, ease: 'power2.out' }, tCyc + 0.36);
-      tl.to(s.rope, { swing: -0.03 * D, duration: 0.5, ease: 'power2.out' }, tCyc + 0.52);
-
-      // pull: the body rises toward the new grip, the stay hand holds fast
-      const rise = tCyc + 0.44;
-      tl.to(s.b, { y: `-=${stepY}`, duration: 0.5, ease: 'power2.inOut' }, rise);
-      tl.to(s.b, { x: `+=${ncx - bodyX}`, duration: 0.5, ease: 'power1.inOut' }, rise);
-      tl.to(s.b, { rot: i % 2 === 0 ? 4 : -4, duration: 0.4, ease: 'power1.inOut' }, rise);
-      // legs brace against the rope below
-      tl.to(L.fAbs[0], { x: bodyX - 0.16 * D, y: bodyY + 0.52 * D, w: 0.85, duration: 0.26, ease: 'power2.out' }, rise - 0.14);
-      tl.to(L.fAbs[1], { x: bodyX + 0.16 * D, y: bodyY + 0.6 * D, w: 0.85, duration: 0.26, ease: 'power2.out' }, rise - 0.06);
-      tl.to(L.fAbs[0], { y: `-=${stepY * 0.85}`, duration: 0.42, ease: 'power1.inOut' }, rise + 0.24);
-      tl.to(L.fAbs[1], { y: `-=${stepY * 0.85}`, duration: 0.42, ease: 'power1.inOut' }, rise + 0.3);
-      // stay hand follows the body up
-      tl.to(L.hAbs[stay], { x: ncx, y: ncy - 0.55 * D, duration: 0.45, ease: 'power2.inOut' }, rise + 0.1);
-
-      // brief settle
-      tl.to(s.b, { rot: 0, duration: 0.3, ease: 'power1.inOut' }, tCyc + 0.98);
-      tl.to(s.b, { px: -0.6, py: -0.7, duration: 0.4 }, tCyc + 0.5);
-
-      bodyY = ncy;
-      bodyX = ncx;
-      t = tCyc + 1.2;
-      if (i === Math.floor(cycles / 2) - 1) blink(s.b, tCyc + 1.0, 0.32);
+      const nextY = cy - stepY;
+      // lead hand releases and reaches higher
+      tl.to(s.rope.grip, { [lead]: 0, duration: 0.1, ease: 'power1.in' }, t);
+      tl.to(L.handOff[lead], { x: (lead === 0 ? -0.02 : 0.02) * D, y: -1.0 * D, duration: 0.24, ease: 'power1.inOut' }, t + 0.08);
+      tl.to(s.rope.grip, { [lead]: 1, duration: 0.14, ease: 'power2.out' }, t + 0.32);
+      // pull: body rises toward the new grip
+      tl.to(s.b, { y: `-=${stepY}`, duration: 0.42, ease: 'power2.inOut' }, t + 0.4);
+      tl.to(s.b, { rot: lead === 0 ? 4 : -4, duration: 0.36, ease: 'power1.inOut' }, t + 0.4);
+      // stay hand slides up to follow
+      tl.to(L.handOff[stay], { x: (stay === 0 ? -0.02 : 0.02) * D, y: -0.66 * D, duration: 0.4, ease: 'power2.inOut' }, t + 0.5);
+      // legs brace and trail against the rope
+      tl.to(L.footOff[0], { x: -0.16 * D, y: 0.52 * D, duration: 0.3, ease: 'power1.inOut' }, t + 0.34);
+      tl.to(L.footOff[1], { x: 0.14 * D, y: 0.6 * D, duration: 0.3, ease: 'power1.inOut' }, t + 0.4);
+      tl.to(s.rope, { swing: (i % 2 ? 1 : -1) * 0.03 * D, duration: 0.4, ease: 'sine.inOut' }, t + 0.4);
+      if (i === Math.floor(cycles / 2)) blink(s.b, t + 0.7, 0.3);
+      cy = nextY;
+      t += 1.0;
     }
 
-    // shimmy left along the rope to hang beside the p
-    const tS = t;
-    const shimmy = 0.85;
-    tl.to(s.b, { x: offX(destX), y: offY(destY), rot: -3, duration: shimmy, ease: 'power1.inOut' }, tS);
-    tl.to(L.hAbs[1], { x: destX + 0.06 * D, y: destY - 1.02 * D, w: 1, duration: shimmy, ease: 'power1.inOut' }, tS);
-    tl.to(L.hAbs[0], { x: destX - 0.06 * D, y: destY - 0.6 * D, w: 1, duration: shimmy, ease: 'power1.inOut' }, tS + 0.08);
-    tl.to(L.fAbs[0], { x: destX - 0.12 * D, y: destY + 0.5 * D, w: 0.8, duration: shimmy }, tS + 0.05);
-    tl.to(L.fAbs[1], { x: destX + 0.14 * D, y: destY + 0.56 * D, w: 0.8, duration: shimmy }, tS + 0.12);
-    blink(s.b, tS + 0.55, 0.3);
+    // settle near the top, hanging just below the anchor
+    const tTop = t;
+    tl.to(s.b, { rot: 0, duration: 0.3, ease: 'power1.inOut' }, tTop);
+    tl.to(s.b, { px: -0.5, py: -0.7, duration: 0.35 }, tTop);
+    blink(s.b, tTop + 0.25, 0.32);
 
-    /* ---------------- Scene F: destination + release ---------------------- */
+    /* ---------------- Scene F: vault back into the slot ------------------- */
 
-    const tF = tS + shimmy + 0.25;
-    tl.to(s.b, { px: -0.8, py: -0.25, duration: 0.35, ease: 'power2.out' }, tF);
-    blink(s.b, tF + 0.4, 0.5);
-    tl.to(s.b, { rot: -5, duration: 0.32, ease: 'sine.inOut' }, tF + 0.35);
-    tl.to(s.b, { rot: -2, duration: 0.35, ease: 'sine.inOut' }, tF + 0.67);
+    const tV = tTop + 0.7;
+    // crouch on the rope, then release and vault up over the p
+    tl.to(s.rope.grip, { 1: 0, duration: 0.14, ease: 'power1.in' }, tV);
+    tl.to(s.rope.grip, { 0: 0, duration: 0.16, ease: 'power1.in' }, tV + 0.08);
+    tl.to(s.b, { sy: 0.86, sx: 1.1, duration: 0.16, ease: 'power2.out' }, tV);
+    // up and over toward the slot
+    tl.to(s.b, { sy: 1.12, sx: 0.93, ...at(lerp(corridorX, oSlot.x, 0.55), apexY), rot: -10, duration: 0.42, ease: 'power2.out' }, tV + 0.16);
+    tl.to(s.b, { ...at(oSlot.x, apexY + 0.15 * D), rot: -6, duration: 0.32, ease: 'power1.inOut' }, tV + 0.58);
+    // limbs trail during the flight
+    tl.to(L.handOff[0], { x: -0.85 * D, y: -0.35 * D, duration: 0.4, ease: 'power2.out' }, tV + 0.2);
+    tl.to(L.handOff[1], { x: 0.8 * D, y: -0.42 * D, duration: 0.4, ease: 'power2.out' }, tV + 0.24);
+    tl.to(L.footOff[0], { x: -0.42 * D, y: 0.4 * D, duration: 0.4, ease: 'power2.out' }, tV + 0.22);
+    tl.to(L.footOff[1], { x: 0.46 * D, y: 0.36 * D, duration: 0.4, ease: 'power2.out' }, tV + 0.26);
+    // rope recoils upward and fades once released
+    tl.to(s.rope, { tailLen: 0.35 * D, swing: 0.12 * D, duration: 0.35, ease: 'power2.out' }, tV + 0.05);
+    tl.to(s.rope, { op: 0, duration: 0.45, ease: 'power1.inOut' }, tV + 0.35);
 
-    const tRel = tF + 1.1;
-    tl.to(L.hAbs[1], { w: 0, duration: 0.16, ease: 'power1.in' }, tRel);
-    tl.to(L.hAbs[0], { w: 0, duration: 0.18, ease: 'power1.in' }, tRel + 0.1);
-    tl.to(L.fAbs[0], { w: 0, duration: 0.3, ease: 'power1.in' }, tRel);
-    tl.to(L.fAbs[1], { w: 0, duration: 0.3, ease: 'power1.in' }, tRel + 0.08);
-    // rope recoils upward and fades
-    tl.to(s.rope, { tailLen: 0.4 * D, swing: 0.14 * D, duration: 0.35, ease: 'power2.out' }, tRel + 0.05);
-    tl.to(s.rope, { swing: -0.08 * D, duration: 0.5, ease: 'sine.inOut' }, tRel + 0.4);
-    tl.to(s.rope, { dash: 1, duration: 0.5, ease: 'power2.inOut' }, tRel + 0.5);
-    tl.to(s.rope, { op: 0, duration: 0.4, ease: 'power1.inOut' }, tRel + 0.75);
-
-    // hop back over the p into the original slot
-    const tBk = tRel + 0.3;
-    const backApexY = restCY - 1.14 * D;
-    tl.to(s.b, { y: offY(backApexY), x: offX(lerp(destX, restCX, 0.55)), duration: 0.42, ease: 'power2.out' }, tBk);
-    tl.to(s.b, { rot: 7, duration: 0.4, ease: 'power1.inOut' }, tBk);
-    tl.to(s.b, { y: offY(restCY), x: 0, rot: -5, duration: 0.6, ease: 'power2.in' }, tBk + 0.42);
-    tl.to(s.b, { rot: 0, duration: 0.3, ease: 'power1.inOut' }, tBk + 0.9);
-    // limbs trail in the air
-    tl.to(L.hOff[0], { x: -1.0 * D, y: -0.42 * D, duration: 0.4, ease: 'power2.out' }, tBk + 0.1);
-    tl.to(L.hOff[1], { x: 0.95 * D, y: -0.5 * D, duration: 0.4, ease: 'power2.out' }, tBk + 0.16);
-    tl.to(L.fOff[0], { x: -0.5 * D, y: 0.46 * D, duration: 0.4, ease: 'power2.out' }, tBk + 0.14);
-    tl.to(L.fOff[1], { x: 0.56 * D, y: 0.4 * D, duration: 0.4, ease: 'power2.out' }, tBk + 0.2);
+    // drop precisely into the slot
+    tl.to(s.b, { ...at(oSlot.x, oSlot.y), rot: -3, sy: 1.02, sx: 0.99, duration: 0.5, ease: 'power2.in' }, tV + 0.9);
+    tl.to(s.floor, { op: 0, duration: 0.4, ease: 'power1.inOut' }, tV + 0.7);
 
     /* ---------------- Scene G: restoration ------------------------------- */
 
-    const tG = tBk + 1.05;
-    const landSquash = 0.5 * D * (1 - 0.88);
-    tl.to(s.b, { sy: 0.88, sx: 1.1, y: landSquash, duration: 0.12, ease: 'power2.out' }, tG);
-    tl.to(s.b, { sy: 1, sx: 1, y: 0, duration: 0.45, ease: 'back.out(2.8)' }, tG + 0.12);
-    blink(s.b, tG + 0.1, 0.3);
-    tl.to(s.floor, { op: 0, duration: 0.5, ease: 'power1.inOut' }, tG - 0.2);
-
+    const tG2 = tV + 1.4;
+    tl.to(s.b, { sy: 0.88, sx: 1.1, y: `+=${0.5 * D * 0.12}`, duration: 0.12, ease: 'power2.out' }, tG2);
+    tl.to(s.b, { sy: 1, sx: 1, y: `-=${0.5 * D * 0.12}`, duration: 0.45, ease: 'back.out(2.8)' }, tG2 + 0.12);
+    blink(s.b, tG2 + 0.1, 0.3);
     // limbs retract behind the body
-    tl.to(L.hOff[0], { x: 0, y: 0, duration: 0.4, ease: 'power2.inOut' }, tG + 0.45);
-    tl.to(L.hOff[1], { x: 0, y: 0, duration: 0.4, ease: 'power2.inOut' }, tG + 0.5);
-    tl.to(L.fOff[0], { x: 0, y: 0.1 * D, duration: 0.4, ease: 'power2.inOut' }, tG + 0.5);
-    tl.to(L.fOff[1], { x: 0, y: 0.1 * D, duration: 0.4, ease: 'power2.inOut' }, tG + 0.55);
-    tl.to(L.armOp, { l: 0, duration: 0.35, ease: 'power1.in' }, tG + 0.7);
-    tl.to(L.armOp, { r: 0, duration: 0.35, ease: 'power1.in' }, tG + 0.76);
-    tl.to(L.legOp, { l: 0, duration: 0.35, ease: 'power1.in' }, tG + 0.82);
-    tl.to(L.legOp, { r: 0, duration: 0.35, ease: 'power1.in' }, tG + 0.88);
-
+    tl.to(L.handOff[0], { x: 0, y: 0, duration: 0.4, ease: 'power2.inOut' }, tG2 + 0.4);
+    tl.to(L.handOff[1], { x: 0, y: 0, duration: 0.4, ease: 'power2.inOut' }, tG2 + 0.45);
+    tl.to(L.footOff[0], { x: 0, y: 0.1 * D, duration: 0.4, ease: 'power2.inOut' }, tG2 + 0.45);
+    tl.to(L.footOff[1], { x: 0, y: 0.1 * D, duration: 0.4, ease: 'power2.inOut' }, tG2 + 0.5);
+    tl.to(L.armOp, { 0: 0, duration: 0.35, ease: 'power1.in' }, tG2 + 0.7);
+    tl.to(L.armOp, { 1: 0, duration: 0.35, ease: 'power1.in' }, tG2 + 0.76);
+    tl.to(L.legOp, { 0: 0, duration: 0.35, ease: 'power1.in' }, tG2 + 0.82);
+    tl.to(L.legOp, { 1: 0, duration: 0.35, ease: 'power1.in' }, tG2 + 0.88);
     // faces return to neutral and dissolve back into the glyphs
-    tl.to(s.b, { px: 0, py: 0, eyeW: 1, duration: 0.35, ease: 'power1.inOut' }, tG + 0.6);
-    blink(s.b, tG + 1.05, 0.4);
-    tl.to(s.b, { face: 0, duration: 0.4, ease: 'power1.inOut' }, tG + 1.35);
-    tl.to(s.a, { px: 0, py: 0, eyeW: 1, duration: 0.4, ease: 'power1.inOut' }, tG + 1.1);
-    blink(s.a, tG + 1.25, 0.4);
-    tl.to(s.a, { face: 0, duration: 0.4, ease: 'power1.inOut' }, tG + 1.55);
+    tl.to(s.b, { px: 0, py: 0, eyeW: 1, duration: 0.35, ease: 'power1.inOut' }, tG2 + 0.55);
+    blink(s.b, tG2 + 1.0, 0.4);
+    tl.to(s.b, { face: 0, duration: 0.4, ease: 'power1.inOut' }, tG2 + 1.3);
+    tl.to(s.a, { px: 0, py: 0, eyeW: 1, duration: 0.4, ease: 'power1.inOut' }, tG2 + 1.05);
+    blink(s.a, tG2 + 1.2, 0.4);
+    tl.to(s.a, { face: 0, duration: 0.4, ease: 'power1.inOut' }, tG2 + 1.5);
 
     // guarantee the exact resting state
-    tl.to(s.b, { x: 0, y: 0, rot: 0, sx: 1, sy: 1, duration: 0.3, ease: 'power1.out' }, tG + 1.7);
-    tl.to(s.a, { x: 0, y: 0, rot: 0, sx: 1, sy: 1, duration: 0.3, ease: 'power1.out' }, tG + 1.7);
-    tl.to(s.limbs.hAbs[0], { w: 0, duration: 0.01 }, tG + 1.95);
-    tl.to(s.limbs.hAbs[1], { w: 0, duration: 0.01 }, tG + 1.95);
-    tl.to(s.limbs.fAbs[0], { w: 0, duration: 0.01 }, tG + 1.95);
-    tl.to(s.limbs.fAbs[1], { w: 0, duration: 0.01 }, tG + 1.95);
-    tl.to(s.rope, { dash: 1, op: 0, swing: 0, tailLen: 0.42 * D, duration: 0.01 }, tG + 1.95);
+    tl.to(s.b, { x: 0, y: 0, rot: 0, sx: 1, sy: 1, duration: 0.3, ease: 'power1.out' }, tG2 + 1.7);
+    tl.to(s.a, { x: 0, y: 0, rot: 0, sx: 1, sy: 1, duration: 0.3, ease: 'power1.out' }, tG2 + 1.7);
+    tl.to(s.rope, { op: 0, whip: 0, throw: 0, swing: 0, tailLen: 0.4 * geo.D, duration: 0.01 }, tG2 + 1.95);
+    tl.to(s.rope.grip, { 0: 0, 1: 0, duration: 0.01 }, tG2 + 1.95);
 
     return tl;
   }
@@ -778,7 +784,7 @@ export function initFooterLogoAnimation(footer) {
       });
     });
     ropePath.style.opacity = '0';
-    ropePath.style.strokeDashoffset = '1';
+    ropePath.setAttribute('d', 'M 0 0');
     floorLine.style.opacity = '0';
   }
 
@@ -798,8 +804,6 @@ export function initFooterLogoAnimation(footer) {
         start: 'top 72%',
         once: false,
         onRefresh(self) {
-          // if we're already past the start when (re)built — e.g. a deep link or a
-          // resize rebuild while the footer is on screen — kick off playback.
           if (self.isActive && tl && tl.progress() === 0) {
             tl.timeScale(1);
             tl.play();
