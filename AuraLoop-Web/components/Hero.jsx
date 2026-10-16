@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import InboxWindow from './InboxWindow.jsx';
 import { useInbox } from './useInbox.js';
 import { INCOMING, PEOPLE } from '../data.js';
@@ -6,22 +6,91 @@ import { face, goToWaitlist, useMedia } from '../lib.js';
 import { Bolt } from '../icons.jsx';
 import { gsap, useGSAP, MOTION_OK } from '../../../shared/gsap.js';
 
-function Tile({ side, person, tileRef, onOpen }) {
-  const p = PEOPLE[person] || PEOPLE.snowfall;
+export const WALLPAPER_POOL = [
+  {
+    id: 'snowfall',
+    name: 'Snowfall in Forest',
+    photo: '1517299321609-52687d1bc55a',
+    thumb: 'https://cdn.murowallpaper.com/thumbs/c0b0484f-80b9-40f3-bf02-03cd0886ba82.jpg',
+  },
+  {
+    id: 'aurora',
+    name: 'Aurora Lake',
+    photo: '1531366936337-7c912a4589a7',
+    thumb: 'https://cdn.murowallpaper.com/thumbs/e4163448-3c37-4b25-bd12-a881af70bed4.jpg',
+  },
+  {
+    id: 'fuji',
+    name: 'Milky Way Over Fuji',
+    photo: '1578637387939-43c525550085',
+    thumb: 'https://cdn.murowallpaper.com/thumbs/df6d9998-abe2-47f6-9c59-724d541228a4.jpg',
+  },
+  {
+    id: 'patagonia',
+    name: 'Patagonia Flyover',
+    photo: '1464822759023-fed622ff2c3b',
+    thumb: 'https://cdn.murowallpaper.com/thumbs/27413b79-8ee3-4c29-ab50-9f7fb9943289.jpg',
+  },
+  {
+    id: 'shore',
+    name: 'Moonlit Shore',
+    photo: '1507525428034-b723cf961d3e',
+    thumb: 'https://cdn.murowallpaper.com/thumbs/7f22ad52-9228-4de9-aa57-c15e93ed619e.jpg',
+  },
+  {
+    id: 'sakura',
+    name: 'Sakura Light',
+    photo: '1522383225653-ed111181a951',
+    thumb: 'https://cdn.murowallpaper.com/thumbs/b09bb416-5cb6-4607-b611-c85a5e3edf15.jpg',
+  },
+  {
+    id: 'dune',
+    name: 'Arrakis Dune',
+    photo: '1509316975850-ff9c5deb0cd9',
+    thumb: 'https://cdn.murowallpaper.com/thumbs/0c68cfdf-0de9-4629-a8a6-51fd6d72ee92.jpg',
+  },
+  {
+    id: 'space',
+    name: 'Cosmic Earth Orbit',
+    photo: '1451187580459-43490279c0fa',
+    thumb: 'https://cdn.murowallpaper.com/thumbs/77d3b04d-2d42-4870-9ef1-738b9faed0fb.jpg',
+  },
+];
+
+function Tile({ side, item, tileRef, onOpen }) {
+  const p = PEOPLE[item?.id] || item || WALLPAPER_POOL[0];
   const { src, srcSet } = face(p.photo, 124);
+  const displaySrc = item?.thumb || src;
+
   return (
     <button
       type="button"
       ref={tileRef}
       className={`ta-ftile ta-ftile--${side}`}
-      onClick={() => onOpen(person)}
-      aria-label={`Inspect ${p.name}`}
+      onClick={() => onOpen(item.id)}
+      aria-label={`Inspect ${item.name}`}
     >
       <span className="ta-ftile__par">
         <span className="ta-ftile__float">
           <span className="ta-ftile__tilt">
             <span className="ta-ftile__card">
-              <img src={src} srcSet={srcSet} width="124" height="124" alt="" decoding="async" fetchPriority="high" />
+              <img
+                key={item.id}
+                src={displaySrc}
+                srcSet={item.thumb ? undefined : srcSet}
+                width="124"
+                height="124"
+                alt={item.name}
+                decoding="async"
+                fetchPriority="high"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  display: 'block',
+                  transition: 'opacity 0.5s ease',
+                }}
+              />
             </span>
           </span>
         </span>
@@ -135,10 +204,39 @@ export default function Hero() {
     { scope: heroRef }
   );
 
-  const left = PEOPLE.snowfall;
-  const right = PEOPLE.aurora;
-  const ml = face(left.photo, 64);
-  const mr = face(right.photo, 64);
+  // Initialize with 2 distinct random wallpapers from the pool
+  const [leftItem, setLeftItem] = useState(() => {
+    const i = Math.floor(Math.random() * WALLPAPER_POOL.length);
+    return WALLPAPER_POOL[i];
+  });
+  const [rightItem, setRightItem] = useState(() => {
+    const remaining = WALLPAPER_POOL.filter(w => w.id !== leftItem?.id);
+    const j = Math.floor(Math.random() * remaining.length);
+    return remaining[j] || WALLPAPER_POOL[1];
+  });
+
+  // Cycle wallpapers periodically so they never stay fixed
+  useEffect(() => {
+    let sideFlip = false;
+    const interval = setInterval(() => {
+      sideFlip = !sideFlip;
+      if (sideFlip) {
+        setLeftItem(prev => {
+          const candidates = WALLPAPER_POOL.filter(w => w.id !== prev.id && w.id !== rightItem.id);
+          return candidates[Math.floor(Math.random() * candidates.length)] || prev;
+        });
+      } else {
+        setRightItem(prev => {
+          const candidates = WALLPAPER_POOL.filter(w => w.id !== prev.id && w.id !== leftItem.id);
+          return candidates[Math.floor(Math.random() * candidates.length)] || prev;
+        });
+      }
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [leftItem.id, rightItem.id]);
+
+  const ml = face(leftItem.photo, 64);
+  const mr = face(rightItem.photo, 64);
 
   return (
     <section className="ta-hero" id="top" ref={heroRef} aria-labelledby="ta-hero-title">
@@ -146,10 +244,10 @@ export default function Hero() {
 
       <div className="ta-hero__copy">
         <span className="ta-mtile ta-mtile--l" aria-hidden="true">
-          <img src={ml.src} srcSet={ml.srcSet} width="64" height="64" alt="" decoding="async" />
+          <img src={leftItem.thumb || ml.src} width="64" height="64" alt="" decoding="async" />
         </span>
         <span className="ta-mtile ta-mtile--r" aria-hidden="true">
-          <img src={mr.src} srcSet={mr.srcSet} width="64" height="64" alt="" decoding="async" />
+          <img src={rightItem.thumb || mr.src} width="64" height="64" alt="" decoding="async" />
         </span>
 
 
@@ -180,8 +278,8 @@ export default function Hero() {
           <path d={paths.l || 'M0,0'} pathLength="1" className={paths.l ? '' : 'is-empty'} />
           <path d={paths.r || 'M0,0'} pathLength="1" className={paths.r ? '' : 'is-empty'} />
         </svg>
-        <Tile side="l" person="snowfall" tileRef={tileL} onOpen={openConvo} />
-        <Tile side="r" person="aurora" tileRef={tileR} onOpen={openConvo} />
+        <Tile side="l" item={leftItem} tileRef={tileL} onOpen={openConvo} />
+        <Tile side="r" item={rightItem} tileRef={tileR} onOpen={openConvo} />
 
         <InboxWindow
           inbox={inbox}

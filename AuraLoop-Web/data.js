@@ -90,6 +90,22 @@ export const CONVERSATIONS = [
     ],
   },
   {
+    id: 'dune', group: 'people', person: 'dune', unread: 0,
+    subject: 'Arrakis Dune (Golden Hour Drift)',
+    cc: [],
+    messages: [
+      { from: 'dune', at: '15 Oct 2026, 17:30', body: 'Golden hour solar cycle: warm sunset tones active across displays.' },
+    ],
+  },
+  {
+    id: 'space', group: 'people', person: 'space', unread: 0,
+    subject: 'Cosmic Earth Orbit (Satellite Horizon)',
+    cc: [],
+    messages: [
+      { from: 'space', at: '16 Oct 2026, 02:15', body: 'High-altitude orbital horizon rendering smoothly at 60 fps.' },
+    ],
+  },
+  {
     id: 'engine', group: 'notifications', person: 'engine', unread: 0,
     subject: 'AVFoundation Hardware Media Engine Status',
     cc: [],
