@@ -74,9 +74,11 @@ jobs:
       - name: Prepare Windows Artifacts
         shell: pwsh
         run: |
-          # Copy executable out to top-level for direct single-file access
-          Copy-Item "./dist-win/AuraLoop.exe" -Destination "./AuraLoop-Win-x64.exe"
-          # Package entire runtime directory into a clean distribution zip
+          Get-ChildItem -Path ./dist-win -Recurse
+          $exe = Get-ChildItem -Path ./dist-win -Filter *.exe | Select-Object -First 1
+          if ($exe) {
+            Copy-Item $exe.FullName -Destination "./AuraLoop-Win-x64.exe"
+          }
           Compress-Archive -Path ./dist-win/* -DestinationPath ./AuraLoop-Windows-x64.zip -Force
 
       - name: Upload Windows Artifacts
