@@ -142,12 +142,7 @@ export default function Hero() {
 
   return (
     <section className="ta-hero" id="top" ref={heroRef} aria-labelledby="ta-hero-title">
-      <div className="ta-hero__grid" aria-hidden="true">
-        <i />
-        <i />
-        <i />
-        <i />
-      </div>
+
 
       <div className="ta-hero__copy">
         <span className="ta-mtile ta-mtile--l" aria-hidden="true">

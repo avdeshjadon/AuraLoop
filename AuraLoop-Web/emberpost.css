@@ -427,67 +427,9 @@
   background: linear-gradient(180deg, rgba(245, 242, 237, 0), var(--ta-bg-2));
   pointer-events: none;
 }
-.ta-hero__grid {
-  position: absolute;
-  top: clamp(70px, 6.6vw, 96px);
-  bottom: 0;
-  left: 50%;
-  width: min(1234px, calc(100% - 2 * var(--ta-gutter) - 40px));
-  transform: translateX(-50%);
-  pointer-events: none;
-  -webkit-mask-image: linear-gradient(
-    180deg,
-    #000 0,
-    #000 78%,
-    transparent 100%
-  );
-  mask-image: linear-gradient(180deg, #000 0, #000 78%, transparent 100%);
-}
+.ta-hero__grid,
 .ta-gridlines {
-  position: absolute;
-  inset: 0 auto;
-  left: 50%;
-  width: min(var(--ta-max), calc(100% - 2 * var(--ta-gutter)));
-  transform: translateX(-50%);
-  pointer-events: none;
-  -webkit-mask-image: linear-gradient(
-    180deg,
-    transparent 0,
-    #000 22%,
-    #000 78%,
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    180deg,
-    transparent 0,
-    #000 22%,
-    #000 78%,
-    transparent 100%
-  );
-}
-.ta-hero__grid i,
-.ta-gridlines i {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: var(--ta-line);
-}
-.ta-hero__grid i:nth-child(1),
-.ta-gridlines i:nth-child(1) {
-  left: 0;
-}
-.ta-hero__grid i:nth-child(2),
-.ta-gridlines i:nth-child(2) {
-  left: 25%;
-}
-.ta-hero__grid i:nth-child(3),
-.ta-gridlines i:nth-child(3) {
-  left: 75%;
-}
-.ta-hero__grid i:nth-child(4),
-.ta-gridlines i:nth-child(4) {
-  right: 0;
+  display: none !important;
 }
 
 .ta-hero__copy {
@@ -1900,7 +1842,7 @@ button.ta-live:hover {
 }
 .ta-feat--split {
   padding-right: clamp(16px, 3vw, 44px);
-  border-right: 1px solid var(--ta-line);
+  border-right: none;
 }
 .ta-split {
   margin-top: 28px;

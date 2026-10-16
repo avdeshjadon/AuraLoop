@@ -3,12 +3,7 @@ import { PRINCIPLES } from '../data.js';
 export default function Manifesto() {
   return (
     <section id="manifesto" className="ta-sec ta-about" aria-labelledby="ta-about-title" tabIndex={-1}>
-      <div className="ta-gridlines ta-gridlines--thirds" aria-hidden="true">
-        <i />
-        <i />
-        <i />
-        <i />
-      </div>
+
       <div className="ta-wrap">
         <div className="ta-about__top" data-reveal>
           <p className="ta-eyebrow">
