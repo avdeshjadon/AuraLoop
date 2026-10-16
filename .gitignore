@@ -3,11 +3,8 @@ AuraLoop/.build/
 AuraLoop/dist/
 AuraLoop/Icon/out/
 AuraLoop/Icon/icongen
-AuraLoop-Web/node_modules/
-AuraLoop-Web/dist/
 .build/
 dist/
-node_modules/
 
 # Test media and source videos — never in git. Wallpapers ship as GitHub
 # release assets and reach the app through catalog.json.
@@ -38,3 +35,12 @@ catalog.json
 TEST-*.md
 RELEASE-NOTES-*.md
 REDDIT-POST-*.md
+
+# Node / Web dependencies & artifacts
+node_modules/
+.vite/
+dist/
+AuraLoop-Web/node_modules/
+AuraLoop-Web/.vite/
+AuraLoop-Web/dist/
+
