@@ -57,7 +57,7 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Restore NuGet Packages
-        run: dotnet restore AuraLoop-Win/AuraLoop-Win/AuraLoop-Win.csproj
+        run: dotnet restore AuraLoop-Win/AuraLoop-Win/AuraLoop-Win.csproj -p:Platform=x64
 
       - name: Build & Publish AuraLoop-Win (win-x64)
         shell: pwsh
@@ -65,6 +65,7 @@ jobs:
           dotnet publish AuraLoop-Win/AuraLoop-Win/AuraLoop-Win.csproj `
             -c Release `
             -r win-x64 `
+            -p:Platform=x64 `
             --self-contained true `
             -p:WindowsPackageType=None `
             -p:WindowsAppSDKSelfContained=true `
