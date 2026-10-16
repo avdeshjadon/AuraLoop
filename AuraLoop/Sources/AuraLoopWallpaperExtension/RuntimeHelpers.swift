@@ -1,5 +1,4 @@
-// Runtime remapping technique derived from Phosphene (MIT),
-// copyright 2026 kageroumado; see THIRD_PARTY_NOTICES.md.
+// Runtime remapping helpers.
 import Foundation
 import ObjectiveC
 

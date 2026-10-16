@@ -1,5 +1,4 @@
-// AVSampleBufferDisplayLayer renderer derived from Phosphene (MIT),
-// copyright 2026 kageroumado; see THIRD_PARTY_NOTICES.md.
+// AVSampleBufferDisplayLayer renderer for wallpaper extension.
 import AVFoundation
 import CoreMedia
 import ObjectiveC

@@ -1,5 +1,4 @@
-// Codable shapes matching WallpaperTypes. Derived from Phosphene (MIT),
-// copyright 2026 kageroumado; see THIRD_PARTY_NOTICES.md.
+// Codable shapes matching WallpaperTypes.
 import Foundation
 
 struct SettingsViewModels: Codable {

@@ -1,5 +1,4 @@
-// Settings-model remapping technique derived from Phosphene (MIT),
-// copyright 2026 kageroumado; see THIRD_PARTY_NOTICES.md.
+// Settings-model provider for wallpaper extension.
 import Foundation
 
 struct ExtensionWallpaperEntry: Codable {

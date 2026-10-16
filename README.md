@@ -18,7 +18,8 @@
 
 [![macOS](https://img.shields.io/badge/macOS-14%2B-black?logo=apple)](https://apple.com/macos)
 [![Universal](https://img.shields.io/badge/Universal-Apple_Silicon_%2B_Intel-black?logo=apple)](https://apple.com)
-[![License](https://img.shields.io/badge/License-Proprietary_%7C_All_Rights_Reserved-red)](LICENSE)
+[![Status](https://img.shields.io/badge/Source-Proprietary%20%2F%20Closed-critical)](#license)
+[![License](https://img.shields.io/badge/License-All_Rights_Reserved-red)](LICENSE)
 [![Swift](https://img.shields.io/badge/Swift-5.9%2B-FA7343?logo=swift&logoColor=white)](https://swift.org)
 
 </div>
@@ -121,7 +122,9 @@ AuraLoop/
 
 ---
 
-## Building from Source
+## Development & Build Guide (Authorized / Internal Only)
+
+> **Notice**: This software is **Proprietary & Closed Source**. Public or unauthorized compilation, redistribution, cloning, or usage is strictly forbidden. The instructions below are provided exclusively for authorized maintainers.
 
 ### Prerequisites
 
