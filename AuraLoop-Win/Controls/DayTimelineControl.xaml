@@ -1,0 +1,47 @@
+<UserControl
+    x:Class="AuraLoop.Controls.DayTimelineControl"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Border Background="{StaticResource AuraLoopSurfaceBrush}"
+            BorderBrush="{StaticResource AuraLoopBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="14"
+            Padding="16,12">
+        <StackPanel Spacing="10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE706;" Foreground="{StaticResource AuraLoopAccentBrush}" FontSize="14"/>
+                    <TextBlock Text="24-Hour Solar Dynamic Timeline" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource AuraLoopForegroundBrush}"/>
+                </StackPanel>
+                <TextBlock x:Name="CurrentPhaseText" Grid.Column="1" Text="Solar Mode: Active" FontSize="11" Foreground="{StaticResource AuraLoopMutedBrush}"/>
+            </Grid>
+
+            <Slider x:Name="HourSlider"
+                    Minimum="0" Maximum="24" StepFrequency="0.5"
+                    Value="14"
+                    ValueChanged="HourSlider_ValueChanged"/>
+
+            <!-- Phase markers -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="06:00 Dawn" FontSize="10" Foreground="{StaticResource AuraLoopMutedBrush}" HorizontalAlignment="Left"/>
+                <TextBlock Grid.Column="1" Text="12:00 Noon" FontSize="10" Foreground="{StaticResource AuraLoopMutedBrush}" HorizontalAlignment="Center"/>
+                <TextBlock Grid.Column="2" Text="18:00 Sunset" FontSize="10" Foreground="{StaticResource AuraLoopMutedBrush}" HorizontalAlignment="Center"/>
+                <TextBlock Grid.Column="3" Text="23:00 Night" FontSize="10" Foreground="{StaticResource AuraLoopMutedBrush}" HorizontalAlignment="Right"/>
+            </Grid>
+        </StackPanel>
+    </Border>
+</UserControl>

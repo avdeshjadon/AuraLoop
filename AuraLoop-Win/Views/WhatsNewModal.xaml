@@ -1,0 +1,43 @@
+<ContentDialog
+    x:Class="AuraLoop.Views.WhatsNewModal"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Title="What's New in AuraLoop"
+    PrimaryButtonText="Explore Now"
+    DefaultButton="Primary"
+    mc:Ignorable="d">
+
+    <StackPanel Spacing="16" Width="440" Padding="0,10">
+        <Border Background="{StaticResource AuraLoopSurfaceBrush}" CornerRadius="12" Padding="14">
+            <StackPanel Spacing="4">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE735;" Foreground="{StaticResource AuraLoopAccentBrush}" FontSize="14"/>
+                    <TextBlock Text="Liquid Glass Engine" FontWeight="Bold" FontSize="13" Foreground="{StaticResource AuraLoopForegroundBrush}"/>
+                </StackPanel>
+                <TextBlock Text="Hardware-accelerated Direct3D 12 desktop injection with near-zero power consumption." FontSize="12" Foreground="{StaticResource AuraLoopMutedBrush}"/>
+            </StackPanel>
+        </Border>
+
+        <Border Background="{StaticResource AuraLoopSurfaceBrush}" CornerRadius="12" Padding="14">
+            <StackPanel Spacing="4">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE753;" Foreground="#FFD60A" FontSize="14"/>
+                    <TextBlock Text="Apple Aerial 4K Streams" FontWeight="Bold" FontSize="13" Foreground="{StaticResource AuraLoopForegroundBrush}"/>
+                </StackPanel>
+                <TextBlock Text="Full access to Apple TV 4K &amp; macOS Sonoma high-framerate dynamic drone aerials." FontSize="12" Foreground="{StaticResource AuraLoopMutedBrush}"/>
+            </StackPanel>
+        </Border>
+
+        <Border Background="{StaticResource AuraLoopSurfaceBrush}" CornerRadius="12" Padding="14">
+            <StackPanel Spacing="4">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE756;" Foreground="#BF5AF2" FontSize="14"/>
+                    <TextBlock Text="Intelligent Automation &amp; Sleep" FontWeight="Bold" FontSize="13" Foreground="{StaticResource AuraLoopForegroundBrush}"/>
+                </StackPanel>
+                <TextBlock Text="Auto-pauses on full-screen games, displays customizable day/night transitions, and protects battery." FontSize="12" Foreground="{StaticResource AuraLoopMutedBrush}"/>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</ContentDialog>

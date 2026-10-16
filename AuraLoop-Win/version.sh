@@ -3,8 +3,8 @@ set -e
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 VERSION_FILE="$DIR/VERSION"
-CSPROJ_FILE="$DIR/AuraLoop-Win/AuraLoop-Win.csproj"
-SETTINGS_FILE="$DIR/AuraLoop-Win/Views/SettingsView.xaml"
+CSPROJ_FILE="$DIR/AuraLoop-Win.csproj"
+SETTINGS_FILE="$DIR/Views/SettingsView.xaml"
 
 # Helper for in-place sed across macOS BSD sed and Linux GNU sed
 portable_sed() {

@@ -2,7 +2,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.8.34330.188
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AuraLoop-Win", "AuraLoop-Win\AuraLoop-Win.csproj", "{4B2B64B7-3E3F-4FA4-8AC8-71A37AEF1C42}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AuraLoop-Win", "AuraLoop-Win.csproj", "{4B2B64B7-3E3F-4FA4-8AC8-71A37AEF1C42}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

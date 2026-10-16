@@ -3,8 +3,8 @@ setlocal enabledelayedexpansion
 
 set SCRIPT_DIR=%~dp0
 set VERSION_FILE=%SCRIPT_DIR%VERSION
-set CSPROJ_FILE=%SCRIPT_DIR%AuraLoop-Win\AuraLoop-Win.csproj
-set SETTINGS_FILE=%SCRIPT_DIR%AuraLoop-Win\Views\SettingsView.xaml
+set CSPROJ_FILE=%SCRIPT_DIR%AuraLoop-Win.csproj
+set SETTINGS_FILE=%SCRIPT_DIR%Views\SettingsView.xaml
 
 if "%~1"=="" (
     if exist "%VERSION_FILE%" (

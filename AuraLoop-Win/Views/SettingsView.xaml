@@ -1,0 +1,145 @@
+<UserControl
+    x:Class="AuraLoop.Views.SettingsView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="24" Padding="28" MaxWidth="720" HorizontalAlignment="Left">
+            
+            <TextBlock Text="Settings" FontSize="26" FontWeight="Bold" Foreground="{StaticResource AuraLoopInkBrush}" />
+
+            <!-- GENERAL SECTION -->
+            <StackPanel Spacing="10">
+                <TextBlock Text="GENERAL" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AuraLoopMutedBrush}" />
+                
+                <Border Style="{StaticResource GlassCardStyle}">
+                    <StackPanel Spacing="14">
+                        <Grid>
+                            <StackPanel>
+                                <TextBlock Text="Launch at Startup" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource AuraLoopInkBrush}" />
+                                <TextBlock Text="Start AuraLoop automatically when Windows logs in." FontSize="12" Foreground="{StaticResource AuraLoopMutedBrush}" />
+                            </StackPanel>
+                            <ToggleSwitch HorizontalAlignment="Right" IsOn="True" />
+                        </Grid>
+
+                        <MenuFlyoutSeparator Background="{StaticResource AuraLoopGlassStrokeBrush}" />
+
+                        <Grid>
+                            <StackPanel>
+                                <TextBlock Text="Minimize to System Tray" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource AuraLoopInkBrush}" />
+                                <TextBlock Text="Keep wallpaper running in the background when closing window." FontSize="12" Foreground="{StaticResource AuraLoopMutedBrush}" />
+                            </StackPanel>
+                            <ToggleSwitch HorizontalAlignment="Right" IsOn="True" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- PERFORMANCE SECTION -->
+            <StackPanel Spacing="10">
+                <TextBlock Text="POWER &amp; PERFORMANCE" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AuraLoopMutedBrush}" />
+                
+                <Border Style="{StaticResource GlassCardStyle}">
+                    <StackPanel Spacing="14">
+                        <Grid>
+                            <StackPanel>
+                                <TextBlock Text="Pause When Desktop is Covered" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource AuraLoopInkBrush}" />
+                                <TextBlock Text="Freezes playback to 0% CPU when windows or full screen games are active." FontSize="12" Foreground="{StaticResource AuraLoopMutedBrush}" />
+                            </StackPanel>
+                            <ToggleSwitch HorizontalAlignment="Right" IsOn="True" />
+                        </Grid>
+
+                        <MenuFlyoutSeparator Background="{StaticResource AuraLoopGlassStrokeBrush}" />
+
+                        <Grid>
+                            <StackPanel>
+                                <TextBlock Text="Pause on Battery Saver" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource AuraLoopInkBrush}" />
+                                <TextBlock Text="Preserves battery life when unplugged." FontSize="12" Foreground="{StaticResource AuraLoopMutedBrush}" />
+                            </StackPanel>
+                            <ToggleSwitch HorizontalAlignment="Right" IsOn="True" />
+                        </Grid>
+
+                        <MenuFlyoutSeparator Background="{StaticResource AuraLoopGlassStrokeBrush}" />
+
+                        <Grid>
+                            <StackPanel>
+                                <TextBlock Text="Screen Saver Idle Delay" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource AuraLoopInkBrush}" />
+                                <TextBlock Text="Automatically enter full-screen screensaver mode when PC is idle." FontSize="12" Foreground="{StaticResource AuraLoopMutedBrush}" />
+                            </StackPanel>
+                            <ComboBox HorizontalAlignment="Right" SelectedIndex="2">
+                                <ComboBoxItem Content="1 Minute" />
+                                <ComboBoxItem Content="2 Minutes" />
+                                <ComboBoxItem Content="5 Minutes" />
+                                <ComboBoxItem Content="10 Minutes" />
+                                <ComboBoxItem Content="Never" />
+                            </ComboBox>
+                        </Grid>
+
+                        <MenuFlyoutSeparator Background="{StaticResource AuraLoopGlassStrokeBrush}" />
+
+                        <Grid>
+                            <StackPanel>
+                                <TextBlock Text="Sync to Windows Lock Screen" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource AuraLoopInkBrush}" />
+                                <TextBlock Text="Automatically apply current wallpaper keyframe to Windows Lock Screen." FontSize="12" Foreground="{StaticResource AuraLoopMutedBrush}" />
+                            </StackPanel>
+                            <ToggleSwitch HorizontalAlignment="Right" IsOn="False" />
+                        </Grid>
+
+                        <MenuFlyoutSeparator Background="{StaticResource AuraLoopGlassStrokeBrush}" />
+
+                        <Grid>
+                            <StackPanel>
+                                <TextBlock Text="Hardware Acceleration" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource AuraLoopInkBrush}" />
+                                <TextBlock Text="Direct3D 11/12 GPU video decoding enabled." FontSize="12" Foreground="{StaticResource AuraLoopMintBrush}" />
+                            </StackPanel>
+                            <Border Background="#243452" CornerRadius="8" Padding="10,4" HorizontalAlignment="Right">
+                                <TextBlock Text="Active (DirectX)" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AuraLoopAccentBrush}" />
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- STORAGE SECTION -->
+            <StackPanel Spacing="10">
+                <TextBlock Text="STORAGE &amp; LIBRARY" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AuraLoopMutedBrush}" />
+                
+                <Border Style="{StaticResource GlassCardStyle}">
+                    <StackPanel Spacing="14">
+                        <Grid>
+                            <StackPanel>
+                                <TextBlock Text="Wallpaper Storage Location" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource AuraLoopInkBrush}" />
+                                <TextBlock Text="%LocalAppData%\AuraLoop\Wallpapers" FontSize="12" Foreground="{StaticResource AuraLoopMutedBrush}" />
+                            </StackPanel>
+                            <Button Style="{StaticResource GlassPillButtonStyle}" Content="Change…" HorizontalAlignment="Right" />
+                        </Grid>
+
+                        <MenuFlyoutSeparator Background="{StaticResource AuraLoopGlassStrokeBrush}" />
+
+                        <Grid>
+                            <StackPanel>
+                                <TextBlock Text="Clear Download Cache" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource AuraLoopInkBrush}" />
+                                <TextBlock Text="Delete cached video clips to recover disk space." FontSize="12" Foreground="{StaticResource AuraLoopMutedBrush}" />
+                            </StackPanel>
+                            <Button Style="{StaticResource GlassPillButtonStyle}" Content="Clear Cache" HorizontalAlignment="Right" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ABOUT SECTION -->
+            <StackPanel Spacing="10">
+                <TextBlock Text="ABOUT" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AuraLoopMutedBrush}" />
+                
+                <Border Style="{StaticResource GlassCardStyle}">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="AuraLoop for Windows" FontSize="16" FontWeight="Bold" Foreground="{StaticResource AuraLoopInkBrush}" />
+                        <TextBlock Text="Version 6.5.0 (Build 112) • High-Performance Native Live Wallpapers" FontSize="12" Foreground="{StaticResource AuraLoopMutedBrush}" />
+                        <TextBlock Text="Copyright © 2026 Avdesh Jadon. All Rights Reserved. Strictly Proprietary." FontSize="11" Foreground="{StaticResource AuraLoopMutedBrush}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

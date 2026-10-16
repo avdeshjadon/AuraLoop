@@ -12,7 +12,6 @@ if %ERRORLEVEL% neq 0 (
 
 cd /d "%~dp0"
 if exist "version.cmd" call version.cmd
-cd /d "%~dp0\AuraLoop-Win"
 dotnet build AuraLoop-Win.csproj -c Release -p:Platform=x64
 if %ERRORLEVEL% neq 0 (
     echo Build failed!

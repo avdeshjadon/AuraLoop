@@ -17,6 +17,6 @@ fi
 if [ -f "$ROOT_DIR/AuraLoop-Win/version.sh" ] && [ -f "$ROOT_DIR/AuraLoop-Win/VERSION" ]; then
     bash "$ROOT_DIR/AuraLoop-Win/version.sh" >/dev/null 2>&1 || true
     git add "$ROOT_DIR/AuraLoop-Win/VERSION" \
-            "$ROOT_DIR/AuraLoop-Win/AuraLoop-Win/AuraLoop-Win.csproj" \
-            "$ROOT_DIR/AuraLoop-Win/AuraLoop-Win/Views/SettingsView.xaml" 2>/dev/null || true
+            "$ROOT_DIR/AuraLoop-Win/AuraLoop-Win.csproj" \
+            "$ROOT_DIR/AuraLoop-Win/Views/SettingsView.xaml" 2>/dev/null || true
 fi

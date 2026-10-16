@@ -5,6 +5,8 @@ AuraLoop-Mac/.build/
 AuraLoop-Mac/dist/
 AuraLoop-Mac/Icon/out/
 AuraLoop-Mac/Icon/icongen
+AuraLoop-Win/bin/
+AuraLoop-Win/obj/
 .build/
 dist/
 bin/
