@@ -33,66 +33,70 @@ public struct AuthSheetView: View {
     public init() {}
 
     public var body: some View {
-        ZStack {
-            VisualEffectBackground(material: Appearance.shared.isLight ? .popover : .hudWindow)
-                .overlay(Color.AuraLoopShade.opacity(0.35))
-                .ignoresSafeArea()
+        VStack(spacing: 0) {
+            topBar
+                .padding(.horizontal, 32)
+                .padding(.top, 26)
+                .padding(.bottom, 16)
 
-            VStack(spacing: 0) {
-                topBar
+            if !auth.isAwaitingOTP {
+                tabPicker
+                    .padding(.horizontal, 32)
                     .padding(.bottom, 20)
+            }
 
-                if auth.isAwaitingOTP {
-                    otpVerificationView
-                } else {
-                    tabPicker
-                        .padding(.bottom, 24)
-
-                    if selectedTab == .signIn {
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
+                    if auth.isAwaitingOTP {
+                        otpVerificationView
+                    } else if selectedTab == .signIn {
                         signInForm
                     } else {
                         signUpForm
                     }
-                }
 
-                if let err = auth.errorMessage {
-                    HStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(Color(hex: 0xFF6B6B))
-                            .font(.system(size: 13))
-                        Text(err)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(Color(hex: 0xFF6B6B))
-                            .multilineTextAlignment(.leading)
+                    if let err = auth.errorMessage {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(Color(hex: 0xFF6B6B))
+                                .font(.system(size: 13))
+                            Text(err)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(Color(hex: 0xFF6B6B))
+                                .multilineTextAlignment(.leading)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(Color(hex: 0xFF6B6B).opacity(0.12))
+                        .cornerRadius(10)
+                        .padding(.top, 16)
+                        .transition(.opacity.combined(with: .scale(scale: 0.96)))
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 9)
-                    .background(Color(hex: 0xFF6B6B).opacity(0.12))
-                    .cornerRadius(10)
-                    .padding(.top, 16)
-                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
-                }
 
-                if let success = auth.successMessage {
-                    HStack(spacing: 8) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(Color(hex: 0x4EBA6F))
-                            .font(.system(size: 13))
-                        Text(success)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(Color(hex: 0x4EBA6F))
+                    if let success = auth.successMessage {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(Color(hex: 0x4EBA6F))
+                                .font(.system(size: 13))
+                            Text(success)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(Color(hex: 0x4EBA6F))
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(Color(hex: 0x4EBA6F).opacity(0.12))
+                        .cornerRadius(10)
+                        .padding(.top, 16)
+                        .transition(.opacity)
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 9)
-                    .background(Color(hex: 0x4EBA6F).opacity(0.12))
-                    .cornerRadius(10)
-                    .padding(.top, 16)
-                    .transition(.opacity)
                 }
+                .padding(.horizontal, 32)
+                .padding(.bottom, 28)
             }
-            .padding(32)
-            .frame(width: 440)
         }
+        .frame(width: 520, height: 600)
+        .sheetSurface()
+        .AuraLoopColorScheme()
         .animation(.easeInOut(duration: 0.22), value: selectedTab)
         .animation(.easeInOut(duration: 0.22), value: auth.isAwaitingOTP)
         .animation(.easeInOut(duration: 0.2), value: auth.errorMessage)
@@ -110,9 +114,9 @@ public struct AuthSheetView: View {
         HStack {
             HStack(spacing: 10) {
                 AuraLoopAppIcon()
-                    .frame(width: 28, height: 28)
+                    .frame(width: 30, height: 30)
                 AuraLoopWordmark(color: Color.AuraLoopInk)
-                    .frame(height: 18)
+                    .frame(height: 19)
             }
 
             Spacer()
@@ -122,9 +126,10 @@ public struct AuthSheetView: View {
                 auth.successMessage = nil
                 dismiss()
             } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 18))
-                    .foregroundStyle(Color.AuraLoopInk.opacity(0.45))
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.AuraLoopInk.opacity(0.7))
+                    .glassCircleChrome(diameter: 28)
             }
             .buttonStyle(.plain)
             .pointingCursor()
@@ -169,6 +174,12 @@ public struct AuthSheetView: View {
 
     private var signInForm: some View {
         VStack(spacing: 16) {
+            Text("Sign in to your AuraLoop account to sync your favorites and settings.")
+                .font(.system(size: 13))
+                .foregroundStyle(Color.AuraLoopInk.opacity(0.65))
+                .multilineTextAlignment(.center)
+                .padding(.bottom, 4)
+
             inputField(
                 icon: "envelope.fill",
                 placeholder: "Email address",
@@ -189,7 +200,7 @@ public struct AuthSheetView: View {
                     }
                 }
             }
-            .padding(.top, 6)
+            .padding(.top, 8)
         }
     }
 
@@ -197,6 +208,12 @@ public struct AuthSheetView: View {
 
     private var signUpForm: some View {
         VStack(spacing: 16) {
+            Text("Create an account to backup your favorites, sync across Macs, and unlock cloud features.")
+                .font(.system(size: 13))
+                .foregroundStyle(Color.AuraLoopInk.opacity(0.65))
+                .multilineTextAlignment(.center)
+                .padding(.bottom, 4)
+
             inputField(
                 icon: "person.fill",
                 placeholder: "Full name",
@@ -231,7 +248,7 @@ public struct AuthSheetView: View {
                     )
                 }
             }
-            .padding(.top, 6)
+            .padding(.top, 8)
         }
     }
 
@@ -401,7 +418,7 @@ public struct AuthSheetView: View {
                     .foregroundStyle(Color.AuraLoopOnInk)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
+            .padding(.vertical, 13)
             .background(
                 Capsule()
                     .fill(Color.AuraLoopInk)
