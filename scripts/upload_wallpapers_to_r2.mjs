@@ -105,7 +105,7 @@ function formatBytes(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-async function uploadFile(item) {
+async function uploadFile(item, retries = 3) {
   const r2Key = `${BUCKET}/${item.relPath}`;
   const contentType = MIME_MAP[item.ext] || 'application/octet-stream';
   const cacheControl = 'public, max-age=31536000, immutable';
@@ -119,7 +119,20 @@ async function uploadFile(item) {
     '--cache-control', cacheControl
   ];
 
-  await execFileAsync('/usr/local/bin/wrangler', args);
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      await execFileAsync('/usr/local/bin/wrangler', args, {
+        maxBuffer: 50 * 1024 * 1024,
+        timeout: 300000 // 5 minutes timeout
+      });
+      return;
+    } catch (err) {
+      if (attempt === retries) throw err;
+      const firstLine = (err.stderr || err.message || '').split('\n').filter(Boolean)[0] || 'Unknown error';
+      console.log(`⚠️  Upload glitch on ${item.relPath} (${attempt}/${retries}): ${firstLine}. Retrying in ${attempt * 2}s...`);
+      await new Promise(r => setTimeout(r, attempt * 2000));
+    }
+  }
 }
 
 async function main() {
