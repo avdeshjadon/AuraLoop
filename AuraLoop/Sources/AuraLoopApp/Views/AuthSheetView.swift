@@ -1,7 +1,7 @@
 import SwiftUI
 import AuraLoopKit
 
-/// AuraLoop Native Authentication Sheet (Sign In, Sign Up, and Email OTP Verification)
+/// AuraLoop Native Authentication Sheet (Sign In, Sign Up, and Telegram-style OTP Verification)
 public struct AuthSheetView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var auth = AuthService.shared
@@ -25,6 +25,9 @@ public struct AuthSheetView: View {
     @State private var showPassword = false
     @State private var showConfirmPassword = false
 
+    // Focus state for Telegram-style OTP
+    @FocusState private var isOtpFieldFocused: Bool
+
     // Alerts
     @State private var showAlert = false
     @State private var alertTitle = ""
@@ -32,17 +35,27 @@ public struct AuthSheetView: View {
 
     public init() {}
 
+    private var sheetHeight: CGFloat {
+        if auth.isAwaitingOTP {
+            return 420
+        } else if selectedTab == .signIn {
+            return 390
+        } else {
+            return 510
+        }
+    }
+
     public var body: some View {
         VStack(spacing: 0) {
             topBar
-                .padding(.horizontal, 32)
-                .padding(.top, 26)
-                .padding(.bottom, 16)
+                .padding(.horizontal, 30)
+                .padding(.top, 24)
+                .padding(.bottom, 14)
 
             if !auth.isAwaitingOTP {
                 tabPicker
-                    .padding(.horizontal, 32)
-                    .padding(.bottom, 20)
+                    .padding(.horizontal, 30)
+                    .padding(.bottom, 18)
             }
 
             ScrollView(showsIndicators: false) {
@@ -58,49 +71,32 @@ public struct AuthSheetView: View {
                     if let err = auth.errorMessage {
                         HStack(spacing: 8) {
                             Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(Color(hex: 0xFF6B6B))
+                                .foregroundStyle(Color(hex: 0xFF5C5C))
                                 .font(.system(size: 13))
                             Text(err)
                                 .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(Color(hex: 0xFF6B6B))
+                                .foregroundStyle(Color(hex: 0xFF5C5C))
                                 .multilineTextAlignment(.leading)
                         }
                         .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(Color(hex: 0xFF6B6B).opacity(0.12))
-                        .cornerRadius(10)
-                        .padding(.top, 16)
+                        .padding(.vertical, 8)
+                        .background(Color(hex: 0xFF5C5C).opacity(0.12))
+                        .cornerRadius(9)
+                        .padding(.top, 14)
                         .transition(.opacity.combined(with: .scale(scale: 0.96)))
                     }
-
-                    if let success = auth.successMessage {
-                        HStack(spacing: 8) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(Color(hex: 0x4EBA6F))
-                                .font(.system(size: 13))
-                            Text(success)
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(Color(hex: 0x4EBA6F))
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(Color(hex: 0x4EBA6F).opacity(0.12))
-                        .cornerRadius(10)
-                        .padding(.top, 16)
-                        .transition(.opacity)
-                    }
                 }
-                .padding(.horizontal, 32)
-                .padding(.bottom, 28)
+                .padding(.horizontal, 30)
+                .padding(.bottom, 22)
             }
         }
-        .frame(width: 520, height: 600)
+        .frame(width: 470, height: sheetHeight)
         .sheetSurface()
         .AuraLoopColorScheme()
-        .animation(.easeInOut(duration: 0.22), value: selectedTab)
-        .animation(.easeInOut(duration: 0.22), value: auth.isAwaitingOTP)
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: selectedTab)
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: auth.isAwaitingOTP)
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: sheetHeight)
         .animation(.easeInOut(duration: 0.2), value: auth.errorMessage)
-        .animation(.easeInOut(duration: 0.2), value: auth.successMessage)
         .alert(alertTitle, isPresented: $showAlert) {
             Button("OK", role: .cancel) { }
         } message: {
@@ -114,9 +110,9 @@ public struct AuthSheetView: View {
         HStack {
             HStack(spacing: 10) {
                 AuraLoopAppIcon()
-                    .frame(width: 30, height: 30)
+                    .frame(width: 28, height: 28)
                 AuraLoopWordmark(color: Color.AuraLoopInk)
-                    .frame(height: 19)
+                    .frame(height: 18)
             }
 
             Spacer()
@@ -153,7 +149,7 @@ public struct AuthSheetView: View {
                         .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
                         .foregroundStyle(isSelected ? Color.AuraLoopOnInk : Color.AuraLoopInk.opacity(0.75))
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 7)
                         .background {
                             if isSelected {
                                 Capsule()
@@ -173,12 +169,12 @@ public struct AuthSheetView: View {
     // MARK: - Sign In Form
 
     private var signInForm: some View {
-        VStack(spacing: 16) {
-            Text("Sign in to your AuraLoop account to sync your favorites and settings.")
-                .font(.system(size: 13))
-                .foregroundStyle(Color.AuraLoopInk.opacity(0.65))
+        VStack(spacing: 14) {
+            Text("Sign in to sync your favorites and settings across devices.")
+                .font(.system(size: 12.5))
+                .foregroundStyle(Color.AuraLoopInk.opacity(0.6))
                 .multilineTextAlignment(.center)
-                .padding(.bottom, 4)
+                .padding(.bottom, 2)
 
             inputField(
                 icon: "envelope.fill",
@@ -200,19 +196,19 @@ public struct AuthSheetView: View {
                     }
                 }
             }
-            .padding(.top, 8)
+            .padding(.top, 4)
         }
     }
 
     // MARK: - Sign Up Form
 
     private var signUpForm: some View {
-        VStack(spacing: 16) {
-            Text("Create an account to backup your favorites, sync across Macs, and unlock cloud features.")
-                .font(.system(size: 13))
-                .foregroundStyle(Color.AuraLoopInk.opacity(0.65))
+        VStack(spacing: 14) {
+            Text("Create an account to backup wallpapers and sync across Macs.")
+                .font(.system(size: 12.5))
+                .foregroundStyle(Color.AuraLoopInk.opacity(0.6))
                 .multilineTextAlignment(.center)
-                .padding(.bottom, 4)
+                .padding(.bottom, 2)
 
             inputField(
                 icon: "person.fill",
@@ -248,58 +244,40 @@ public struct AuthSheetView: View {
                     )
                 }
             }
-            .padding(.top, 8)
+            .padding(.top, 4)
         }
     }
 
-    // MARK: - OTP Verification View
+    // MARK: - Telegram-Style OTP Verification View
 
     private var otpVerificationView: some View {
         VStack(spacing: 18) {
-            VStack(spacing: 8) {
-                Image(systemName: "envelope.badge.shield.half.filled")
-                    .font(.system(size: 40))
-                    .foregroundStyle(Color(hex: 0xC084FC))
-                    .padding(.bottom, 4)
+            VStack(spacing: 6) {
+                Image(systemName: "envelope.fill")
+                    .font(.system(size: 26))
+                    .foregroundStyle(Color.AuraLoopInk.opacity(0.85))
+                    .padding(.bottom, 2)
 
                 Text("Check Your Email")
-                    .font(.system(size: 20, weight: .bold))
+                    .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(Color.AuraLoopInk)
 
-                Text("We sent a 6-digit verification code to\n\(auth.pendingEmail)")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color.AuraLoopInk.opacity(0.65))
-                    .multilineTextAlignment(.center)
+                HStack(spacing: 4) {
+                    Text("We sent a 6-digit code to")
+                        .foregroundStyle(Color.AuraLoopInk.opacity(0.6))
+                    Text(auth.pendingEmail)
+                        .foregroundStyle(Color.AuraLoopInk)
+                        .fontWeight(.semibold)
+                }
+                .font(.system(size: 12.5))
+                .multilineTextAlignment(.center)
             }
 
-            // Monospaced 6-digit OTP input
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.black.opacity(0.3))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color(hex: 0xC084FC).opacity(0.4), lineWidth: 1.5)
-                    )
+            // Telegram-style 6 individual digit boxes
+            telegramOtpInput
 
-                TextField("000000", text: $otpCode)
-                    .font(.system(size: 32, weight: .bold, design: .monospaced))
-                    .multilineTextAlignment(.center)
-                    .textFieldStyle(.plain)
-                    .foregroundStyle(Color.AuraLoopInk)
-                    .padding(.vertical, 14)
-                    .onChange(of: otpCode) { _, newValue in
-                        let filtered = newValue.filter { $0.isNumber }
-                        if filtered.count > 6 {
-                            otpCode = String(filtered.prefix(6))
-                        } else {
-                            otpCode = filtered
-                        }
-                    }
-            }
-            .frame(height: 64)
-            .padding(.horizontal, 20)
-
-            primaryButton(title: "Verify & Create Account", isBusy: auth.isBusy) {
+            // Button matching the exact width of the OTP boxes (326pt)
+            primaryButton(title: "Verify & Create Account", isBusy: auth.isBusy, width: 326) {
                 Task {
                     let ok = await auth.verifyOTPAndCompleteRegistration(enteredOTP: otpCode)
                     if ok {
@@ -308,33 +286,121 @@ public struct AuthSheetView: View {
                 }
             }
 
-            HStack(spacing: 16) {
+            HStack(spacing: 14) {
                 Button {
                     Task { _ = await auth.resendOTP() }
                 } label: {
                     Text("Resend Code")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Color(hex: 0xC084FC))
+                        .foregroundStyle(Color.AuraLoopInk.opacity(0.75))
                 }
                 .buttonStyle(.plain)
                 .pointingCursor()
 
                 Text("·")
-                    .foregroundStyle(Color.AuraLoopInk.opacity(0.3))
+                    .foregroundStyle(Color.AuraLoopInk.opacity(0.25))
 
                 Button {
                     auth.isAwaitingOTP = false
                     auth.errorMessage = nil
+                    auth.successMessage = nil
                 } label: {
                     Text("Change Email")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Color.AuraLoopInk.opacity(0.65))
+                        .foregroundStyle(Color.AuraLoopInk.opacity(0.55))
                 }
                 .buttonStyle(.plain)
                 .pointingCursor()
             }
-            .padding(.top, 4)
+            .padding(.top, 2)
         }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isOtpFieldFocused = true
+            }
+        }
+    }
+
+    // MARK: - Telegram-Style 6-Box Input Component
+
+    private var telegramOtpInput: some View {
+        ZStack {
+            // Hidden capture TextField
+            TextField("", text: $otpCode)
+                .font(.system(size: 1))
+                .opacity(0.01)
+                .focused($isOtpFieldFocused)
+                .onChange(of: otpCode) { _, newValue in
+                    let filtered = newValue.filter { $0.isNumber }
+                    if filtered.count > 6 {
+                        otpCode = String(filtered.prefix(6))
+                    } else {
+                        otpCode = filtered
+                    }
+                    if auth.errorMessage != nil {
+                        auth.errorMessage = nil
+                    }
+                    if otpCode.count == 6 {
+                        Task {
+                            let ok = await auth.verifyOTPAndCompleteRegistration(enteredOTP: otpCode)
+                            if ok {
+                                dismiss()
+                            }
+                        }
+                    }
+                }
+
+            // 6 Individual Visual Boxes (Width: 46 * 6 + 10 * 5 = 326pt)
+            HStack(spacing: 10) {
+                ForEach(0..<6, id: \.self) { index in
+                    let digit = index < otpCode.count ? String(Array(otpCode)[index]) : ""
+                    let isActive = (index == otpCode.count) && isOtpFieldFocused
+                    let hasError = auth.errorMessage != nil
+                    let hasSuccess = auth.successMessage != nil
+
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(
+                                hasError ? Color(hex: 0xFF5C5C).opacity(0.12) :
+                                hasSuccess ? Color(hex: 0x4EBA6F).opacity(0.12) :
+                                isActive ? Color.white.opacity(Appearance.shared.isLight ? 0.8 : 0.09) :
+                                Color.white.opacity(Appearance.shared.isLight ? 0.5 : 0.04)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(
+                                        hasError ? Color(hex: 0xFF5C5C) :
+                                        hasSuccess ? Color(hex: 0x4EBA6F) :
+                                        isActive ? Color.AuraLoopInk :
+                                        (index < otpCode.count ? Color.AuraLoopInk.opacity(0.35) : Color.AuraLoopInk.opacity(0.12)),
+                                        lineWidth: (isActive || hasError || hasSuccess) ? 1.6 : 1
+                                    )
+                            )
+
+                        if !digit.isEmpty {
+                            Text(digit)
+                                .font(.system(size: 24, weight: .bold, design: .rounded))
+                                .foregroundStyle(
+                                    hasError ? Color(hex: 0xFF5C5C) :
+                                    hasSuccess ? Color(hex: 0x4EBA6F) :
+                                    Color.AuraLoopInk
+                                )
+                                .transition(.scale.combined(with: .opacity))
+                        } else if isActive {
+                            Circle()
+                                .fill(Color.AuraLoopInk.opacity(0.5))
+                                .frame(width: 5, height: 5)
+                        }
+                    }
+                    .frame(width: 46, height: 54)
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                isOtpFieldFocused = true
+            }
+        }
+        .frame(width: 326, height: 56)
     }
 
     // MARK: - Helpers & Form Controls
@@ -352,7 +418,7 @@ public struct AuthSheetView: View {
                 .foregroundStyle(Color.AuraLoopInk)
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .padding(.vertical, 11)
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.white.opacity(Appearance.shared.isLight ? 0.6 : 0.06))
@@ -393,7 +459,7 @@ public struct AuthSheetView: View {
             .pointingCursor()
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .padding(.vertical, 11)
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.white.opacity(Appearance.shared.isLight ? 0.6 : 0.06))
@@ -404,7 +470,7 @@ public struct AuthSheetView: View {
         )
     }
 
-    private func primaryButton(title: String, isBusy: Bool, action: @escaping () -> Void) -> some View {
+    private func primaryButton(title: String, isBusy: Bool, width: CGFloat? = nil, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 8) {
                 if isBusy {
@@ -414,11 +480,11 @@ public struct AuthSheetView: View {
                         .tint(Color.AuraLoopOnInk)
                 }
                 Text(title)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 13.5, weight: .semibold))
                     .foregroundStyle(Color.AuraLoopOnInk)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 13)
+            .frame(maxWidth: width ?? .infinity)
+            .padding(.vertical, 12)
             .background(
                 Capsule()
                     .fill(Color.AuraLoopInk)

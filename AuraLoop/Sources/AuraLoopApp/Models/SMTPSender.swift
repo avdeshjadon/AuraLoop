@@ -15,7 +15,7 @@ public actor SMTPSender {
 
     private init() {}
 
-    /// Sends a 6-digit verification code with the AuraLoop Wordmark and dark theme
+    /// Sends a 6-digit verification code with the AuraLoop Wordmark and clean light theme
     public func sendOTP(to recipient: String, otp: String, recipientName: String) async throws {
         let subject = "\(otp) is your AuraLoop verification code"
         let htmlBody = buildHTML(recipientName: recipientName, otp: otp)
@@ -114,18 +114,24 @@ public actor SMTPSender {
 
         return """
         <!DOCTYPE html>
-        <html>
+        <html lang="en">
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <meta name="color-scheme" content="light only">
+          <meta name="supported-color-schemes" content="light only">
           <title>AuraLoop Verification Code</title>
           <style>
+            :root {
+              color-scheme: light only;
+            }
             body {
               margin: 0;
               padding: 0;
-              background-color: #07090e;
+              background-color: #f1f5f9 !important;
               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-              color: #f1f5f9;
+              color: #0f172a !important;
+              -webkit-font-smoothing: antialiased;
             }
             .wrapper {
               width: 100%;
@@ -134,109 +140,108 @@ public actor SMTPSender {
               padding: 0 16px;
             }
             .card {
-              background: linear-gradient(145deg, #10141f, #0c0e17);
-              border: 1px solid rgba(255, 255, 255, 0.09);
+              background-color: #ffffff !important;
+              border: 1px solid #e2e8f0;
               border-radius: 20px;
               padding: 44px 36px;
               text-align: center;
-              box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+              box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
             }
             .wordmark-wrap {
-              margin-bottom: 32px;
+              margin-bottom: 28px;
             }
             .wordmark {
               font-family: 'Avenir Next', -apple-system, sans-serif;
               font-size: 26px;
-              font-weight: 300;
+              font-weight: 400;
               letter-spacing: 12px;
-              color: #ffffff;
+              color: #0f172a !important;
               text-transform: uppercase;
               display: inline-block;
             }
             .infinity {
               font-size: 32px;
-              font-weight: 400;
-              color: #c084fc;
+              font-weight: 500;
+              color: #7c3aed !important;
               letter-spacing: 2px;
               line-height: 0;
               vertical-align: middle;
             }
             .badge {
               display: inline-block;
-              background: rgba(168, 85, 247, 0.12);
-              border: 1px solid rgba(168, 85, 247, 0.28);
-              color: #d8b4fe;
+              background-color: #f3e8ff !important;
+              border: 1px solid #ddd6fe;
+              color: #7c3aed !important;
               font-size: 11px;
-              font-weight: 600;
+              font-weight: 700;
               text-transform: uppercase;
               letter-spacing: 2px;
               padding: 6px 14px;
               border-radius: 9999px;
-              margin-bottom: 20px;
+              margin-bottom: 22px;
             }
             h1 {
-              font-size: 22px;
-              font-weight: 600;
+              font-size: 24px;
+              font-weight: 700;
               margin: 0 0 10px 0;
-              color: #ffffff;
+              color: #0f172a !important;
             }
             p.lead {
               font-size: 14px;
-              color: #94a3b8;
-              margin: 0 0 32px 0;
+              color: #475569 !important;
+              margin: 0 0 30px 0;
               line-height: 1.6;
             }
             .otp-box {
-              background: #090b12;
-              border: 1px solid rgba(192, 132, 252, 0.35);
+              background-color: #f8fafc !important;
+              border: 2px solid #e2e8f0;
               border-radius: 14px;
-              padding: 22px 10px;
+              padding: 20px 10px;
               font-family: ui-monospace, Menlo, Monaco, 'Courier New', monospace;
-              font-size: 38px;
+              font-size: 40px;
               font-weight: 800;
-              letter-spacing: 12px;
-              color: #f3e8ff;
-              text-shadow: 0 0 16px rgba(168, 85, 247, 0.5);
-              margin-bottom: 28px;
+              letter-spacing: 14px;
+              color: #0f172a !important;
+              margin-bottom: 26px;
             }
             .footer-note {
               font-size: 13px;
-              color: #64748b;
+              color: #64748b !important;
               margin: 0 0 20px 0;
               line-height: 1.5;
             }
             .divider {
               height: 1px;
-              background: rgba(255, 255, 255, 0.06);
-              margin: 32px 0 20px 0;
+              background-color: #e2e8f0 !important;
+              margin: 30px 0 20px 0;
             }
             .sub-footer {
               font-size: 12px;
-              color: #475569;
+              color: #94a3b8 !important;
               letter-spacing: 0.5px;
             }
           </style>
         </head>
-        <body>
+        <body style="background-color: #f1f5f9; color: #0f172a;">
           <div class="wrapper">
-            <div class="card">
+            <div class="card" style="background-color: #ffffff; border: 1px solid #e2e8f0;">
               <!-- AuraLoop Wordmark with Infinity Double-O -->
               <div class="wordmark-wrap">
-                <div class="wordmark">AURAL<span class="infinity">&#8734;</span>P</div>
+                <div class="wordmark" style="color: #0f172a;">AURAL<span class="infinity" style="color: #7c3aed;">&#8734;</span>P</div>
               </div>
 
-              <div class="badge">Verification Required</div>
+              <div class="badge" style="background-color: #f3e8ff; color: #7c3aed; border: 1px solid #ddd6fe;">Verification Required</div>
 
-              <h1>Hello, \(greetingName)!</h1>
-              <p class="lead">Use the 6-digit verification code below to confirm your account and sign in to AuraLoop.</p>
+              <h1 style="color: #0f172a;">Hello, \(greetingName)!</h1>
+              <p class="lead" style="color: #475569;">Use the 6-digit verification code below to confirm your account and sign in to AuraLoop.</p>
 
-              <div class="otp-box">\(otp)</div>
+              <div class="otp-box" style="background-color: #f8fafc; border: 2px solid #e2e8f0; color: #0f172a;">\(otp)</div>
 
-              <p class="footer-note">This code will expire in <strong>10 minutes</strong>. If you did not request this verification, you can safely ignore this email.</p>
+              <p class="footer-note" style="color: #64748b;">This code will expire in <strong style="color: #0f172a;">10 minutes</strong>. If you did not request this verification, you can safely ignore this email.</p>
 
-              <div class="divider"></div>
+              <div class="divider" style="background-color: #e2e8f0;"></div>
 
-              <div class="sub-footer">
+              <div class="sub-footer" style="color: #94a3b8;">
                 AuraLoop &middot; Live 4K Wallpapers for macOS
               </div>
             </div>

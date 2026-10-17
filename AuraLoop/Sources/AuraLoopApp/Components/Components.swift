@@ -320,7 +320,7 @@ struct TopBar: View {
                 systemName: AuthService.shared.isAuthenticated ? "person.crop.circle.fill" : "person.crop.circle",
                 glyphScale: 0.44,
                 active: AuthService.shared.isAuthenticated,
-                help: AuthService.shared.currentUser.map { "Account: \($0.name)" } ?? "Sign In / Account"
+                help: AuthService.shared.currentUser.map { "\($0.name) · Settings" } ?? "Sign In / Settings"
             ) {
                 if AuthService.shared.isAuthenticated {
                     openSettingsWindow()
@@ -329,15 +329,6 @@ struct TopBar: View {
                 }
             }
             .pointingCursor()
-
-            GlassBubbleButton(
-                systemName: "gearshape",
-                glyphScale: 0.44,
-                turns: true,
-                help: "Settings"
-            ) {
-                openSettingsWindow()
-            }
         }
     }
 }
