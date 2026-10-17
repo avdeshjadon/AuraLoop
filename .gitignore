@@ -43,4 +43,5 @@ dist/
 AuraLoop-Web/node_modules/
 AuraLoop-Web/.vite/
 AuraLoop-Web/dist/
-
+scripts/upload_progress.json
+upload_progress.json
