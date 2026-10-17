@@ -25,9 +25,11 @@ public struct AuthSheetView: View {
     @State private var showPassword = false
     @State private var showConfirmPassword = false
 
-    // Focus state and verification state for Telegram-style OTP
+    // Focus state and animation states for Telegram-style OTP
     @FocusState private var isOtpFieldFocused: Bool
-    @State private var isOtpVerifiedSuccess = false
+    @State private var otpSuccessStep: Int = -1 // -1 = normal, 0..5 = turns green line-by-line
+    @State private var isOtpError: Bool = false
+    @State private var shakeOffset: CGFloat = 0
 
     // Alerts
     @State private var showAlert = false
@@ -36,27 +38,19 @@ public struct AuthSheetView: View {
 
     public init() {}
 
-    private var sheetHeight: CGFloat {
-        if auth.isAwaitingOTP {
-            return 420
-        } else if selectedTab == .signIn {
-            return 390
-        } else {
-            return 510
-        }
-    }
-
     public var body: some View {
         VStack(spacing: 0) {
             topBar
                 .padding(.horizontal, 30)
-                .padding(.top, 24)
-                .padding(.bottom, 14)
+                .padding(.top, 22)
+                .padding(.bottom, 12)
+                .layoutPriority(2)
 
             if !auth.isAwaitingOTP {
                 tabPicker
                     .padding(.horizontal, 30)
-                    .padding(.bottom, 18)
+                    .padding(.bottom, 16)
+                    .layoutPriority(2)
             }
 
             ScrollView(showsIndicators: false) {
@@ -88,15 +82,14 @@ public struct AuthSheetView: View {
                     }
                 }
                 .padding(.horizontal, 30)
-                .padding(.bottom, 22)
+                .padding(.bottom, 20)
             }
         }
-        .frame(width: 470, height: sheetHeight)
+        .frame(width: 480, height: 490)
         .sheetSurface()
         .AuraLoopColorScheme()
-        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: selectedTab)
-        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: auth.isAwaitingOTP)
-        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: sheetHeight)
+        .animation(.easeInOut(duration: 0.2), value: selectedTab)
+        .animation(.easeInOut(duration: 0.2), value: auth.isAwaitingOTP)
         .animation(.easeInOut(duration: 0.2), value: auth.errorMessage)
         .alert(alertTitle, isPresented: $showAlert) {
             Button("OK", role: .cancel) { }
@@ -204,7 +197,7 @@ public struct AuthSheetView: View {
     // MARK: - Sign Up Form
 
     private var signUpForm: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 12) {
             Text("Create an account to backup wallpapers and sync across Macs.")
                 .font(.system(size: 12.5))
                 .foregroundStyle(Color.AuraLoopInk.opacity(0.6))
@@ -238,7 +231,8 @@ public struct AuthSheetView: View {
             primaryButton(title: "Send Verification Code", isBusy: auth.isBusy) {
                 Task {
                     otpCode = ""
-                    isOtpVerifiedSuccess = false
+                    otpSuccessStep = -1
+                    isOtpError = false
                     _ = await auth.initiateSignUp(
                         name: name,
                         email: email,
@@ -276,8 +270,9 @@ public struct AuthSheetView: View {
                 .multilineTextAlignment(.center)
             }
 
-            // Telegram-style 6 individual digit boxes (clean without focus line)
+            // Telegram-style 6 individual digit boxes (with line-by-line green & rapid red animations)
             telegramOtpInput
+                .offset(x: shakeOffset)
 
             // Button matching the exact width of the OTP boxes (326pt)
             primaryButton(title: "Verify & Create Account", isBusy: auth.isBusy, width: 326) {
@@ -303,7 +298,8 @@ public struct AuthSheetView: View {
                     auth.errorMessage = nil
                     auth.successMessage = nil
                     otpCode = ""
-                    isOtpVerifiedSuccess = false
+                    otpSuccessStep = -1
+                    isOtpError = false
                 } label: {
                     Text("Change Email")
                         .font(.system(size: 12, weight: .medium))
@@ -315,7 +311,8 @@ public struct AuthSheetView: View {
             .padding(.top, 2)
         }
         .onAppear {
-            isOtpVerifiedSuccess = false
+            otpSuccessStep = -1
+            isOtpError = false
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 isOtpFieldFocused = true
             }
@@ -323,15 +320,30 @@ public struct AuthSheetView: View {
     }
 
     private func submitOTP() {
-        guard otpCode.count == 6 else { return }
+        guard otpCode.count == 6, !auth.isBusy else { return }
         Task {
             let ok = await auth.verifyOTPAndCompleteRegistration(enteredOTP: otpCode)
             if ok {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    isOtpVerifiedSuccess = true
+                // Animate green sequentially line by line: box 0 -> 1 -> 2 -> 3 -> 4 -> 5
+                for i in 0..<6 {
+                    withAnimation(.spring(response: 0.22, dampingFraction: 0.75)) {
+                        otpSuccessStep = i
+                    }
+                    try? await Task.sleep(nanoseconds: 70_000_000) // 70ms per digit
                 }
-                try? await Task.sleep(nanoseconds: 650_000_000)
+                try? await Task.sleep(nanoseconds: 450_000_000)
                 dismiss()
+            } else {
+                // Rapid red animation!
+                withAnimation(.easeInOut(duration: 0.12)) {
+                    isOtpError = true
+                }
+                // Quick shake
+                withAnimation(.linear(duration: 0.08)) { shakeOffset = 8 }
+                try? await Task.sleep(nanoseconds: 80_000_000)
+                withAnimation(.linear(duration: 0.08)) { shakeOffset = -6 }
+                try? await Task.sleep(nanoseconds: 80_000_000)
+                withAnimation(.linear(duration: 0.08)) { shakeOffset = 0 }
             }
         }
     }
@@ -342,25 +354,26 @@ public struct AuthSheetView: View {
         HStack(spacing: 10) {
             ForEach(0..<6, id: \.self) { index in
                 let digit = index < otpCode.count ? String(Array(otpCode)[index]) : ""
-                let isActive = (index == otpCode.count) && isOtpFieldFocused && !isOtpVerifiedSuccess
-                let hasError = auth.errorMessage != nil
+                let isGreen = otpSuccessStep >= index
+                let isRed = isOtpError
+                let isActive = (index == otpCode.count) && isOtpFieldFocused && !isGreen && !isRed
 
                 ZStack {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(
-                            hasError ? Color(hex: 0xFF5C5C).opacity(0.12) :
-                            isOtpVerifiedSuccess ? Color(hex: 0x4EBA6F).opacity(0.12) :
+                            isGreen ? Color(hex: 0x4EBA6F).opacity(0.18) :
+                            isRed ? Color(hex: 0xFF5C5C).opacity(0.15) :
                             isActive ? Color.white.opacity(Appearance.shared.isLight ? 0.75 : 0.08) :
                             Color.white.opacity(Appearance.shared.isLight ? 0.5 : 0.04)
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
                                 .stroke(
-                                    hasError ? Color(hex: 0xFF5C5C) :
-                                    isOtpVerifiedSuccess ? Color(hex: 0x4EBA6F) :
+                                    isGreen ? Color(hex: 0x4EBA6F) :
+                                    isRed ? Color(hex: 0xFF5C5C) :
                                     isActive ? Color.AuraLoopInk :
                                     (index < otpCode.count ? Color.AuraLoopInk.opacity(0.35) : Color.AuraLoopInk.opacity(0.12)),
-                                    lineWidth: (isActive || hasError || isOtpVerifiedSuccess) ? 1.6 : 1
+                                    lineWidth: (isActive || isGreen || isRed) ? 1.6 : 1
                                 )
                         )
 
@@ -368,10 +381,11 @@ public struct AuthSheetView: View {
                         Text(digit)
                             .font(.system(size: 24, weight: .bold, design: .rounded))
                             .foregroundStyle(
-                                hasError ? Color(hex: 0xFF5C5C) :
-                                isOtpVerifiedSuccess ? Color(hex: 0x4EBA6F) :
+                                isGreen ? Color(hex: 0x4EBA6F) :
+                                isRed ? Color(hex: 0xFF5C5C) :
                                 Color.AuraLoopInk
                             )
+                            .scaleEffect(isGreen ? 1.08 : 1.0)
                             .transition(.scale.combined(with: .opacity))
                     } else if isActive {
                         BlinkingCursor(color: Color.AuraLoopInk.opacity(0.7))
@@ -385,11 +399,13 @@ public struct AuthSheetView: View {
             isOtpFieldFocused = true
         }
         .background(
+            // Positioned off-screen to guarantee zero blue caret / system lines over boxes!
             TextField("", text: $otpCode)
                 .textFieldStyle(.plain)
                 .font(.system(size: 1))
                 .frame(width: 1, height: 1)
                 .opacity(0.001)
+                .offset(x: -2000, y: -2000)
                 .focused($isOtpFieldFocused)
                 .onChange(of: otpCode) { _, newValue in
                     let filtered = newValue.filter { $0.isNumber }
@@ -397,6 +413,9 @@ public struct AuthSheetView: View {
                         otpCode = String(filtered.prefix(6))
                     } else {
                         otpCode = filtered
+                    }
+                    if isOtpError {
+                        isOtpError = false
                     }
                     if auth.errorMessage != nil {
                         auth.errorMessage = nil
@@ -424,7 +443,7 @@ public struct AuthSheetView: View {
                 .foregroundStyle(Color.AuraLoopInk)
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 11)
+        .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.white.opacity(Appearance.shared.isLight ? 0.6 : 0.06))
@@ -465,7 +484,7 @@ public struct AuthSheetView: View {
             .pointingCursor()
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 11)
+        .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.white.opacity(Appearance.shared.isLight ? 0.6 : 0.06))
