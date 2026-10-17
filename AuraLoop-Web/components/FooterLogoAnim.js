@@ -9,11 +9,11 @@
  * timeline for control of the same properties.
  *
  * The right "o" periodically wakes up, leaps out of the wordmark and falls into
- * the clear corridor to the right of the tagline, lands smoothly, grows arms
- * and legs, looks around with curiosity, looks up, then jumps back up with a
- * single controlled midair rotation and lands precisely in its original
- * typographic slot. It then rests (default ~10s, eyes still alive) before the
- * whole sequence repeats automatically. There is no rope.
+ * the clear corridor to the right of the tagline, lands smoothly, looks around
+ * with curiosity, looks up, then jumps back up with a single controlled midair
+ * rotation and lands precisely in its original typographic slot. It then rests
+ * (default ~10s, eyes still alive) before the whole sequence repeats
+ * automatically. The character is a pure glyph — no limbs. There is no rope.
  *
  * Everything is driven by a single plain-object proxy rendered on every flip of
  * any timeline, so playback/resume is deterministic and nothing can desync.
@@ -44,17 +44,6 @@ const EYE = [
   { ox: 584, oy: 402 },
 ];
 const PUPIL_AMP = { x: 24, y: 18 };
-const SHOULDER = [
-  { x: 352, y: 500 },
-  { x: 648, y: 500 },
-];
-const HIP = [
-  { x: 434, y: 622 },
-  { x: 566, y: 622 },
-];
-const ARM = { l1: 128, l2: 112 };
-const LEG = { l1: 118, l2: 104 };
-const BEND = { arm: [-1, 1], leg: [-1, 1] };
 
 const canvas = document.createElement('canvas').getContext('2d');
 
@@ -64,26 +53,6 @@ const canvas = document.createElement('canvas').getContext('2d');
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const lerp = (a, b, t) => a + (b - a) * t;
-
-/** two-bone IK; limbs point along +y at rotation 0. returns degrees. */
-function solveIK(sx, sy, tx, ty, l1, l2, bend) {
-  let dx = tx - sx;
-  let dy = ty - sy;
-  let d = Math.hypot(dx, dy);
-  const maxD = (l1 + l2) * 0.999;
-  if (d > maxD) {
-    dx *= maxD / d;
-    dy *= maxD / d;
-    d = maxD;
-  }
-  if (d < 1e-3) d = 1e-3;
-  const a = Math.atan2(dy, dx);
-  const A = Math.acos(clamp((l1 * l1 + d * d - l2 * l2) / (2 * l1 * d), -1, 1));
-  const a1 = a + bend * A;
-  const B = Math.acos(clamp((l1 * l1 + l2 * l2 - d * d) / (2 * l1 * l2), -1, 1));
-  const a2 = -bend * (Math.PI - B);
-  return { a1: (a1 * 180) / Math.PI - 90, a2: (a2 * 180) / Math.PI };
-}
 
 function fontString(el) {
   const cs = getComputedStyle(el);
@@ -173,12 +142,6 @@ export function initFooterLogoAnimation(footer) {
   const faces = rigs.map(r => (r ? r.querySelector('.ta-rig-face') : null));
   const eyeGroups = rigs.map(r => (r ? Array.from(r.querySelectorAll('.ta-rig-eye')) : []));
   const pupils = eyeGroups.map(g => g.map(e => e.querySelector('.ta-rig-pupil')));
-  const armEls = rigs[1] ? Array.from(rigs[1].querySelectorAll('.ta-rig-limb--arm')) : [];
-  const legEls = rigs[1] ? Array.from(rigs[1].querySelectorAll('.ta-rig-limb--leg')) : [];
-  const armU = armEls.map(a => a.querySelector('.ta-rig-limb-u'));
-  const armF = armEls.map(a => a.querySelector('.ta-rig-limb-f'));
-  const legU = legEls.map(l => l.querySelector('.ta-rig-limb-u'));
-  const legF = legEls.map(l => l.querySelector('.ta-rig-limb-f'));
 
   let active = false;
   let tickerFn = null;
@@ -194,16 +157,6 @@ export function initFooterLogoAnimation(footer) {
 
   let geo = null;
   let s = null;
-
-  // stage-space positions of the character's hands/feet, refreshed each frame
-  const hand = [
-    { x: 0, y: 0 },
-    { x: 0, y: 0 },
-  ];
-  const foot = [
-    { x: 0, y: 0 },
-    { x: 0, y: 0 },
-  ];
 
   /* ---------------------------- measurement ------------------------------ */
 
@@ -240,8 +193,6 @@ export function initFooterLogoAnimation(footer) {
     const rigSize = 1000 * pxPerUnit;
     const r = D / 2;
 
-    const feetExt = 0.66 * D;
-
     // play corridor: right of BOTH the tagline and the p. The character rotates
     // in the corridor, so reserve the glyph box's rotated half-diagonal (not the
     // ink radius) to guarantee the spinning body can never reach the tagline.
@@ -252,9 +203,9 @@ export function initFooterLogoAnimation(footer) {
       brandW - r - 8
     );
 
-    // floor + standing position, below the tagline and above the divider
+    // floor + resting position, below the tagline and above the divider
     const floorY = clamp(tag.bottom + (bot.y - tag.bottom) * 0.5, tag.bottom + 24, bot.y - 14);
-    const landCY = floorY - feetExt;
+    const landCY = floorY - r;
 
     // apex for the exit vault over the p
     const pTop = Math.min(p.inkTop, b.cy);
@@ -269,9 +220,8 @@ export function initFooterLogoAnimation(footer) {
       D,
       r,
       pxPerUnit,
-      feetExt,
       a: { ...a, origin: `${gA.inkCx}px ${gA.inkCy}px` },
-      b: { ...b, origin: `${gB.inkCx}px ${gB.inkCy}px`, pxPerUnit },
+      b: { ...b, origin: `${gB.inkCx}px ${gB.inkCy}px` },
       p,
       pRect,
       oSlot: { x: b.cx, y: b.cy },
@@ -314,36 +264,10 @@ export function initFooterLogoAnimation(footer) {
       },
       // choreography gaze override for the acting character (w blends it in)
       cue: { px: 0, py: 0, w: 0 },
-      limbs: {
-        armOp: [0, 0],
-        legOp: [0, 0],
-        handOff: [
-          { x: 0, y: 0 },
-          { x: 0, y: 0 },
-        ],
-        footOff: [
-          { x: 0, y: 0 },
-          { x: 0, y: 0 },
-        ],
-      },
     };
   }
 
   /* ------------------------------- render -------------------------------- */
-
-  function stageToRig(px, py) {
-    const bst = s.b;
-    const ox = geo.b.cx + bst.x;
-    const oy = geo.b.cy + bst.y;
-    const dx = px - ox;
-    const dy = py - oy;
-    const th = (bst.rot * Math.PI) / 180;
-    const c = Math.cos(th);
-    const sn = Math.sin(th);
-    const ux = (c * dx + sn * dy) / bst.sx;
-    const uy = (-sn * dx + c * dy) / bst.sy;
-    return { x: 500 + ux / geo.b.pxPerUnit, y: 500 + uy / geo.b.pxPerUnit };
-  }
 
   // The face is a permanent feature: it is never faded out. Only the pupils and
   // the eyelid (a vertical squish of the eye group) move.
@@ -368,42 +292,12 @@ export function initFooterLogoAnimation(footer) {
     }
   }
 
-  function renderLimbs() {
-    const L = s.limbs;
-    const cx = geo.b.cx + s.b.x;
-    const cy = geo.b.cy + s.b.y;
-
-    for (let i = 0; i < 2; i++) {
-      hand[i].x = cx + L.handOff[i].x;
-      hand[i].y = cy + L.handOff[i].y;
-      foot[i].x = cx + L.footOff[i].x;
-      foot[i].y = cy + L.footOff[i].y;
-    }
-
-    for (let i = 0; i < 2; i++) {
-      if (!armEls[i]) continue;
-      armEls[i].style.opacity = L.armOp[i];
-      legEls[i].style.opacity = L.legOp[i];
-
-      const hr = stageToRig(hand[i].x, hand[i].y);
-      const fr = stageToRig(foot[i].x, foot[i].y);
-      const armIK = solveIK(SHOULDER[i].x, SHOULDER[i].y, hr.x, hr.y, ARM.l1, ARM.l2, BEND.arm[i]);
-      const legIK = solveIK(HIP[i].x, HIP[i].y, fr.x, fr.y, LEG.l1, LEG.l2, BEND.leg[i]);
-
-      gsap.set(armU[i], { x: SHOULDER[i].x, y: SHOULDER[i].y, rotation: armIK.a1 });
-      gsap.set(armF[i], { rotation: armIK.a2 });
-      gsap.set(legU[i], { x: HIP[i].x, y: HIP[i].y, rotation: legIK.a1 });
-      gsap.set(legF[i], { rotation: legIK.a2 });
-    }
-  }
-
   function render() {
     gsap.set(oEls[0], { x: s.a.x, y: s.a.y, rotation: s.a.rot, scaleX: s.a.sx, scaleY: s.a.sy });
     gsap.set(oEls[1], { x: s.b.x, y: s.b.y, rotation: s.b.rot, scaleX: s.b.sx, scaleY: s.b.sy });
     floorLine.style.opacity = s.floor.op;
     renderFace(0);
     renderFace(1);
-    renderLimbs();
   }
 
   /** Set transform pivots once so the per-frame render stays allocation-free. */
@@ -421,7 +315,7 @@ export function initFooterLogoAnimation(footer) {
    * Independent, lightweight eye animation. A single repeating timeline drives
    * the pupils (varied, randomised gazes — using repeatRefresh so each loop is
    * different) and blinks. It only ever touches `s.eye.*`, so it can never
-   * conflict with the main timeline (which touches `s.b`, `s.cue`, `s.limbs`).
+   * conflict with the main timeline (which touches `s.b` and `s.cue`).
    */
   function buildIdle() {
     const R = gsap.utils.random;
@@ -485,7 +379,6 @@ export function initFooterLogoAnimation(footer) {
     const oSlot = geo.oSlot;
     const corridorX = geo.corridorX;
     const landCY = geo.landCY;
-    const feetExt = geo.feetExt;
     const vaultY = geo.vaultY;
     const jumpY = geo.jumpY;
 
@@ -494,7 +387,6 @@ export function initFooterLogoAnimation(footer) {
     const toX = v => v - restCX; // stage x -> body x offset
     const toY = v => v - restCY;
 
-    const L = s.limbs;
     const at = (px, py) => ({ x: toX(px), y: toY(py) });
 
     const rest = clamp(CYCLE_REST_S, 5, 20);
@@ -527,19 +419,11 @@ export function initFooterLogoAnimation(footer) {
     const bounce = 0.12 * D;
     tl.to(s.b, { sy: 0.58, sx: 1.34, y: `+=${sq}`, rot: 8, duration: 0.12, ease: 'power3.out' }, tI);
     tl.to(s.b, { sy: 1.07, sx: 0.95, y: `-=${sq + bounce}`, rot: -4, duration: 0.26, ease: 'power2.out' }, tI + 0.14);
-    tl.to(s.b, { sy: 1, sx: 1, y: `+=${bounce}`, rot: 0, duration: 0.5, ease: 'back.out(2.6)' }, tI + 0.4);
+    tl.to(s.b, { sy: 1, sx: 1, y: `+=${bounce}`, rot: 0, duration: 0.5, ease: 'back.out(1.5)' }, tI + 0.4);
 
-    /* ---------------- Scene C: limbs emerge ------------------------------- */
+    /* ---------------- Scene C: settle weight after landing ---------------- */
 
     const tC = tI + 1.25;
-    tl.to(L.armOp, { 0: 1, duration: 0.4, ease: 'power1.out' }, tC + 0.05);
-    tl.to(L.armOp, { 1: 1, duration: 0.4, ease: 'power1.out' }, tC + 0.17);
-    tl.to(L.legOp, { 0: 1, duration: 0.4, ease: 'power1.out' }, tC + 0.37);
-    tl.to(L.legOp, { 1: 1, duration: 0.4, ease: 'power1.out' }, tC + 0.47);
-    tl.to(L.handOff[0], { x: -0.55 * D, y: 0.12 * D, duration: 0.5, ease: 'power2.out' }, tC + 0.3);
-    tl.to(L.handOff[1], { x: 0.55 * D, y: 0.12 * D, duration: 0.5, ease: 'power2.out' }, tC + 0.36);
-    tl.to(L.footOff[0], { x: -0.3 * D, y: feetExt, duration: 0.5, ease: 'power2.out' }, tC + 0.4);
-    tl.to(L.footOff[1], { x: 0.3 * D, y: feetExt, duration: 0.5, ease: 'power2.out' }, tC + 0.46);
     tl.to(s.b, { x: `+=${0.1 * D}`, duration: 0.24, ease: 'power2.out' }, tC + 0.85);
     tl.to(s.b, { x: `-=${0.1 * D}`, duration: 0.3, ease: 'power2.inOut' }, tC + 1.09);
 
@@ -559,18 +443,10 @@ export function initFooterLogoAnimation(footer) {
     const tJ = tD + 2.15;
     // crouch
     tl.to(s.b, { sy: 0.82, sx: 1.16, duration: 0.22, ease: 'power2.out' }, tJ);
-    tl.to(L.footOff[0], { y: feetExt * 1.05, duration: 0.2, ease: 'power2.out' }, tJ);
-    tl.to(L.footOff[1], { y: feetExt * 1.05, duration: 0.2, ease: 'power2.out' }, tJ);
-    tl.to(L.handOff[0], { x: -0.32 * D, y: 0.34 * D, duration: 0.22, ease: 'power2.out' }, tJ);
-    tl.to(L.handOff[1], { x: 0.32 * D, y: 0.34 * D, duration: 0.22, ease: 'power2.out' }, tJ);
 
     // launch: rise straight up, spinning begins
     const tLp = tJ + 0.22;
     tl.to(s.b, { sy: 1.14, sx: 0.9, ...at(corridorX, jumpY), rot: 130, duration: 0.55, ease: 'power2.out' }, tLp);
-    tl.to(L.handOff[0], { x: -0.14 * D, y: -0.7 * D, duration: 0.5, ease: 'power2.out' }, tLp);
-    tl.to(L.handOff[1], { x: 0.2 * D, y: -0.74 * D, duration: 0.5, ease: 'power2.out' }, tLp);
-    tl.to(L.footOff[0], { x: -0.12 * D, y: 0.56 * D, duration: 0.45, ease: 'power2.out' }, tLp + 0.05);
-    tl.to(L.footOff[1], { x: 0.14 * D, y: 0.6 * D, duration: 0.45, ease: 'power2.out' }, tLp + 0.05);
 
     // glide across (staying above the whole wordmark) toward the slot
     const tTr = tLp + 0.55;
@@ -579,30 +455,18 @@ export function initFooterLogoAnimation(footer) {
     // descend straight into the slot
     const tDe = tTr + 0.62;
     tl.to(s.b, { ...at(oSlot.x, oSlot.y), rot: 360, sy: 1.04, sx: 0.98, duration: 0.5, ease: 'power2.in' }, tDe);
-    tl.to(L.footOff[0], { x: -0.26 * D, y: feetExt, duration: 0.4, ease: 'power2.out' }, tDe + 0.1);
-    tl.to(L.footOff[1], { x: 0.26 * D, y: feetExt, duration: 0.4, ease: 'power2.out' }, tDe + 0.12);
-    tl.to(L.handOff[0], { x: -0.5 * D, y: 0.1 * D, duration: 0.4, ease: 'power2.out' }, tDe + 0.15);
-    tl.to(L.handOff[1], { x: 0.5 * D, y: 0.1 * D, duration: 0.4, ease: 'power2.out' }, tDe + 0.18);
 
     // land squash in the slot; cue blends back out so idle gaze resumes
     const tLs = tDe + 0.5;
     tl.to(s.b, { sy: 0.86, sx: 1.12, y: `+=${0.06 * D}`, rot: 360, duration: 0.12, ease: 'power2.out' }, tLs);
-    tl.to(s.b, { sy: 1, sx: 1, y: `-=${0.06 * D}`, rot: 360, duration: 0.45, ease: 'back.out(2.8)' }, tLs + 0.12);
+    tl.to(s.b, { sy: 1, sx: 1, y: `-=${0.06 * D}`, rot: 360, duration: 0.45, ease: 'back.out(1.6)' }, tLs + 0.12);
     tl.set(s.b, { rot: 0 }, tLs + 0.6); // 360 == 0; normalise without spinning back
     tl.to(s.cue, { w: 0, duration: 0.45, ease: 'power1.inOut' }, tLs + 0.25);
 
-    /* ---------------- Scene F: settle + retract --------------------------- */
+    /* ---------------- Scene F: settle + rest ------------------------------ */
 
     const tF = tLs + 0.65;
     tl.to(s.floor, { op: 0, duration: 0.4, ease: 'power1.inOut' }, tF);
-    tl.to(L.handOff[0], { x: 0, y: 0, duration: 0.4, ease: 'power2.inOut' }, tF + 0.1);
-    tl.to(L.handOff[1], { x: 0, y: 0, duration: 0.4, ease: 'power2.inOut' }, tF + 0.15);
-    tl.to(L.footOff[0], { x: 0, y: 0.1 * D, duration: 0.4, ease: 'power2.inOut' }, tF + 0.15);
-    tl.to(L.footOff[1], { x: 0, y: 0.1 * D, duration: 0.4, ease: 'power2.inOut' }, tF + 0.2);
-    tl.to(L.armOp, { 0: 0, duration: 0.35, ease: 'power1.in' }, tF + 0.35);
-    tl.to(L.armOp, { 1: 0, duration: 0.35, ease: 'power1.in' }, tF + 0.4);
-    tl.to(L.legOp, { 0: 0, duration: 0.35, ease: 'power1.in' }, tF + 0.45);
-    tl.to(L.legOp, { 1: 0, duration: 0.35, ease: 'power1.in' }, tF + 0.5);
 
     // guarantee the exact resting state (no drift, exact slot position)
     tl.to(s.b, { x: 0, y: 0, rot: 0, sx: 1, sy: 1, duration: 0.35, ease: 'power1.out' }, tF + 0.75);
@@ -638,12 +502,9 @@ export function initFooterLogoAnimation(footer) {
 
   function resetDom() {
     gsap.set(oEls, { clearProps: 'transform' });
-    // faces stay visible; only limbs are hidden at rest
+    // faces are permanent features: always visible
     faces.forEach(f => {
       if (f) f.style.opacity = '1';
-    });
-    armEls.concat(legEls).forEach(l => {
-      l.style.opacity = '0';
     });
     eyeGroups.forEach(eyes => eyes.forEach(eye => gsap.set(eye, { clearProps: 'transform' })));
     pupils.forEach(ps => ps.forEach(p => p && gsap.set(p, { clearProps: 'transform' })));

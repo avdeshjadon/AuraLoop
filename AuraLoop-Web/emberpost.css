@@ -2895,20 +2895,11 @@ button.ta-live:hover {
   transform: translate(-50%, -50%);
 }
 .ta-rig-eye,
-.ta-rig-pupil,
-.ta-rig-limb-u,
-.ta-rig-limb-f {
+.ta-rig-pupil {
   will-change: transform;
 }
 .ta-rig-face {
   opacity: 1;
-}
-.ta-rig-limbs {
-  opacity: 1;
-}
-.ta-rig-limb {
-  opacity: 0;
-  will-change: opacity;
 }
 .ta-rig-sclera {
   fill: var(--ta-surface);
@@ -2916,15 +2907,6 @@ button.ta-live:hover {
   stroke-width: 22;
 }
 .ta-rig-pupil {
-  fill: currentColor;
-}
-.ta-rig-limbs line {
-  stroke: currentColor;
-  stroke-width: 42;
-  stroke-linecap: round;
-}
-.ta-rig-hand,
-.ta-rig-foot {
   fill: currentColor;
 }
 .ta-footer__stage {

@@ -35,44 +35,6 @@ function OGlyph() {
           <circle className="ta-rig-pupil" cx="584" cy="408" r="32" />
         </g>
       </g>
-      <g className="ta-rig-limbs">
-        <g className="ta-rig-limb ta-rig-limb--arm">
-          <g className="ta-rig-limb-u">
-            <line x1="0" y1="0" x2="0" y2="128" />
-            <g className="ta-rig-limb-f">
-              <line x1="0" y1="0" x2="0" y2="112" />
-              <circle className="ta-rig-hand" cx="0" cy="126" r="27" />
-            </g>
-          </g>
-        </g>
-        <g className="ta-rig-limb ta-rig-limb--arm">
-          <g className="ta-rig-limb-u">
-            <line x1="0" y1="0" x2="0" y2="128" />
-            <g className="ta-rig-limb-f">
-              <line x1="0" y1="0" x2="0" y2="112" />
-              <circle className="ta-rig-hand" cx="0" cy="126" r="27" />
-            </g>
-          </g>
-        </g>
-        <g className="ta-rig-limb ta-rig-limb--leg">
-          <g className="ta-rig-limb-u">
-            <line x1="0" y1="0" x2="0" y2="118" />
-            <g className="ta-rig-limb-f">
-              <line x1="0" y1="0" x2="0" y2="104" />
-              <circle className="ta-rig-foot" cx="0" cy="116" r="28" />
-            </g>
-          </g>
-        </g>
-        <g className="ta-rig-limb ta-rig-limb--leg">
-          <g className="ta-rig-limb-u">
-            <line x1="0" y1="0" x2="0" y2="118" />
-            <g className="ta-rig-limb-f">
-              <line x1="0" y1="0" x2="0" y2="104" />
-              <circle className="ta-rig-foot" cx="0" cy="116" r="28" />
-            </g>
-          </g>
-        </g>
-      </g>
     </svg>
   );
 }
