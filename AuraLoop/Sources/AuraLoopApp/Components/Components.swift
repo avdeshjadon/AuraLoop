@@ -320,13 +320,9 @@ struct TopBar: View {
                 systemName: AuthService.shared.isAuthenticated ? "person.crop.circle.fill" : "person.crop.circle",
                 glyphScale: 0.44,
                 active: AuthService.shared.isAuthenticated,
-                help: AuthService.shared.currentUser.map { "\($0.name) · Settings" } ?? "Sign In / Settings"
+                help: AuthService.shared.currentUser.map { "\($0.name) · Settings" } ?? "Settings & Account"
             ) {
-                if AuthService.shared.isAuthenticated {
-                    openSettingsWindow()
-                } else {
-                    store.authSheetOpen = true
-                }
+                openSettingsWindow()
             }
             .pointingCursor()
         }
