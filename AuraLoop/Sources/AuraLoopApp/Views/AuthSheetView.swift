@@ -25,8 +25,9 @@ public struct AuthSheetView: View {
     @State private var showPassword = false
     @State private var showConfirmPassword = false
 
-    // Focus state for Telegram-style OTP
+    // Focus state and verification state for Telegram-style OTP
     @FocusState private var isOtpFieldFocused: Bool
+    @State private var isOtpVerifiedSuccess = false
 
     // Alerts
     @State private var showAlert = false
@@ -236,6 +237,8 @@ public struct AuthSheetView: View {
 
             primaryButton(title: "Send Verification Code", isBusy: auth.isBusy) {
                 Task {
+                    otpCode = ""
+                    isOtpVerifiedSuccess = false
                     _ = await auth.initiateSignUp(
                         name: name,
                         email: email,
@@ -273,17 +276,12 @@ public struct AuthSheetView: View {
                 .multilineTextAlignment(.center)
             }
 
-            // Telegram-style 6 individual digit boxes
+            // Telegram-style 6 individual digit boxes (clean without focus line)
             telegramOtpInput
 
             // Button matching the exact width of the OTP boxes (326pt)
             primaryButton(title: "Verify & Create Account", isBusy: auth.isBusy, width: 326) {
-                Task {
-                    let ok = await auth.verifyOTPAndCompleteRegistration(enteredOTP: otpCode)
-                    if ok {
-                        dismiss()
-                    }
-                }
+                submitOTP()
             }
 
             HStack(spacing: 14) {
@@ -304,6 +302,8 @@ public struct AuthSheetView: View {
                     auth.isAwaitingOTP = false
                     auth.errorMessage = nil
                     auth.successMessage = nil
+                    otpCode = ""
+                    isOtpVerifiedSuccess = false
                 } label: {
                     Text("Change Email")
                         .font(.system(size: 12, weight: .medium))
@@ -315,8 +315,23 @@ public struct AuthSheetView: View {
             .padding(.top, 2)
         }
         .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            isOtpVerifiedSuccess = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 isOtpFieldFocused = true
+            }
+        }
+    }
+
+    private func submitOTP() {
+        guard otpCode.count == 6 else { return }
+        Task {
+            let ok = await auth.verifyOTPAndCompleteRegistration(enteredOTP: otpCode)
+            if ok {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    isOtpVerifiedSuccess = true
+                }
+                try? await Task.sleep(nanoseconds: 650_000_000)
+                dismiss()
             }
         }
     }
@@ -324,11 +339,57 @@ public struct AuthSheetView: View {
     // MARK: - Telegram-Style 6-Box Input Component
 
     private var telegramOtpInput: some View {
-        ZStack {
-            // Hidden capture TextField
+        HStack(spacing: 10) {
+            ForEach(0..<6, id: \.self) { index in
+                let digit = index < otpCode.count ? String(Array(otpCode)[index]) : ""
+                let isActive = (index == otpCode.count) && isOtpFieldFocused && !isOtpVerifiedSuccess
+                let hasError = auth.errorMessage != nil
+
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            hasError ? Color(hex: 0xFF5C5C).opacity(0.12) :
+                            isOtpVerifiedSuccess ? Color(hex: 0x4EBA6F).opacity(0.12) :
+                            isActive ? Color.white.opacity(Appearance.shared.isLight ? 0.75 : 0.08) :
+                            Color.white.opacity(Appearance.shared.isLight ? 0.5 : 0.04)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(
+                                    hasError ? Color(hex: 0xFF5C5C) :
+                                    isOtpVerifiedSuccess ? Color(hex: 0x4EBA6F) :
+                                    isActive ? Color.AuraLoopInk :
+                                    (index < otpCode.count ? Color.AuraLoopInk.opacity(0.35) : Color.AuraLoopInk.opacity(0.12)),
+                                    lineWidth: (isActive || hasError || isOtpVerifiedSuccess) ? 1.6 : 1
+                                )
+                        )
+
+                    if !digit.isEmpty {
+                        Text(digit)
+                            .font(.system(size: 24, weight: .bold, design: .rounded))
+                            .foregroundStyle(
+                                hasError ? Color(hex: 0xFF5C5C) :
+                                isOtpVerifiedSuccess ? Color(hex: 0x4EBA6F) :
+                                Color.AuraLoopInk
+                            )
+                            .transition(.scale.combined(with: .opacity))
+                    } else if isActive {
+                        BlinkingCursor(color: Color.AuraLoopInk.opacity(0.7))
+                    }
+                }
+                .frame(width: 46, height: 54)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            isOtpFieldFocused = true
+        }
+        .background(
             TextField("", text: $otpCode)
+                .textFieldStyle(.plain)
                 .font(.system(size: 1))
-                .opacity(0.01)
+                .frame(width: 1, height: 1)
+                .opacity(0.001)
                 .focused($isOtpFieldFocused)
                 .onChange(of: otpCode) { _, newValue in
                     let filtered = newValue.filter { $0.isNumber }
@@ -341,65 +402,10 @@ public struct AuthSheetView: View {
                         auth.errorMessage = nil
                     }
                     if otpCode.count == 6 {
-                        Task {
-                            let ok = await auth.verifyOTPAndCompleteRegistration(enteredOTP: otpCode)
-                            if ok {
-                                dismiss()
-                            }
-                        }
+                        submitOTP()
                     }
                 }
-
-            // 6 Individual Visual Boxes (Width: 46 * 6 + 10 * 5 = 326pt)
-            HStack(spacing: 10) {
-                ForEach(0..<6, id: \.self) { index in
-                    let digit = index < otpCode.count ? String(Array(otpCode)[index]) : ""
-                    let isActive = (index == otpCode.count) && isOtpFieldFocused
-                    let hasError = auth.errorMessage != nil
-                    let hasSuccess = auth.successMessage != nil
-
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(
-                                hasError ? Color(hex: 0xFF5C5C).opacity(0.12) :
-                                hasSuccess ? Color(hex: 0x4EBA6F).opacity(0.12) :
-                                isActive ? Color.white.opacity(Appearance.shared.isLight ? 0.8 : 0.09) :
-                                Color.white.opacity(Appearance.shared.isLight ? 0.5 : 0.04)
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(
-                                        hasError ? Color(hex: 0xFF5C5C) :
-                                        hasSuccess ? Color(hex: 0x4EBA6F) :
-                                        isActive ? Color.AuraLoopInk :
-                                        (index < otpCode.count ? Color.AuraLoopInk.opacity(0.35) : Color.AuraLoopInk.opacity(0.12)),
-                                        lineWidth: (isActive || hasError || hasSuccess) ? 1.6 : 1
-                                    )
-                            )
-
-                        if !digit.isEmpty {
-                            Text(digit)
-                                .font(.system(size: 24, weight: .bold, design: .rounded))
-                                .foregroundStyle(
-                                    hasError ? Color(hex: 0xFF5C5C) :
-                                    hasSuccess ? Color(hex: 0x4EBA6F) :
-                                    Color.AuraLoopInk
-                                )
-                                .transition(.scale.combined(with: .opacity))
-                        } else if isActive {
-                            Circle()
-                                .fill(Color.AuraLoopInk.opacity(0.5))
-                                .frame(width: 5, height: 5)
-                        }
-                    }
-                    .frame(width: 46, height: 54)
-                }
-            }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                isOtpFieldFocused = true
-            }
-        }
+        )
         .frame(width: 326, height: 56)
     }
 
@@ -494,5 +500,24 @@ public struct AuthSheetView: View {
         .buttonStyle(.plain)
         .disabled(isBusy)
         .pointingCursor()
+    }
+}
+
+// MARK: - Telegram-Style Blinking Cursor
+
+private struct BlinkingCursor: View {
+    @State private var visible = true
+    var color: Color
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 1)
+            .fill(color)
+            .frame(width: 2, height: 22)
+            .opacity(visible ? 1 : 0)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 0.6).repeatForever()) {
+                    visible.toggle()
+                }
+            }
     }
 }
