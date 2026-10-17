@@ -317,6 +317,20 @@ struct TopBar: View {
                 .pointingCursor()
 
             GlassBubbleButton(
+                systemName: AuthService.shared.isAuthenticated ? "person.crop.circle.fill" : "person.crop.circle",
+                glyphScale: 0.44,
+                active: AuthService.shared.isAuthenticated,
+                help: AuthService.shared.currentUser.map { "Account: \($0.name)" } ?? "Sign In / Account"
+            ) {
+                if AuthService.shared.isAuthenticated {
+                    openSettingsWindow()
+                } else {
+                    store.authSheetOpen = true
+                }
+            }
+            .pointingCursor()
+
+            GlassBubbleButton(
                 systemName: "gearshape",
                 glyphScale: 0.44,
                 turns: true,

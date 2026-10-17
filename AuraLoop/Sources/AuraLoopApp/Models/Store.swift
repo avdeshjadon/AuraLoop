@@ -272,6 +272,7 @@ final class AppStore: ObservableObject {
     /// anything else that should open it later (the menu bar, a first run
     /// after an update) has one switch to flip.
     @Published var whatsNewOpen = false
+    @Published var authSheetOpen = false
     /// Whether Home's banner is behind the top bar, for the light look's top
     /// bar, which stays white over the playing wallpaper and turns dark once
     /// the page scrolls under it. Set by Home only when it changes.

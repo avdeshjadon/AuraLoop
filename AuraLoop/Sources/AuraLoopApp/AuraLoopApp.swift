@@ -372,6 +372,10 @@ struct RootView: View {
             ConfirmDeleteView(request: request)
                 .environmentObject(store)
         }
+        .sheet(isPresented: $store.authSheetOpen) {
+            AuthSheetView()
+                .environmentObject(store)
+        }
         // The lock screen is set, macOS just has not noticed. A dead-end
         // error here is what people reported; this says what finishes it and
         // offers the button that gets them there.

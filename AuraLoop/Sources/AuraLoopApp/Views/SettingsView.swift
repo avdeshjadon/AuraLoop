@@ -25,6 +25,10 @@ struct SettingsView: View {
     /// preserve the scroll position — reopening must always show the header.
     @State private var scrollToTopOnNextOpen = false
 
+    @ObservedObject private var auth = AuthService.shared
+    @State private var showAuthSheet = false
+    @State private var showSignOutConfirm = false
+
     var body: some View {
         ZStack(alignment: .top) {
             // Full-bleed glass layer: fills the ENTIRE window including under
@@ -42,6 +46,8 @@ struct SettingsView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.top, 56)
                     .id("settings-top")
+
+                accountSection
 
                 section("GENERAL") {
                     row(icon: .launchAtLogin, title: "Launch at Login",
@@ -415,6 +421,120 @@ struct SettingsView: View {
         } message: {
             Text("This will delete locally cached wallpapers (\(formatSize(store.libraryBytes))) from your Mac. You can re-download them anytime from Explore.")
         }
+        .alert("Sign Out", isPresented: $showSignOutConfirm) {
+            Button("Sign Out", role: .destructive) { auth.signOut() }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Are you sure you want to sign out of AuraLoop?")
+        }
+        .sheet(isPresented: $showAuthSheet) {
+            AuthSheetView()
+        }
+    }
+
+    private var accountSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("ACCOUNT")
+                .font(.system(size: 11, weight: .bold))
+                .tracking(1.4)
+                .foregroundStyle(Color.AuraLoopSecondary.opacity(0.85))
+                .padding(.leading, 4)
+
+            HStack(spacing: 16) {
+                if let user = auth.currentUser {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color(hex: 0xA855F7), Color(hex: 0x6366F1)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 44, height: 44)
+
+                        Text(String(user.name.prefix(1)).uppercased())
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 6) {
+                            Text("Welcome back, \(user.name)")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(Color.AuraLoopInk)
+                            Circle()
+                                .fill(Color(hex: 0x4EBA6F))
+                                .frame(width: 7, height: 7)
+                        }
+
+                        Text(user.email)
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.AuraLoopSecondary)
+                    }
+
+                    Spacer()
+
+                    Button {
+                        showSignOutConfirm = true
+                    } label: {
+                        Text("Sign Out")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color(hex: 0xFF6B6B))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 7)
+                            .background(Color(hex: 0xFF6B6B).opacity(0.12))
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .pointingCursor()
+                } else {
+                    ZStack {
+                        Circle()
+                            .fill(Color.AuraLoopInk.opacity(0.08))
+                            .frame(width: 44, height: 44)
+
+                        Image(systemName: "person.crop.circle.badge.plus")
+                            .font(.system(size: 22))
+                            .foregroundStyle(Color(hex: 0xC084FC))
+                    }
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("AuraLoop Account")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(Color.AuraLoopInk)
+
+                        Text("Sign in or create an account to sync your wallpapers & unlock cloud access")
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(Color.AuraLoopSecondary)
+                    }
+
+                    Spacer()
+
+                    Button {
+                        showAuthSheet = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "person.fill")
+                                .font(.system(size: 11))
+                            Text("Sign In / Sign Up")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+                        .foregroundStyle(Color.AuraLoopOnInk)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.AuraLoopInk)
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .pointingCursor()
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 16)
+            .liquidGlass(cornerRadius: 16, tint: 0.16, stroke: 0.12)
+        }
+        .padding(.top, 22)
     }
 
     /// Issue #3: a fast wallpaper is distracting, so let it move for a while
