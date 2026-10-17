@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { LayoutGroup, motion } from "motion/react";
 import Avatar from "./Avatar.jsx";
-import { CLASSIC_ROWS, PEOPLE, PEOPLE_CARDS } from "../data.js";
+import { PEOPLE, PEOPLE_CARDS } from "../data.js";
 import { unsplash } from "../shared/img.js";
 
 const move = { type: "spring", bounce: 0, duration: 0.75 };
@@ -18,60 +18,80 @@ const COPY = {
     "AuraLoop animates your Mac with cinematic 4K 60fps dynamic atmospheres, hardware-decoded with zero CPU overhead.",
 };
 
-const ATMOSPHERES = {
-  snowfall: {
-    badge: "4K · 60fps",
-    codec: "HEVC 10-bit P3",
-    resolution: "3840×2160 Master",
-    telemetry: "0.28% CPU · AVFoundation GPU",
-    status: "Active",
-    dotColor: "#10b981",
+const STATIC_WALLPAPERS = [
+  {
+    id: "s1",
+    who: "snowfall",
+    name: "Snowfall in Forest",
+    format: "Static HEIC (4K)",
+    fps: "0 fps · Still",
+    solar: "Frozen daylight",
+    status: "Static Frame",
   },
-  aurora: {
-    badge: "Dynamic Solar",
-    codec: "Solar Ephemeris",
-    resolution: "24h Solar Keyframes",
-    telemetry: "Sun Angle: -14.2° · Metal Shaders",
-    status: "Night Cycle",
-    dotColor: "#6366f1",
+  {
+    id: "s2",
+    who: "aurora",
+    name: "Aurora Lake",
+    format: "Static JPEG (4K)",
+    fps: "0 fps · Still",
+    solar: "No solar tracking",
+    status: "Static Frame",
   },
-  fuji: {
-    badge: "Mini-LED XDR",
-    codec: "ExtensionKit Sync",
-    resolution: "Liquid Retina XDR",
-    telemetry: "Shadows: 0.00 nits · Lock Screen",
-    status: "Synced",
-    dotColor: "#f59e0b",
+  {
+    id: "s3",
+    who: "fuji",
+    name: "Milky Way Over Fuji",
+    format: "Static HEIC (4K)",
+    fps: "0 fps · Still",
+    solar: "Frozen night",
+    status: "Static Frame",
   },
-};
-
-function ClassicRow({ row, mark }) {
-  const p = PEOPLE[row.who];
-  return (
-    <motion.li
-      layoutId={`ta-cmp-${row.id}`}
-      layout="position"
-      transition={move}
-      className={`ta-cmp-row${mark ? " is-mark" : ""}`}
-    >
-      <div className="ta-cmp-row__thumb">
-        {p?.photo ? (
-          <img
-            src={unsplash(p.photo, { w: 80, h: 56, crop: "crop", q: 75 })}
-            alt=""
-            loading="lazy"
-          />
-        ) : (
-          <Avatar id={row.who} size={28} />
-        )}
-      </div>
-      <span className="ta-cmp-row__who">{p?.name || row.who}</span>
-      <span className="ta-cmp-row__subject">{row.subject}</span>
-      <span className="ta-cmp-row__badge">Fixed Frame</span>
-      <time className="ta-cmp-row__time">{row.time}</time>
-    </motion.li>
-  );
-}
+  {
+    id: "s4",
+    who: "patagonia",
+    name: "Patagonia Flyover",
+    format: "Static JPEG (4K)",
+    fps: "0 fps · Still",
+    solar: "Fixed exposure",
+    status: "Static Frame",
+  },
+  {
+    id: "s5",
+    who: "shore",
+    name: "Moonlit Shore",
+    format: "Static PNG (4K)",
+    fps: "0 fps · Still",
+    solar: "Frozen dusk",
+    status: "Static Frame",
+  },
+  {
+    id: "s6",
+    who: "sakura",
+    name: "Sakura Light",
+    format: "Static JPEG (4K)",
+    fps: "0 fps · Still",
+    solar: "Fixed color temp",
+    status: "Static Frame",
+  },
+  {
+    id: "s7",
+    who: "dune",
+    name: "Arrakis Dune",
+    format: "Static JPEG (4K)",
+    fps: "0 fps · Still",
+    solar: "Static sunset",
+    status: "Static Frame",
+  },
+  {
+    id: "s8",
+    who: "space",
+    name: "Cosmic Earth Orbit",
+    format: "Static PNG (4K)",
+    fps: "0 fps · Still",
+    solar: "No orbital motion",
+    status: "Static Frame",
+  },
+];
 
 export default function PeopleSection() {
   const [mode, setMode] = useState("grouped");
@@ -129,37 +149,73 @@ export default function PeopleSection() {
             {mode === "classic" ? (
               <div className="ta-classic">
                 <div className="ta-classic__bar" aria-hidden="true">
-                  <span>Standard Static Wallpaper</span>
-                  <span>
-                    Frozen display · <em>Snowfall</em> bundled master
-                  </span>
+                  <div className="ta-classic__bar-left">
+                    <span className="ta-classic__bar-title">Standard macOS Desktop Library</span>
+                    <span className="ta-classic__bar-count">8 Wallpapers</span>
+                  </div>
+                  <div className="ta-classic__bar-right">
+                    <span>Rendering State: <em>Frozen at 0 fps · No Motion</em></span>
+                  </div>
                 </div>
+
+                <div className="ta-classic__table-head" aria-hidden="true">
+                  <span>WALLPAPER</span>
+                  <span>FORMAT</span>
+                  <span>FRAME RATE</span>
+                  <span>SOLAR CYCLE</span>
+                  <span>STATUS</span>
+                </div>
+
                 <ol
                   className="ta-classic__list"
                   role="list"
                   aria-label="Static wallpapers list"
                 >
-                  {CLASSIC_ROWS.map((r) => (
-                    <ClassicRow
-                      key={r.id}
-                      row={r}
-                      mark={r.who === "snowfall"}
-                    />
-                  ))}
+                  {STATIC_WALLPAPERS.map((item) => {
+                    const p = PEOPLE[item.who];
+                    return (
+                      <motion.li
+                        key={item.id}
+                        layoutId={`ta-cmp-${item.id}`}
+                        layout="position"
+                        transition={move}
+                        className="ta-cmp-row"
+                      >
+                        <div className="ta-cmp-row__primary">
+                          <div className="ta-cmp-row__thumb">
+                            {p?.photo ? (
+                              <img
+                                src={unsplash(p.photo, {
+                                  w: 96,
+                                  h: 64,
+                                  crop: "crop",
+                                  q: 75,
+                                })}
+                                alt=""
+                                loading="lazy"
+                              />
+                            ) : (
+                              <Avatar id={item.who} size={28} />
+                            )}
+                          </div>
+                          <strong className="ta-cmp-row__name">{item.name}</strong>
+                        </div>
+                        <span className="ta-cmp-row__format">{item.format}</span>
+                        <span className="ta-cmp-row__fps">{item.fps}</span>
+                        <span className="ta-cmp-row__solar">{item.solar}</span>
+                        <span className="ta-cmp-row__status">
+                          <span className="ta-cmp-row__status-dot" />
+                          {item.status}
+                        </span>
+                      </motion.li>
+                    );
+                  })}
                 </ol>
               </div>
             ) : (
               <div className="ta-pcards">
                 {PEOPLE_CARDS.map((who, i) => {
                   const p = PEOPLE[who];
-                  const spec = ATMOSPHERES[who] || {
-                    badge: "4K Motion",
-                    codec: "Metal GPU",
-                    resolution: "Ultra HD",
-                    telemetry: "Hardware Decoded",
-                    status: "Ready",
-                    dotColor: "#10b981",
-                  };
                   return (
                     <motion.article
                       key={who}
@@ -178,13 +234,6 @@ export default function PeopleSection() {
                           <strong>{p.name}</strong>
                           <small>{p.role}</small>
                         </div>
-                        <span className="ta-pcard__tag">
-                          <span
-                            className="ta-pcard__pulse"
-                            style={{ backgroundColor: spec.dotColor }}
-                          />
-                          {spec.badge}
-                        </span>
                       </header>
 
                       <div className="ta-pcard__preview">
@@ -201,24 +250,7 @@ export default function PeopleSection() {
                             className="ta-pcard__img"
                           />
                         )}
-                        <div className="ta-pcard__overlay">
-                          <span className="ta-pcard__codec">{spec.codec}</span>
-                          <span className="ta-pcard__res">{spec.resolution}</span>
-                        </div>
                       </div>
-
-                      <footer className="ta-pcard__foot">
-                        <span className="ta-pcard__telemetry">
-                          {spec.telemetry}
-                        </span>
-                        <span className="ta-pcard__status">
-                          <span
-                            className="ta-pcard__status-dot"
-                            style={{ backgroundColor: spec.dotColor }}
-                          />
-                          {spec.status}
-                        </span>
-                      </footer>
                     </motion.article>
                   );
                 })}
