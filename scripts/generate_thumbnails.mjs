@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 
 /**
- * AuraLoop Thumbnail Generator
- * Generates crisp 4K/high-res thumbnails for every .mp4 video in Premium/
- * placing the thumbnail in the exact same character folder with `_thumb.jpg`.
+ * AuraLoop Native macOS Thumbnail Batch Generator
+ * Uses macOS QuickLook (`qlmanage`) to generate exact 4K thumbnails
+ * identical to what Finder displays as the video preview icon, then converts
+ * them to high-quality JPG (`_thumb.jpg`) in the same character folder.
  */
 
 import fs from 'node:fs';
@@ -14,119 +15,125 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 const PREMIUM_DIR = path.join(os.homedir(), 'Downloads', 'AuraLoop-Wallpapers', 'Premium');
-const CONCURRENCY = 4;
+const SKIP_EXISTING = process.argv.includes('--skip-existing');
 
-async function generateThumb(videoPath, thumbPath) {
-  // Seek to 1.5s to get a clear, stable frame (past fade-in)
-  const args = [
-    '-y',
-    '-ss', '00:00:01.5',
-    '-i', videoPath,
-    '-frames:v', '1',
-    '-update', '1',
-    '-q:v', '2',
-    thumbPath
-  ];
+async function processFolder(folderName, folderPath) {
+  const mp4Files = fs.readdirSync(folderPath).filter(f => f.endsWith('.mp4') && !f.startsWith('.'));
+  if (mp4Files.length === 0) return { folder: folderName, total: 0, created: 0, skipped: 0, failed: 0 };
 
-  try {
-    await execFileAsync('/opt/homebrew/bin/ffmpeg', args);
-    return { ok: true };
-  } catch (err) {
-    // If video is shorter than 1.5s, fallback to 0.5s
-    try {
-      const fallbackArgs = [
-        '-y',
-        '-ss', '00:00:00.5',
-        '-i', videoPath,
-        '-frames:v', '1',
-        '-update', '1',
-        '-q:v', '2',
-        thumbPath
-      ];
-      await execFileAsync('/opt/homebrew/bin/ffmpeg', fallbackArgs);
-      return { ok: true };
-    } catch (err2) {
-      return { ok: false, error: err2.message };
+  const tmpDir = path.join(os.tmpdir(), `auraloop-thumb-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`);
+  fs.mkdirSync(tmpDir, { recursive: true });
+
+  const filesToProcess = [];
+  let skipped = 0;
+
+  for (const file of mp4Files) {
+    const baseName = file.slice(0, -4);
+    const thumbPath = path.join(folderPath, `${baseName}_thumb.jpg`);
+    const videoPath = path.join(folderPath, file);
+
+    if (SKIP_EXISTING && fs.existsSync(thumbPath) && fs.statSync(thumbPath).size > 1024) {
+      skipped++;
+    } else {
+      filesToProcess.push({ file, baseName, videoPath, thumbPath });
     }
   }
+
+  if (filesToProcess.length === 0) {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    return { folder: folderName, total: mp4Files.length, created: 0, skipped, failed: 0 };
+  }
+
+  // 1. Batch generate PNG thumbnails using native macOS QuickLook
+  const videoPaths = filesToProcess.map(f => f.videoPath);
+  try {
+    await execFileAsync('qlmanage', ['-t', '-s', '3840', '-o', tmpDir, ...videoPaths]);
+  } catch (err) {
+    // qlmanage might exit with non-zero on minor warnings, ignore if files were generated
+  }
+
+  let created = 0;
+  let failed = 0;
+
+  // 2. Convert each generated PNG to JPEG via sips (or fallback to ffmpeg)
+  for (const item of filesToProcess) {
+    const genPng = path.join(tmpDir, `${item.file}.png`);
+    let success = false;
+
+    if (fs.existsSync(genPng) && fs.statSync(genPng).size > 1024) {
+      try {
+        await execFileAsync('sips', ['-s', 'format', 'jpeg', '-s', 'formatOptions', '92', genPng, '--out', item.thumbPath]);
+        success = true;
+      } catch (err) {
+        // Fallback to ffmpeg
+      }
+    }
+
+    if (!success) {
+      // Fallback: extract frame 0 via ffmpeg
+      try {
+        await execFileAsync('/opt/homebrew/bin/ffmpeg', [
+          '-y',
+          '-i', item.videoPath,
+          '-vframes', '1',
+          '-update', '1',
+          '-q:v', '2',
+          item.thumbPath
+        ]);
+        success = true;
+      } catch (err2) {
+        console.error(`❌ Failed thumbnail for ${folderName}/${item.file}:`, err2.message);
+        failed++;
+      }
+    }
+
+    if (success) {
+      created++;
+    }
+  }
+
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+  return { folder: folderName, total: mp4Files.length, created, skipped, failed };
 }
 
 async function main() {
   console.log('\n======================================================');
-  console.log('       AuraLoop 4K Thumbnail Batch Generator         ');
+  console.log('   AuraLoop macOS Native QuickLook Thumbnail Generator');
   console.log('======================================================\n');
-  console.log(`📂 Scanning: ${PREMIUM_DIR}\n`);
+  console.log(`📂 Scanning: ${PREMIUM_DIR}`);
+  console.log(`⚡ Mode: ${SKIP_EXISTING ? 'Skip existing' : 'Regenerate / Match macOS Finder'}\n`);
 
   if (!fs.existsSync(PREMIUM_DIR)) {
     console.error(`❌ Premium directory not found: ${PREMIUM_DIR}`);
     process.exit(1);
   }
 
-  // Find all folders
   const characterFolders = fs.readdirSync(PREMIUM_DIR).filter(item => {
     const full = path.join(PREMIUM_DIR, item);
     return fs.statSync(full).isDirectory() && !item.startsWith('.');
-  });
+  }).sort();
 
-  const tasks = [];
-  for (const folder of characterFolders) {
-    const folderPath = path.join(PREMIUM_DIR, folder);
-    const files = fs.readdirSync(folderPath).filter(f => f.endsWith('.mp4'));
+  console.log(`📁 Found ${characterFolders.length} character folders.\n`);
 
-    for (const file of files) {
-      const baseName = file.slice(0, -4);
-      const videoPath = path.join(folderPath, file);
-      const thumbPath = path.join(folderPath, `${baseName}_thumb.jpg`);
-
-      tasks.push({
-        folder,
-        videoFile: file,
-        thumbFile: `${baseName}_thumb.jpg`,
-        videoPath,
-        thumbPath
-      });
-    }
-  }
-
-  console.log(`🎬 Total videos found: ${tasks.length} across ${characterFolders.length} folders`);
-  console.log(`🚀 Generating thumbnails (${CONCURRENCY} parallel workers)...\n`);
-
-  let completed = 0;
-  let createdCount = 0;
-  let skippedCount = 0;
-  let failedCount = 0;
-
-  async function worker(queue) {
-    while (queue.length > 0) {
-      const task = queue.shift();
-      if (!task) break;
-
-      if (fs.existsSync(task.thumbPath) && fs.statSync(task.thumbPath).size > 1024) {
-        skippedCount++;
-        completed++;
-        continue;
-      }
-
-      const res = await generateThumb(task.videoPath, task.thumbPath);
-      completed++;
-      const pct = ((completed / tasks.length) * 100).toFixed(1);
-
-      if (res.ok) {
-        createdCount++;
-        const sizeKb = (fs.statSync(task.thumbPath).size / 1024).toFixed(0);
-        console.log(`[${completed}/${tasks.length}] (${pct}%) 📸 Generated: ${task.folder}/${task.thumbFile} (${sizeKb} KB)`);
-      } else {
-        failedCount++;
-        console.error(`[${completed}/${tasks.length}] (${pct}%) ❌ Failed: ${task.folder}/${task.videoFile}: ${res.error}`);
-      }
-    }
-  }
-
-  const queue = [...tasks];
+  let grandTotal = 0;
+  let totalCreated = 0;
+  let totalSkipped = 0;
+  let totalFailed = 0;
   const startTime = Date.now();
-  const workers = Array.from({ length: CONCURRENCY }, () => worker(queue));
 
-  await Promise.all(workers);
+  for (let i = 0; i < characterFolders.length; i++) {
+    const folder = characterFolders[i];
+    const folderPath = path.join(PREMIUM_DIR, folder);
+    const res = await processFolder(folder, folderPath);
+
+    grandTotal += res.total;
+    totalCreated += res.created;
+    totalSkipped += res.skipped;
+    totalFailed += res.failed;
+
+    const pct = (((i + 1) / characterFolders.length) * 100).toFixed(0);
+    console.log(`[${i + 1}/${characterFolders.length}] (${pct}%) ✅ ${folder}: ${res.created} created, ${res.skipped} skipped, ${res.failed} failed`);
+  }
 
   const durationSec = ((Date.now() - startTime) / 1000).toFixed(1);
 
@@ -134,9 +141,10 @@ async function main() {
   console.log('                 Thumbnail Summary                    ');
   console.log('======================================================');
   console.log(`⏱️  Duration:        ${durationSec}s`);
-  console.log(`📸 Generated:       ${createdCount} thumbnails`);
-  console.log(`⏭️  Skipped:         ${skippedCount} thumbnails (already existed)`);
-  console.log(`❌ Failed:          ${failedCount}`);
+  console.log(`🎬 Total Videos:    ${grandTotal}`);
+  console.log(`📸 Generated:       ${totalCreated} thumbnails`);
+  console.log(`⏭️  Skipped:         ${totalSkipped}`);
+  console.log(`❌ Failed:          ${totalFailed}`);
   console.log(`📁 Destination:     ${PREMIUM_DIR}`);
   console.log('======================================================\n');
 }
