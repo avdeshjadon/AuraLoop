@@ -2,6 +2,31 @@ import Foundation
 import SwiftUI
 import Combine
 
+/// Cloud-synced user metadata (Pro Tier, UTR verification, and Favorites)
+public struct CloudUserData: Codable {
+    public var proTier: String?
+    public var verifiedUTRs: [String]?
+    public var favorites: [String]?
+    public var updatedAt: Double?
+
+    public init(proTier: String? = nil, verifiedUTRs: [String]? = nil, favorites: [String]? = nil, updatedAt: Double? = nil) {
+        self.proTier = proTier
+        self.verifiedUTRs = verifiedUTRs
+        self.favorites = favorites
+        self.updatedAt = updatedAt
+    }
+
+    public func encodeToPayloadString() -> String {
+        guard let data = try? JSONEncoder().encode(self) else { return "" }
+        return data.base64EncodedString()
+    }
+
+    public static func decode(from payloadString: String) -> CloudUserData? {
+        guard let data = Data(base64Encoded: payloadString) else { return nil }
+        return try? JSONDecoder().decode(CloudUserData.self, from: data)
+    }
+}
+
 /// Profile of a signed-in AuraLoop user
 public struct UserProfile: Codable, Identifiable, Equatable {
     public var id: String
@@ -9,13 +34,15 @@ public struct UserProfile: Codable, Identifiable, Equatable {
     public var name: String
     public var idToken: String
     public var refreshToken: String?
+    public var photoUrl: String?
 
-    public init(id: String, email: String, name: String, idToken: String, refreshToken: String? = nil) {
+    public init(id: String, email: String, name: String, idToken: String, refreshToken: String? = nil, photoUrl: String? = nil) {
         self.id = id
         self.email = email
         self.name = name
         self.idToken = idToken
         self.refreshToken = refreshToken
+        self.photoUrl = photoUrl
     }
 }
 
@@ -57,6 +84,9 @@ public final class AuthService: ObservableObject {
             return
         }
         self.currentUser = profile
+        Task {
+            await syncCloudSession(idToken: profile.idToken, uid: profile.id)
+        }
     }
 
     private func saveSession(_ profile: UserProfile) {
@@ -76,6 +106,7 @@ public final class AuthService: ObservableObject {
         self.generatedOTP = ""
         self.errorMessage = nil
         self.successMessage = "Signed out successfully."
+        AppStore.shared.proTier = .none
     }
 
     // MARK: - Sign In Flow (Email + Password)
@@ -148,6 +179,7 @@ public final class AuthService: ObservableObject {
 
             saveSession(profile)
             self.successMessage = "Welcome back, \(displayName)!"
+            await syncCloudSession(idToken: idToken, uid: uid)
             return true
         } catch {
             self.errorMessage = error.localizedDescription
@@ -314,6 +346,7 @@ public final class AuthService: ObservableObject {
             saveSession(profile)
             self.isAwaitingOTP = false
             self.successMessage = "Account created! Welcome to AuraLoop, \(pendingName)!"
+            await syncCloudSession(idToken: idToken, uid: uid)
             return true
         } catch {
             self.errorMessage = error.localizedDescription
@@ -333,6 +366,146 @@ public final class AuthService: ObservableObject {
         ]
         req.httpBody = try? JSONSerialization.data(withJSONObject: payload)
         _ = try? await URLSession.shared.data(for: req)
+    }
+
+    // MARK: - Cloud Metadata Sync (Pro Tier & Favorites)
+
+    public func syncCloudSession(idToken: String, uid: String) async {
+        if let cloud = await fetchCloudData(idToken: idToken, uid: uid) {
+            AppStore.shared.applyCloudUserData(cloud)
+        } else {
+            // Push existing local favorites and tier if any
+            await pushCloudData(
+                proTier: AppStore.shared.proTier.rawValue,
+                utrs: Array(AppStore.shared.verifiedUTRs),
+                favorites: Array(AppStore.shared.likedIDs)
+            )
+        }
+    }
+
+    public func pushCloudData(proTier: String?, utrs: [String]?, favorites: [String]?) async {
+        guard let user = currentUser, !user.idToken.isEmpty else { return }
+
+        let existing = await fetchCloudData(idToken: user.idToken, uid: user.id) ?? CloudUserData()
+        var updated = existing
+
+        if let proTier { updated.proTier = proTier }
+        if let utrs {
+            var combined = Set(updated.verifiedUTRs ?? [])
+            combined.formUnion(utrs)
+            updated.verifiedUTRs = Array(combined)
+        }
+        if let favorites {
+            var combined = Set(updated.favorites ?? [])
+            combined.formUnion(favorites)
+            updated.favorites = Array(combined)
+        }
+        updated.updatedAt = Date().timeIntervalSince1970
+
+        let payloadString = updated.encodeToPayloadString()
+        guard !payloadString.isEmpty else { return }
+
+        // Update Firebase Auth user photoUrl
+        await updateProfilePhotoUrl(idToken: user.idToken, photoUrl: payloadString)
+
+        // Also try Firestore if enabled
+        await writeToFirestore(uid: user.id, idToken: user.idToken, data: updated)
+    }
+
+    public func fetchCloudData(idToken: String, uid: String) async -> CloudUserData? {
+        // 1. Try Firebase Auth accounts:lookup
+        if let photoUrl = await fetchProfilePhotoUrl(idToken: idToken),
+           let decoded = CloudUserData.decode(from: photoUrl) {
+            return decoded
+        }
+
+        // 2. Fallback to Firestore if available
+        if let firestore = await readFromFirestore(uid: uid, idToken: idToken) {
+            return firestore
+        }
+
+        return nil
+    }
+
+    private func updateProfilePhotoUrl(idToken: String, photoUrl: String) async {
+        guard let url = URL(string: "https://identitytoolkit.googleapis.com/v1/accounts:update?key=\(apiKey)") else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let payload: [String: Any] = [
+            "idToken": idToken,
+            "photoUrl": photoUrl,
+            "returnSecureToken": true
+        ]
+        req.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+        _ = try? await URLSession.shared.data(for: req)
+    }
+
+    private func fetchProfilePhotoUrl(idToken: String) async -> String? {
+        guard let url = URL(string: "https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=\(apiKey)") else { return nil }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let payload: [String: Any] = ["idToken": idToken]
+        guard let body = try? JSONSerialization.data(withJSONObject: payload) else { return nil }
+        req.httpBody = body
+
+        guard let (data, resp) = try? await URLSession.shared.data(for: req),
+              let http = resp as? HTTPURLResponse, http.statusCode == 200,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let users = json["users"] as? [[String: Any]],
+              let first = users.first else {
+            return nil
+        }
+        return first["photoUrl"] as? String
+    }
+
+    private func writeToFirestore(uid: String, idToken: String, data: CloudUserData) async {
+        guard let url = URL(string: "https://firestore.googleapis.com/v1/projects/\(projectId)/databases/(default)/documents/users/\(uid)?key=\(apiKey)") else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "PATCH"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
+
+        var fields: [String: Any] = [:]
+        if let tier = data.proTier {
+            fields["proTier"] = ["stringValue": tier]
+        }
+        if let utrs = data.verifiedUTRs {
+            fields["verifiedUTRs"] = ["arrayValue": ["values": utrs.map { ["stringValue": $0] }]]
+        }
+        if let favs = data.favorites {
+            fields["favorites"] = ["arrayValue": ["values": favs.map { ["stringValue": $0] }]]
+        }
+        if let updated = data.updatedAt {
+            fields["updatedAt"] = ["doubleValue": updated]
+        }
+
+        let body: [String: Any] = ["fields": fields]
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        _ = try? await URLSession.shared.data(for: req)
+    }
+
+    private func readFromFirestore(uid: String, idToken: String) async -> CloudUserData? {
+        guard let url = URL(string: "https://firestore.googleapis.com/v1/projects/\(projectId)/databases/(default)/documents/users/\(uid)?key=\(apiKey)") else { return nil }
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        req.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
+
+        guard let (data, resp) = try? await URLSession.shared.data(for: req),
+              let http = resp as? HTTPURLResponse, http.statusCode == 200,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let fields = json["fields"] as? [String: Any] else {
+            return nil
+        }
+
+        let tier = (fields["proTier"] as? [String: Any])?["stringValue"] as? String
+        let utrObj = (fields["verifiedUTRs"] as? [String: Any])?["arrayValue"] as? [String: Any]
+        let utrList = (utrObj?["values"] as? [[String: Any]])?.compactMap { $0["stringValue"] as? String }
+        let favObj = (fields["favorites"] as? [String: Any])?["arrayValue"] as? [String: Any]
+        let favList = (favObj?["values"] as? [[String: Any]])?.compactMap { $0["stringValue"] as? String }
+
+        return CloudUserData(proTier: tier, verifiedUTRs: utrList, favorites: favList)
     }
 
     // MARK: - Error Mapping

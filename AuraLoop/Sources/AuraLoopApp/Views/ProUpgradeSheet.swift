@@ -26,10 +26,11 @@ enum UPIQRCode {
     }
 }
 
-/// The Liquid Glass Pro Upgrade Sheet
+/// The Liquid Glass Pro Upgrade Sheet with Account Authentication Gate
 public struct ProUpgradeSheet: View {
     @EnvironmentObject var store: AppStore
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var auth = AuthService.shared
 
     @State private var selectedTier: ProTier = .lifetime
     @State private var utrInput: String = ""
@@ -62,11 +63,17 @@ public struct ProUpgradeSheet: View {
 
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 20) {
-                        tierCardsSection
+                        if !auth.isAuthenticated {
+                            authRequiredSection
+                        } else {
+                            accountLinkedBar
 
-                        paymentDetailSection
+                            tierCardsSection
 
-                        utrVerificationSection
+                            paymentDetailSection
+
+                            utrVerificationSection
+                        }
 
                         if let err = errorMessage {
                             HStack(spacing: 8) {
@@ -98,6 +105,7 @@ public struct ProUpgradeSheet: View {
         .sheetSurface(cornerRadius: 28)
         .AuraLoopColorScheme()
         .animation(.easeInOut(duration: 0.22), value: selectedTier)
+        .animation(.easeInOut(duration: 0.22), value: auth.isAuthenticated)
         .animation(.easeInOut(duration: 0.2), value: errorMessage)
         .animation(.spring(response: 0.35, dampingFraction: 0.75), value: isSuccess)
         .onAppear {
@@ -170,6 +178,157 @@ public struct ProUpgradeSheet: View {
             .keyboardShortcut(.cancelAction)
             .pointingCursor()
         }
+    }
+
+    // MARK: - Account Required Gate (Mandatory Login)
+
+    private var authRequiredSection: some View {
+        VStack(spacing: 20) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(hex: 0xF59E0B), Color(hex: 0xD97706)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 58, height: 58)
+                    .shadow(color: Color(hex: 0xF59E0B).opacity(0.35), radius: 12, x: 0, y: 4)
+
+                Image(systemName: "person.crop.circle.badge.plus")
+                    .font(.system(size: 26, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            .padding(.top, 14)
+
+            VStack(spacing: 6) {
+                Text("Sign In Required to Unlock Pro")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(Color.AuraLoopInk)
+
+                Text("To permanently link your Pro license and sync your wallpapers & favorites across all your Macs, please sign in or create an account first.")
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(Color.AuraLoopSecondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 480)
+            }
+
+            VStack(spacing: 10) {
+                benefitRow(
+                    icon: "shield.checkmark.fill",
+                    title: "Permanent Cloud License",
+                    desc: "Your Pro membership is saved to your account in Firebase. Reinstall anytime with 0 hassle."
+                )
+                benefitRow(
+                    icon: "laptopcomputer.and.ipad",
+                    title: "Cross-Mac Activation",
+                    desc: "One license unlocks all 300+ 4K 60fps wallpapers on your MacBook and iMac."
+                )
+                benefitRow(
+                    icon: "heart.fill",
+                    title: "Cloud Favorites Backup",
+                    desc: "Your liked wallpapers sync seamlessly so you never lose your curated library."
+                )
+            }
+            .padding(16)
+            .background(Color.AuraLoopInk.opacity(0.04))
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(Color.AuraLoopInk.opacity(0.08), lineWidth: 1)
+            )
+
+            Button {
+                store.authSheetOpen = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 13, weight: .bold))
+                    Text("Sign In / Create Account")
+                        .font(.system(size: 13.5, weight: .bold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 28)
+                .padding(.vertical, 12)
+                .background(
+                    LinearGradient(
+                        colors: [Color(hex: 0xF59E0B), Color(hex: 0xD97706)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .clipShape(Capsule())
+                .shadow(color: Color(hex: 0xF59E0B).opacity(0.35), radius: 10, x: 0, y: 4)
+            }
+            .buttonStyle(.plain)
+            .pointingCursor()
+            .padding(.top, 4)
+        }
+    }
+
+    private func benefitRow(icon: String, title: String, desc: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Color(hex: 0xF59E0B).opacity(0.14))
+                    .frame(width: 28, height: 28)
+
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color(hex: 0xF59E0B))
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 12.5, weight: .bold))
+                    .foregroundStyle(Color.AuraLoopInk)
+
+                Text(desc)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.AuraLoopSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer()
+        }
+    }
+
+    // MARK: - Account Linked Bar
+
+    private var accountLinkedBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark.seal.fill")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Color(hex: 0x10B981))
+
+            Text("Linked Account:")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Color.AuraLoopSecondary)
+
+            Text(auth.currentUser?.email ?? "")
+                .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                .foregroundStyle(Color.AuraLoopInk)
+
+            Spacer()
+
+            Text("Cloud Sync Active")
+                .font(.system(size: 9.5, weight: .heavy))
+                .tracking(0.6)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 2.5)
+                .background(Color(hex: 0x10B981).opacity(0.16))
+                .foregroundStyle(Color(hex: 0x10B981))
+                .clipShape(Capsule())
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(Color.AuraLoopInk.opacity(0.04))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color(hex: 0x10B981).opacity(0.2), lineWidth: 1)
+        )
     }
 
     // MARK: - 3 Tier Cards
@@ -554,8 +713,8 @@ public struct ProUpgradeSheet: View {
                         .foregroundStyle(Color.AuraLoopInk)
 
                     Text(selectedTier == .lifetime
-                         ? "You have unlocked the Entire Wallpaper Library (300+ Wallpapers) with perpetual 4K 60fps access."
-                         : "You have unlocked \(selectedTier.displayLimit) in master 4K 60fps quality.")
+                         ? "You have unlocked the Entire Wallpaper Library (300+ Wallpapers) with perpetual 4K 60fps access linked to your account."
+                         : "You have unlocked \(selectedTier.displayLimit) in master 4K 60fps quality linked to your account.")
                         .font(.system(size: 13))
                         .foregroundStyle(Color.AuraLoopSecondary)
                         .multilineTextAlignment(.center)
@@ -627,6 +786,11 @@ public struct ProUpgradeSheet: View {
     }
 
     private func verifyAndUnlock() {
+        guard auth.isAuthenticated else {
+            errorMessage = "Please sign in before activating Pro."
+            return
+        }
+
         guard cleanUTR.count == 12 else {
             errorMessage = "Please enter all 12 digits of your UTR number."
             return

@@ -1251,7 +1251,45 @@ final class AppStore: ObservableObject {
         proTier = tier
         defaults.set(tier.rawValue, forKey: "auraLoop_pro_tier")
 
+        // Sync with Firebase linked to user account
+        if AuthService.shared.isAuthenticated {
+            Task {
+                await AuthService.shared.pushCloudData(
+                    proTier: tier.rawValue,
+                    utrs: Array(verifiedUTRs),
+                    favorites: Array(likedIDs)
+                )
+            }
+        }
+
         return (true, "Unlocked \(tier.title) successfully!")
+    }
+
+    // MARK: - Cloud Data Restoration
+
+    func applyCloudUserData(_ cloud: CloudUserData) {
+        // 1. Restore Pro Tier
+        if let tierString = cloud.proTier,
+           let tier = ProTier(rawValue: tierString),
+           tier != .none {
+            if proTier == .none || tier.wallpaperLimit > proTier.wallpaperLimit {
+                proTier = tier
+                defaults.set(tier.rawValue, forKey: "auraLoop_pro_tier")
+            }
+        }
+
+        // 2. Restore Verified UTRs
+        if let utrs = cloud.verifiedUTRs, !utrs.isEmpty {
+            verifiedUTRs.formUnion(utrs)
+            defaults.set(Array(verifiedUTRs), forKey: "auraLoop_verified_utrs")
+        }
+
+        // 3. Merge Cloud Favorites
+        if let favs = cloud.favorites, !favs.isEmpty {
+            likedIDs.formUnion(favs)
+            defaults.set(Array(likedIDs), forKey: "likedIDs")
+            invalidateItemCache()
+        }
     }
 
     /// The 59 / 30 switch in the detail bar.
@@ -1926,6 +1964,16 @@ final class AppStore: ObservableObject {
         }
         defaults.set(Array(likedIDs), forKey: "likedIDs")
         invalidateItemCache()
+
+        if AuthService.shared.isAuthenticated {
+            Task {
+                await AuthService.shared.pushCloudData(
+                    proTier: proTier.rawValue,
+                    utrs: Array(verifiedUTRs),
+                    favorites: Array(likedIDs)
+                )
+            }
+        }
     }
 
     /// Every small manifest edit the interface makes, in one place.
