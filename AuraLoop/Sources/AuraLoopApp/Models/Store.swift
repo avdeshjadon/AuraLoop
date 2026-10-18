@@ -583,18 +583,30 @@ final class AppStore: ObservableObject {
             catalog.map { ($0.id, $0) },
             uniquingKeysWith: { first, _ in first }
         )
-        var seen = Set<String>()
+        var seenIDs = Set<String>()
+        var seenVideos = Set<String>()
         var out: [WallpaperItem] = []
         out.reserveCapacity(manifest.wallpapers.count + catalog.count)
         let liked = likedIDs
-        for entry in manifest.wallpapers where seen.insert(entry.id).inserted {
+        for entry in manifest.wallpapers where seenIDs.insert(entry.id).inserted {
+            seenVideos.insert(entry.file)
             out.append(WallpaperItem(
                 local: entry, remote: remoteByID[entry.id], liked: liked.contains(entry.id)
             ))
         }
-        for remote in catalog where !seen.contains(remote.id) {
+        for (index, remote) in catalog.enumerated() {
+            let videoKey = remote.video.lastPathComponent
+            if seenVideos.contains(videoKey) { continue }
+            seenVideos.insert(videoKey)
+
+            var safeRemote = remote
+            if seenIDs.contains(safeRemote.id) {
+                safeRemote.id = "\(remote.id)-\(index)"
+            }
+            seenIDs.insert(safeRemote.id)
+
             out.append(WallpaperItem(
-                local: nil, remote: remote, liked: liked.contains(remote.id)
+                local: nil, remote: safeRemote, liked: liked.contains(remote.id) || liked.contains(safeRemote.id)
             ))
         }
         cachedItems = out
@@ -619,12 +631,15 @@ final class AppStore: ObservableObject {
     var newestFirstItems: [WallpaperItem] {
         if let cachedNewestFirstItems { return cachedNewestFirstItems }
         var position: [String: Int] = [:]
-        for (index, entry) in catalog.enumerated() where position[entry.id] == nil {
-            position[entry.id] = index
+        for (index, entry) in catalog.enumerated() {
+            if position[entry.id] == nil { position[entry.id] = index }
+            position[entry.video.absoluteString] = index
         }
         let out = items.sorted { a, b in
             if a.availableAt != b.availableAt { return a.availableAt > b.availableAt }
-            switch (position[a.id], position[b.id]) {
+            let posA = position[a.id] ?? (a.remote.flatMap { position[$0.video.absoluteString] })
+            let posB = position[b.id] ?? (b.remote.flatMap { position[$0.video.absoluteString] })
+            switch (posA, posB) {
             case let (x?, y?): return x < y
             // A video the user imported has no catalog position. It only ties
             // with a catalog entry when both dates are missing, and then the
