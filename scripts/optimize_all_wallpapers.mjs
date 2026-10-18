@@ -96,14 +96,16 @@ async function optimizeVideo(video) {
   if (fs.existsSync(tmpOut)) fs.unlinkSync(tmpOut);
 
   // Bitrate target: 20 Mbps for pristine 4K 60fps (visually indistinguishable from master)
-  // Audio: copied bit-for-bit with 0% loss (-c:a copy)
+  // Audio: copied bit-for-bit with 0% loss if audio exists
   const args = [
     '-v', 'error',
     '-stats',
     '-i', video.fullPath,
+    '-map', '0:v',
     '-c:v', 'h264_videotoolbox',
     '-b:v', '20M',
     '-pix_fmt', 'yuv420p',
+    '-map', '0:a?',
     '-c:a', 'copy',
     '-y',
     tmpOut

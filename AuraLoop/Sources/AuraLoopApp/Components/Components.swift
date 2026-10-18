@@ -219,25 +219,63 @@ struct TopBar: View {
         store.tab == .home && store.homeScrolled
     }
 
+    /// Whether to display the frosted glass titlebar header:
+    /// - Home tab: dynamically smoothly fades in when scrolled past hero banner
+    private var showGlassHeader: Bool {
+        store.tab == .home ? isHomeScrolled : false
+    }
+
     var body: some View {
         ZStack {
             HStack(spacing: 0) {
                 logo
-                    .opacity(isHomeScrolled ? 0 : 1)
-                    .scaleEffect(isHomeScrolled ? 0.92 : 1.0)
-                    .animation(.easeInOut(duration: 0.25), value: isHomeScrolled)
                 Spacer()
                 actions
             }
             navPill
-                .offset(x: isHomeScrolled ? 48 : 0)
-                .animation(.easeInOut(duration: 0.25), value: isHomeScrolled)
         }
         .padding(.leading, 92)   // clear of the traffic lights
         .padding(.trailing, 40)
         .padding(.top, 22)
+        .padding(.bottom, 14)
+        .frame(maxWidth: .infinity)
+        .background {
+            glassHeaderBackground
+                .allowsHitTesting(false)
+        }
         .environment(\.AuraLoopOnMedia, onMedia)
         .animation(.easeOut(duration: 0.2), value: onMedia)
+    }
+
+    /// Pinned frosted glass header matching SettingsView aesthetic:
+    /// .ultraThinMaterial, themed shade tint, bottom divider, and soft dissolution feather.
+    private var glassHeaderBackground: some View {
+        ZStack(alignment: .bottom) {
+            Rectangle()
+                .fill(.ultraThinMaterial.opacity(0.94))
+
+            (Appearance.shared.isLight
+                ? Color.white.opacity(0.32)
+                : Color.black.opacity(0.48))
+
+            Divider()
+                .opacity(0.18)
+        }
+        .overlay(alignment: .bottom) {
+            LinearGradient(
+                colors: [
+                    (Appearance.shared.isLight ? Color.white.opacity(0.22) : Color.black.opacity(0.28)),
+                    Color.clear
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 18)
+            .offset(y: 18)
+        }
+        .ignoresSafeArea(edges: .top)
+        .opacity(showGlassHeader ? 1 : 0)
+        .animation(.easeInOut(duration: 0.28), value: showGlassHeader)
     }
 
     private var logo: some View {
