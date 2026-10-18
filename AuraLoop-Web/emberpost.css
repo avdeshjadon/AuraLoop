@@ -282,11 +282,11 @@
     0 10px 30px -14px rgba(90, 45, 20, 0.25);
 }
 .ta-nav__bar {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: 8px;
   height: 54px;
-  padding: 0 8px 0 24px;
+  padding: 0 10px 0 24px;
   border-radius: 18px;
   background: linear-gradient(
     180deg,
@@ -300,7 +300,7 @@
     0 3px 6px -2px rgba(23, 19, 15, 0.1);
 }
 .ta-wordmark {
-  margin-right: auto;
+  justify-self: start;
   font-size: 26px;
   font-weight: 560;
   letter-spacing: -0.045em;
@@ -310,9 +310,15 @@
   padding-bottom: 2px;
 }
 .ta-nav__links {
+  justify-self: center;
   display: flex;
   gap: 4px;
-  margin-right: 10px;
+}
+.ta-nav__actions {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .ta-nav__links a {
   padding: 8px 12px;
@@ -378,16 +384,19 @@
 }
 
 @media (max-width: 859px) {
+  .ta-nav__bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 52px;
+    padding-left: 16px;
+    padding-right: 6px;
+  }
   .ta-nav__links {
     display: none;
   }
   .ta-nav__menu {
     display: grid;
-  }
-  .ta-nav__bar {
-    height: 52px;
-    padding-left: 16px;
-    padding-right: 6px;
   }
   .ta-wordmark {
     font-size: 23px;

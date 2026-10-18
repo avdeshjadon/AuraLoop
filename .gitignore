@@ -27,6 +27,9 @@ AuraLoop/lock screen status.md
 
 # Credentials must never be committable (R2 keys live in ~/.config/AuraLoop/)
 Cloudflare API Token.rtf
+.env
+*.env
+.env.*
 
 .DS_Store
 

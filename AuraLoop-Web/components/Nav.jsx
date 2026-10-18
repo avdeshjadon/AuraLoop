@@ -3,6 +3,7 @@ import { useEscape, useFocusTrap, useScrollLock } from '../../../shared/a11y.js'
 import { prefersReducedMotion } from '../../../shared/gsap.js';
 import { goToWaitlist, useMedia } from '../lib.js';
 import { Bolt, Close, Menu, ArrowRight } from '../icons.jsx';
+import { onAuthStateChanged } from '../lib/auth.js';
 
 const MENU = [
   { href: '#wallpapers', label: '4K Wallpapers' },
@@ -11,11 +12,14 @@ const MENU = [
   { href: '#manifesto', label: 'Architecture' },
 ];
 
-export default function Nav() {
+export default function Nav({ onOpenAuth }) {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [user, setUser] = useState(null);
   const ringRef = useRef(null);
   const desktop = useMedia('(min-width: 860px)', true);
+
+  useEffect(() => onAuthStateChanged(setUser), []);
 
   useEscape(open, () => setOpen(false));
   useFocusTrap(ringRef, open);
@@ -86,33 +90,108 @@ export default function Nav() {
             <a href="#workflows">Automation</a>
             <a href="#manifesto">Architecture</a>
           </nav>
-          <a
-            href="#waitlist"
-            className="ta-btn ta-btn--ink ta-nav__cta"
-            onClick={early}
-            style={{
-              color: '#ffffff',
-              fontWeight: 600,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
-            }}
-          >
-            <span className="ta-nav__cta-long" style={{ color: '#ffffff' }}>Download .DMG</span>
-            <span className="ta-nav__cta-short" style={{ color: '#ffffff' }}>Download</span>
-            <Bolt size={13} style={{ color: '#ffffff' }} />
-          </a>
-          <button
-            type="button"
-            className="ta-nav__menu"
-            aria-expanded={open}
-            aria-controls="ta-menu"
-            aria-label={open ? 'Close menu' : 'Open menu'}
-            onClick={() => setOpen(o => !o)}
-          >
-            {open ? <Close size={18} /> : <Menu size={18} />}
-          </button>
+
+          <div className="ta-nav__actions">
+            {user ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="ta-btn"
+                  onClick={() => onOpenAuth?.('account')}
+                  style={{
+                    background: user.proTier !== 'none'
+                      ? 'linear-gradient(135deg, #e4572e 0%, #b93c18 100%)'
+                      : 'rgba(23, 19, 15, 0.06)',
+                    border: user.proTier !== 'none' ? 'none' : '1px solid rgba(23, 19, 15, 0.12)',
+                    borderRadius: '999px',
+                    padding: '7px 15px',
+                    color: user.proTier !== 'none' ? '#ffffff' : '#17130f',
+                    fontSize: '12.5px',
+                    fontWeight: '600',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {user.proTier !== 'none' ? '✦ Lifetime VIP' : '✦ Upgrade to Pro'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onOpenAuth?.('account')}
+                  title="My Account"
+                  style={{
+                    width: '34px',
+                    height: '34px',
+                    borderRadius: '50%',
+                    background: '#17130f',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontWeight: '700',
+                    fontSize: '13px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {user.displayName ? user.displayName[0].toUpperCase() : 'A'}
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="ta-btn"
+                  onClick={() => onOpenAuth?.('signin')}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid rgba(23, 19, 15, 0.14)',
+                    borderRadius: '999px',
+                    padding: '7px 14px',
+                    color: '#17130f',
+                    fontSize: '12.5px',
+                    fontWeight: '600',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  className="ta-btn ta-btn--ember"
+                  onClick={() => onOpenAuth?.('signup')}
+                  style={{
+                    borderRadius: '999px',
+                    padding: '7px 16px',
+                    fontSize: '12.5px',
+                    fontWeight: '600',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <span>Sign Up</span>
+                  <span style={{ fontSize: '11px' }}>↗</span>
+                </button>
+              </div>
+            )}
+
+            <button
+              type="button"
+              className="ta-nav__menu"
+              aria-expanded={open}
+              aria-controls="ta-menu"
+              aria-label={open ? 'Close menu' : 'Open menu'}
+              onClick={() => setOpen(o => !o)}
+            >
+              {open ? <Close size={18} /> : <Menu size={18} />}
+            </button>
+          </div>
         </div>
 
         <div id="ta-menu" className="ta-menu" hidden={!open}>
@@ -128,9 +207,37 @@ export default function Nav() {
               ))}
             </ul>
           </nav>
-          <a href="#waitlist" className="ta-btn ta-btn--ember ta-menu__cta" onClick={early}>
-            Download .DMG (v6.6.0) <Bolt size={14} />
-          </a>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+            {user ? (
+              <button
+                type="button"
+                className="ta-btn ta-btn--ember"
+                style={{ width: '100%', padding: '12px', borderRadius: '12px', fontSize: '14px', fontWeight: '600' }}
+                onClick={() => { setOpen(false); onOpenAuth?.('account'); }}
+              >
+                {user.proTier !== 'none' ? '✦ Lifetime VIP Member' : '✦ Upgrade to Pro'}
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="ta-btn ta-btn--ember"
+                  style={{ width: '100%', padding: '12px', borderRadius: '12px', fontSize: '14px', fontWeight: '600' }}
+                  onClick={() => { setOpen(false); onOpenAuth?.('signup'); }}
+                >
+                  Create AuraLoop Account ↗
+                </button>
+                <button
+                  type="button"
+                  className="ta-btn"
+                  style={{ width: '100%', padding: '11px', borderRadius: '12px', border: '1px solid rgba(23,19,15,0.12)', background: '#fff', fontSize: '14px', fontWeight: '600' }}
+                  onClick={() => { setOpen(false); onOpenAuth?.('signin'); }}
+                >
+                  Sign In
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </header>

@@ -25,6 +25,13 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
+// Load .env automatically if present
+if (typeof process.loadEnvFile === 'function') {
+  try {
+    process.loadEnvFile();
+  } catch {}
+}
+
 const BUCKET = 'auraloop-wallpapers';
 const ROOT_DIR = path.join(os.homedir(), 'Downloads', 'AuraLoop-Wallpapers');
 const STATE_FILE = path.join(path.dirname(new URL(import.meta.url).pathname), 'upload_progress.json');
@@ -123,7 +130,8 @@ async function uploadFile(item, retries = 3) {
     try {
       await execFileAsync('/usr/local/bin/wrangler', args, {
         maxBuffer: 50 * 1024 * 1024,
-        timeout: 300000 // 5 minutes timeout
+        timeout: 300000, // 5 minutes timeout
+        env: process.env
       });
       return;
     } catch (err) {

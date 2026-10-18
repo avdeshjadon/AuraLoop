@@ -1,128 +1,76 @@
 import SwiftUI
-import CoreImage
 import AuraLoopKit
 import AppKit
 
-/// Generates crystal-clear, high-resolution QR codes using macOS CoreImage
-enum UPIQRCode {
-    static func generate(from string: String, size: CGFloat = 160) -> NSImage? {
-        guard let data = string.data(using: .utf8) else { return nil }
-        guard let filter = CIFilter(name: "CIQRCodeGenerator") else { return nil }
-        filter.setValue(data, forKey: "inputMessage")
-        filter.setValue("M", forKey: "inputCorrectionLevel")
-        guard let outputImage = filter.outputImage else { return nil }
-
-        let extent = outputImage.extent
-        guard extent.width > 0, extent.height > 0 else { return nil }
-
-        let scale = size / extent.width
-        let transform = CGAffineTransform(scaleX: scale, y: scale)
-        let scaledImage = outputImage.transformed(by: transform)
-
-        let rep = NSCIImageRep(ciImage: scaledImage)
-        let nsImage = NSImage(size: NSSize(width: size, height: size))
-        nsImage.addRepresentation(rep)
-        return nsImage
-    }
-}
-
-/// The Liquid Glass Pro Upgrade Sheet with Account Authentication Gate
+/// AuraLoop Pro Upgrade Sheet
+/// Minimalist design: Directs user to Sign In or Visit Website for Upgradation
 public struct ProUpgradeSheet: View {
     @EnvironmentObject var store: AppStore
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var auth = AuthService.shared
 
-    @State private var selectedTier: ProTier = .lifetime
-    @State private var utrInput: String = ""
-    @State private var copiedUPI: Bool = false
-    @State private var isVerifying: Bool = false
-    @State private var errorMessage: String?
-    @State private var isSuccess: Bool = false
-
-    private let upiID = "avdeshjadon@ptaxis"
+    @State private var isRefreshing = false
+    @State private var refreshNotice: String?
 
     public init() {}
 
-    private var currentQRString: String {
-        let titleParam = selectedTier.title.replacingOccurrences(of: " ", with: "%20")
-        return "upi://pay?pa=\(upiID)&pn=AuraLoop&am=\(selectedTier.priceINR)&cu=INR&tn=AuraLoop%20\(titleParam)"
-    }
-
-    private var cleanUTR: String {
-        utrInput.replacingOccurrences(of: " ", with: "")
-            .replacingOccurrences(of: "-", with: "")
-    }
-
     public var body: some View {
-        ZStack {
-            VStack(spacing: 0) {
-                header
-                    .padding(.horizontal, 28)
-                    .padding(.top, 24)
-                    .padding(.bottom, 16)
+        VStack(spacing: 0) {
+            topBar
+                .padding(.horizontal, 28)
+                .padding(.top, 24)
+                .padding(.bottom, 16)
 
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 20) {
-                        if !auth.isAuthenticated {
-                            authRequiredSection
-                        } else {
-                            accountLinkedBar
-
-                            tierCardsSection
-
-                            paymentDetailSection
-
-                            utrVerificationSection
-                        }
-
-                        if let err = errorMessage {
-                            HStack(spacing: 8) {
-                                Image(systemName: "exclamationmark.circle.fill")
-                                    .foregroundStyle(Color(hex: 0xEF4444))
-                                    .font(.system(size: 13))
-                                Text(err)
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundStyle(Color(hex: 0xEF4444))
-                            }
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(Color(hex: 0xEF4444).opacity(0.12))
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                            .transition(.opacity.combined(with: .scale(scale: 0.96)))
-                        }
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 22) {
+                    if !auth.isAuthenticated {
+                        // User not logged in
+                        unauthenticatedView
+                    } else if store.proTier == .none {
+                        // User logged in, but on free tier
+                        upgradePromptView
+                    } else {
+                        // User is Pro
+                        alreadyProView
                     }
-                    .padding(.horizontal, 28)
-                    .padding(.bottom, 26)
-                }
-            }
 
-            if isSuccess {
-                successOverlay
-                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                    if let notice = refreshNotice {
+                        Text(notice)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Color(hex: 0x4ADE80))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 7)
+                            .background(Color(hex: 0x4ADE80).opacity(0.12))
+                            .clipShape(Capsule())
+                            .transition(.opacity)
+                    }
+                }
+                .padding(.horizontal, 28)
+                .padding(.bottom, 26)
             }
         }
-        .frame(width: 680, height: 600)
-        .sheetSurface(cornerRadius: 28)
+        .frame(width: 540, height: auth.isAuthenticated && store.proTier != .none ? 360 : 420)
+        .sheetSurface(cornerRadius: 26)
         .AuraLoopColorScheme()
-        .animation(.easeInOut(duration: 0.22), value: selectedTier)
         .animation(.easeInOut(duration: 0.22), value: auth.isAuthenticated)
-        .animation(.easeInOut(duration: 0.2), value: errorMessage)
-        .animation(.spring(response: 0.35, dampingFraction: 0.75), value: isSuccess)
+        .animation(.easeInOut(duration: 0.22), value: store.proTier)
         .onAppear {
-            if store.proTier == .starter {
-                selectedTier = .plus
-            } else if store.proTier == .plus {
-                selectedTier = .lifetime
-            } else if store.proTier == .lifetime {
-                selectedTier = .lifetime
+            autoSyncStatus()
+        }
+    }
+
+    private func autoSyncStatus() {
+        if let user = auth.currentUser {
+            Task {
+                await auth.syncCloudSession(idToken: user.idToken, uid: user.id)
             }
         }
     }
 
-    // MARK: - Header
+    // MARK: - Top Bar
 
-    private var header: some View {
-        HStack(alignment: .center) {
+    private var topBar: some View {
+        HStack {
             HStack(spacing: 12) {
                 ZStack {
                     Circle()
@@ -158,7 +106,7 @@ public struct ProUpgradeSheet: View {
                         }
                     }
 
-                    Text("Unlock 4K 60fps master quality live wallpapers · Direct UPI activation")
+                    Text("Unlock 1,582+ 4K master quality live wallpapers")
                         .font(.system(size: 12))
                         .foregroundStyle(Color.AuraLoopSecondary)
                 }
@@ -180,641 +128,227 @@ public struct ProUpgradeSheet: View {
         }
     }
 
-    // MARK: - Account Required Gate (Mandatory Login)
+    // MARK: - Case 1: Unauthenticated
 
-    private var authRequiredSection: some View {
+    private var unauthenticatedView: some View {
         VStack(spacing: 20) {
-            ZStack {
-                Circle()
-                    .fill(
+            VStack(spacing: 8) {
+                Text("Sign in to Access Pro Wallpapers")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(Color.AuraLoopInk)
+
+                Text("Log in with your registered AuraLoop account to sync your Pro status and unlock the entire 4K wallpaper library.")
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(Color.AuraLoopSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 16)
+            }
+            .padding(.top, 10)
+
+            VStack(spacing: 12) {
+                // Button 1: Sign In in App
+                Button {
+                    dismiss()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        store.authSheetOpen = true
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 12))
+                        Text("Sign In with Email & Password")
+                            .font(.system(size: 13.5, weight: .semibold))
+                    }
+                    .foregroundStyle(Color.AuraLoopOnInk)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.AuraLoopInk)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .pointingCursor()
+
+                // Button 2: Register on Website
+                Button {
+                    AuraLoopWebLink.open(action: "signup")
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "safari")
+                            .font(.system(size: 12))
+                        Text("Create Account on Website ↗")
+                            .font(.system(size: 13.5, weight: .semibold))
+                    }
+                    .foregroundStyle(Color.AuraLoopInk)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.AuraLoopInk.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .pointingCursor()
+            }
+        }
+    }
+
+    // MARK: - Case 2: Logged in on Free Tier -> Visit Website for Upgradation
+
+    private var upgradePromptView: some View {
+        VStack(spacing: 20) {
+            if let user = auth.currentUser {
+                // Account bar
+                HStack(spacing: 12) {
+                    Circle()
+                        .fill(Color(hex: 0x818CF8).opacity(0.2))
+                        .frame(width: 36, height: 36)
+                        .overlay(
+                            Text(String(user.name.prefix(1)).uppercased())
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(Color(hex: 0x818CF8))
+                        )
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(user.name)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Color.AuraLoopInk)
+                        Text(user.email)
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(Color.AuraLoopSecondary)
+                    }
+
+                    Spacer()
+
+                    Text("Free Plan")
+                        .font(.system(size: 11, weight: .semibold))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 4)
+                        .background(Color.AuraLoopInk.opacity(0.06))
+                        .clipShape(Capsule())
+                }
+                .padding(12)
+                .background(Color.AuraLoopInk.opacity(0.04))
+                .cornerRadius(14)
+            }
+
+            VStack(spacing: 8) {
+                Text("Visit to Website for Upgradation")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(Color.AuraLoopInk)
+
+                Text("To unlock all 1,582+ 4K ultra-wide wallpapers and audio synchronization, upgrade your membership on our website.")
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(Color.AuraLoopSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 10)
+            }
+
+            VStack(spacing: 12) {
+                // Primary action: Open Website Upgrade
+                Button {
+                    AuraLoopWebLink.open(action: "upgrade")
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "crown.fill")
+                            .font(.system(size: 13))
+                        Text("Visit to Website for Upgradation ↗")
+                            .font(.system(size: 14, weight: .bold))
+                    }
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 13)
+                    .background(
                         LinearGradient(
                             colors: [Color(hex: 0xF59E0B), Color(hex: 0xD97706)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(width: 58, height: 58)
-                    .shadow(color: Color(hex: 0xF59E0B).opacity(0.35), radius: 12, x: 0, y: 4)
-
-                Image(systemName: "person.crop.circle.badge.plus")
-                    .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(.white)
-            }
-            .padding(.top, 14)
-
-            VStack(spacing: 6) {
-                Text("Sign In Required to Unlock Pro")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(Color.AuraLoopInk)
-
-                Text("To permanently link your Pro license and sync your wallpapers & favorites across all your Macs, please sign in or create an account first.")
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(Color.AuraLoopSecondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 480)
-            }
-
-            VStack(spacing: 10) {
-                benefitRow(
-                    icon: "shield.checkmark.fill",
-                    title: "Permanent Cloud License",
-                    desc: "Your Pro membership is saved to your account in Firebase. Reinstall anytime with 0 hassle."
-                )
-                benefitRow(
-                    icon: "laptopcomputer.and.ipad",
-                    title: "Cross-Mac Activation",
-                    desc: "One license unlocks all 300+ 4K 60fps wallpapers on your MacBook and iMac."
-                )
-                benefitRow(
-                    icon: "heart.fill",
-                    title: "Cloud Favorites Backup",
-                    desc: "Your liked wallpapers sync seamlessly so you never lose your curated library."
-                )
-            }
-            .padding(16)
-            .background(Color.AuraLoopInk.opacity(0.04))
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(Color.AuraLoopInk.opacity(0.08), lineWidth: 1)
-            )
-
-            Button {
-                store.authSheetOpen = true
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "person.fill")
-                        .font(.system(size: 13, weight: .bold))
-                    Text("Sign In / Create Account")
-                        .font(.system(size: 13.5, weight: .bold))
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .shadow(color: Color(hex: 0xF59E0B).opacity(0.35), radius: 8, x: 0, y: 3)
                 }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 28)
-                .padding(.vertical, 12)
-                .background(
+                .buttonStyle(.plain)
+                .pointingCursor()
+
+                // Secondary action: Refresh Pro Status
+                Button {
+                    if let user = auth.currentUser {
+                        isRefreshing = true
+                        Task {
+                            await auth.syncCloudSession(idToken: user.idToken, uid: user.id)
+                            isRefreshing = false
+                            if store.proTier != .none {
+                                refreshNotice = "✦ Pro membership unlocked!"
+                            } else {
+                                refreshNotice = "Refreshed. If you just upgraded on the web, please allow a few seconds."
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                                refreshNotice = nil
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        if isRefreshing {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 12))
+                        }
+                        Text("Refresh Pro Status")
+                            .font(.system(size: 12.5, weight: .medium))
+                    }
+                    .foregroundStyle(Color.AuraLoopSecondary)
+                    .padding(.vertical, 6)
+                }
+                .buttonStyle(.plain)
+                .disabled(isRefreshing)
+                .pointingCursor()
+            }
+        }
+    }
+
+    // MARK: - Case 3: Already Pro
+
+    private var alreadyProView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "checkmark.seal.fill")
+                .font(.system(size: 44))
+                .foregroundStyle(
                     LinearGradient(
                         colors: [Color(hex: 0xF59E0B), Color(hex: 0xD97706)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
-                .clipShape(Capsule())
-                .shadow(color: Color(hex: 0xF59E0B).opacity(0.35), radius: 10, x: 0, y: 4)
+
+            VStack(spacing: 6) {
+                Text("✦ Lifetime Pro Active")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(Color.AuraLoopInk)
+
+                if let user = auth.currentUser {
+                    Text("All premium wallpapers and 4K features are unlocked for \(user.email).")
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(Color.AuraLoopSecondary)
+                        .multilineTextAlignment(.center)
+                }
+            }
+
+            Button {
+                dismiss()
+            } label: {
+                Text("Done")
+                    .font(.system(size: 13.5, weight: .semibold))
+                    .foregroundStyle(Color.AuraLoopOnInk)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 11)
+                    .background(Color.AuraLoopInk)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             .buttonStyle(.plain)
             .pointingCursor()
-            .padding(.top, 4)
+            .padding(.top, 10)
         }
-    }
-
-    private func benefitRow(icon: String, title: String, desc: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(Color(hex: 0xF59E0B).opacity(0.14))
-                    .frame(width: 28, height: 28)
-
-                Image(systemName: icon)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color(hex: 0xF59E0B))
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 12.5, weight: .bold))
-                    .foregroundStyle(Color.AuraLoopInk)
-
-                Text(desc)
-                    .font(.system(size: 11))
-                    .foregroundStyle(Color.AuraLoopSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Spacer()
-        }
-    }
-
-    // MARK: - Account Linked Bar
-
-    private var accountLinkedBar: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(Color(hex: 0x10B981))
-
-            Text("Linked Account:")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Color.AuraLoopSecondary)
-
-            Text(auth.currentUser?.email ?? "")
-                .font(.system(size: 11.5, weight: .bold, design: .monospaced))
-                .foregroundStyle(Color.AuraLoopInk)
-
-            Spacer()
-
-            Text("Cloud Sync Active")
-                .font(.system(size: 9.5, weight: .heavy))
-                .tracking(0.6)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 2.5)
-                .background(Color(hex: 0x10B981).opacity(0.16))
-                .foregroundStyle(Color(hex: 0x10B981))
-                .clipShape(Capsule())
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(Color.AuraLoopInk.opacity(0.04))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color(hex: 0x10B981).opacity(0.2), lineWidth: 1)
-        )
-    }
-
-    // MARK: - 3 Tier Cards
-
-    private var tierCardsSection: some View {
-        HStack(spacing: 12) {
-            tierCard(
-                tier: .starter,
-                price: "₹129",
-                limit: "50 Wallpapers",
-                subtitle: "Starter collection in 4K"
-            )
-
-            tierCard(
-                tier: .plus,
-                price: "₹169",
-                limit: "100 Wallpapers",
-                subtitle: "Expanded library access"
-            )
-
-            tierCard(
-                tier: .lifetime,
-                price: "₹199",
-                limit: "Entire Wallpaper Library (300+ Wallpapers)",
-                subtitle: "Complete library perpetual pass",
-                badge: "BEST VALUE"
-            )
-        }
-    }
-
-    private func tierCard(
-        tier: ProTier,
-        price: String,
-        limit: String,
-        subtitle: String,
-        badge: String? = nil
-    ) -> some View {
-        let isSelected = selectedTier == tier
-        let isCurrent = store.proTier == tier
-
-        return Button {
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
-                selectedTier = tier
-                errorMessage = nil
-            }
-        } label: {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .top) {
-                    Text(tier.title)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Color.AuraLoopInk)
-
-                    Spacer()
-
-                    if let badge {
-                        Text(badge)
-                            .font(.system(size: 8.5, weight: .heavy))
-                            .tracking(0.5)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2.5)
-                            .background(
-                                LinearGradient(
-                                    colors: [Color(hex: 0xF59E0B), Color(hex: 0xD97706)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .foregroundStyle(.white)
-                            .clipShape(Capsule())
-                    } else if isCurrent {
-                        Text("ACTIVE")
-                            .font(.system(size: 8.5, weight: .bold))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2.5)
-                            .background(Color(hex: 0x10B981).opacity(0.2))
-                            .foregroundStyle(Color(hex: 0x10B981))
-                            .clipShape(Capsule())
-                    }
-                }
-
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(price)
-                        .font(.system(size: 22, weight: .heavy, design: .rounded))
-                        .foregroundStyle(isSelected ? Color(hex: 0xF59E0B) : Color.AuraLoopInk)
-
-                    Text("one-time")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(Color.AuraLoopSecondary)
-                }
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(limit)
-                        .font(.system(size: 11.5, weight: .semibold))
-                        .foregroundStyle(isSelected ? Color.AuraLoopInk : Color.AuraLoopInk.opacity(0.85))
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Text(subtitle)
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(Color.AuraLoopSecondary)
-                        .lineLimit(1)
-                }
-            }
-            .padding(14)
-            .frame(maxWidth: .infinity, minHeight: 128, alignment: .topLeading)
-            .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(isSelected
-                          ? (Appearance.shared.isLight ? Color(hex: 0xF59E0B).opacity(0.08) : Color(hex: 0xF59E0B).opacity(0.12))
-                          : Color.AuraLoopInk.opacity(0.04))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(
-                        isSelected
-                            ? Color(hex: 0xF59E0B).opacity(0.85)
-                            : Color.AuraLoopInk.opacity(0.12),
-                        lineWidth: isSelected ? 1.8 : 1
-                    )
-            )
-            .scaleEffect(isSelected ? 1.02 : 1.0)
-            .shadow(color: isSelected ? Color(hex: 0xF59E0B).opacity(0.18) : .clear, radius: 10, x: 0, y: 4)
-        }
-        .buttonStyle(.plain)
-        .pointingCursor()
-    }
-
-    // MARK: - Dynamic Payment Box (QR + Steps)
-
-    private var paymentDetailSection: some View {
-        HStack(spacing: 20) {
-            // High-DPI QR Code Box
-            VStack(spacing: 8) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color.white)
-                        .frame(width: 146, height: 146)
-                        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 3)
-
-                    if let qrImage = UPIQRCode.generate(from: currentQRString, size: 134) {
-                        Image(nsImage: qrImage)
-                            .interpolation(.none)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 134, height: 134)
-                    }
-                }
-
-                Text("Scan with any UPI App")
-                    .font(.system(size: 9.5, weight: .semibold))
-                    .foregroundStyle(Color.AuraLoopSecondary)
-            }
-            .frame(width: 160)
-
-            // Payment Instructions & VPA Copy
-            VStack(alignment: .leading, spacing: 12) {
-                // UPI Address Pill
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("UPI ID / VPA")
-                        .font(.system(size: 9.5, weight: .bold))
-                        .tracking(1.0)
-                        .foregroundStyle(Color.AuraLoopSecondary)
-
-                    HStack(spacing: 8) {
-                        Text(upiID)
-                            .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(Color.AuraLoopInk)
-
-                        Spacer()
-
-                        Button {
-                            copyUPI()
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: copiedUPI ? "checkmark" : "doc.on.doc")
-                                    .font(.system(size: 10, weight: .semibold))
-                                Text(copiedUPI ? "Copied" : "Copy")
-                                    .font(.system(size: 11, weight: .semibold))
-                            }
-                            .foregroundStyle(copiedUPI ? Color(hex: 0x10B981) : Color.AuraLoopInk)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 4.5)
-                            .background(Color.AuraLoopInk.opacity(0.08))
-                            .clipShape(Capsule())
-                        }
-                        .buttonStyle(.plain)
-                        .pointingCursor()
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Color.AuraLoopInk.opacity(0.05))
-                    .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
-                }
-
-                // 3 Step Guide
-                VStack(alignment: .leading, spacing: 6) {
-                    stepRow(
-                        num: "1",
-                        text: "Scan QR or transfer \(priceForSelected) to \(upiID)"
-                    )
-                    stepRow(
-                        num: "2",
-                        text: "Open receipt & copy the 12-digit UTR / UPI Ref ID"
-                    )
-                    stepRow(
-                        num: "3",
-                        text: "Paste the 12-digit UTR below to unlock instantly"
-                    )
-                }
-            }
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.AuraLoopInk.opacity(0.035))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(Color.AuraLoopInk.opacity(0.09), lineWidth: 1)
-        )
-    }
-
-    private var priceForSelected: String {
-        "₹\(selectedTier.priceINR)"
-    }
-
-    private func stepRow(num: String, text: String) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Text(num)
-                .font(.system(size: 9.5, weight: .bold))
-                .foregroundStyle(Color(hex: 0xF59E0B))
-                .frame(width: 17, height: 17)
-                .background(Color(hex: 0xF59E0B).opacity(0.16))
-                .clipShape(Circle())
-
-            Text(text)
-                .font(.system(size: 11.5))
-                .foregroundStyle(Color.AuraLoopInk.opacity(0.85))
-                .lineLimit(2)
-        }
-    }
-
-    // MARK: - UTR Input & Verification Button
-
-    private var utrVerificationSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("ENTER 12-DIGIT UTR / UPI REF ID")
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(1.0)
-                    .foregroundStyle(Color.AuraLoopSecondary)
-
-                Spacer()
-
-                Text("\(cleanUTR.count)/12 digits")
-                    .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(cleanUTR.count == 12 ? Color(hex: 0x10B981) : Color.AuraLoopSecondary)
-            }
-
-            HStack(spacing: 10) {
-                // Input Field
-                HStack(spacing: 8) {
-                    Image(systemName: "number")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.AuraLoopSecondary)
-
-                    TextField("e.g. 4281 9283 1092", text: $utrInput)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(Color.AuraLoopInk)
-                        .onChange(of: utrInput) { _, newValue in
-                            formatUTRInput(newValue)
-                        }
-
-                    if !utrInput.isEmpty {
-                        Button {
-                            utrInput = ""
-                            errorMessage = nil
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 13))
-                                .foregroundStyle(Color.AuraLoopSecondary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    Button {
-                        pasteFromClipboard()
-                    } label: {
-                        Text("Paste")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(Color(hex: 0xF59E0B))
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 4)
-                            .background(Color(hex: 0xF59E0B).opacity(0.12))
-                            .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .pointingCursor()
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(Color.AuraLoopInk.opacity(0.06))
-                .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 13, style: .continuous)
-                        .strokeBorder(
-                            cleanUTR.count == 12 ? Color(hex: 0xF59E0B).opacity(0.65) : Color.AuraLoopInk.opacity(0.12),
-                            lineWidth: 1
-                        )
-                )
-
-                // Verify Button
-                Button {
-                    verifyAndUnlock()
-                } label: {
-                    HStack(spacing: 6) {
-                        if isVerifying {
-                            ProgressView()
-                                .controlSize(.small)
-                                .colorInvert()
-                        } else {
-                            Image(systemName: "checkmark.shield.fill")
-                                .font(.system(size: 12, weight: .bold))
-                            Text("Verify & Unlock")
-                                .font(.system(size: 13, weight: .bold))
-                        }
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 10.5)
-                    .background(
-                        LinearGradient(
-                            colors: cleanUTR.count == 12
-                                ? [Color(hex: 0xF59E0B), Color(hex: 0xD97706)]
-                                : [Color.gray.opacity(0.5), Color.gray.opacity(0.6)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-                    .shadow(
-                        color: cleanUTR.count == 12 ? Color(hex: 0xF59E0B).opacity(0.35) : .clear,
-                        radius: 8, x: 0, y: 3
-                    )
-                }
-                .buttonStyle(.plain)
-                .disabled(cleanUTR.count != 12 || isVerifying)
-                .pointingCursor()
-            }
-        }
-    }
-
-    // MARK: - Success Overlay
-
-    private var successOverlay: some View {
-        ZStack {
-            VisualEffectBackground(material: .popover)
-                .ignoresSafeArea()
-
-            VStack(spacing: 16) {
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color(hex: 0x10B981), Color(hex: 0x059669)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 64, height: 64)
-                        .shadow(color: Color(hex: 0x10B981).opacity(0.4), radius: 14, x: 0, y: 4)
-
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundStyle(.white)
-                }
-
-                VStack(spacing: 6) {
-                    Text("\(selectedTier.title) Activated!")
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundStyle(Color.AuraLoopInk)
-
-                    Text(selectedTier == .lifetime
-                         ? "You have unlocked the Entire Wallpaper Library (300+ Wallpapers) with perpetual 4K 60fps access linked to your account."
-                         : "You have unlocked \(selectedTier.displayLimit) in master 4K 60fps quality linked to your account.")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.AuraLoopSecondary)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: 420)
-                }
-
-                Button {
-                    dismiss()
-                } label: {
-                    Text("Start Exploring")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 9)
-                        .background(
-                            LinearGradient(
-                                colors: [Color(hex: 0xF59E0B), Color(hex: 0xD97706)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .clipShape(Capsule())
-                        .shadow(color: Color(hex: 0xF59E0B).opacity(0.35), radius: 8, x: 0, y: 3)
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 8)
-                .pointingCursor()
-            }
-            .padding(32)
-        }
-    }
-
-    // MARK: - Actions
-
-    private func formatUTRInput(_ value: String) {
-        let filtered = value.filter { $0.isNumber }
-        let truncated = String(filtered.prefix(12))
-
-        // Group in 4s: 4281 9283 1092
-        var formatted = ""
-        for (i, char) in truncated.enumerated() {
-            if i > 0 && i % 4 == 0 {
-                formatted.append(" ")
-            }
-            formatted.append(char)
-        }
-
-        if formatted != utrInput {
-            utrInput = formatted
-        }
-        if truncated.count == 12 {
-            errorMessage = nil
-        }
-    }
-
-    private func copyUPI() {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(upiID, forType: .string)
-        withAnimation { copiedUPI = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            withAnimation { copiedUPI = false }
-        }
-    }
-
-    private func pasteFromClipboard() {
-        if let clipboard = NSPasteboard.general.string(forType: .string) {
-            formatUTRInput(clipboard)
-        }
-    }
-
-    private func verifyAndUnlock() {
-        guard auth.isAuthenticated else {
-            errorMessage = "Please sign in before activating Pro."
-            return
-        }
-
-        guard cleanUTR.count == 12 else {
-            errorMessage = "Please enter all 12 digits of your UTR number."
-            return
-        }
-
-        isVerifying = true
-        errorMessage = nil
-
-        // Simulate seamless verification delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            isVerifying = false
-            let result = store.verifyAndUnlockPro(utr: cleanUTR, tier: selectedTier)
-            if result.success {
-                NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .default)
-                withAnimation {
-                    isSuccess = true
-                }
-                // Automatically dismiss after celebration
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
-                    dismiss()
-                }
-            } else {
-                errorMessage = result.message
-            }
-        }
+        .padding(.vertical, 10)
     }
 }

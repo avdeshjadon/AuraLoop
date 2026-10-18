@@ -1,6 +1,24 @@
 import Foundation
 import SwiftUI
 import Combine
+import AppKit
+
+/// Deep-link helper to open the AuraLoop website with specific actions
+public enum AuraLoopWebLink {
+    public static var baseURL: String {
+        UserDefaults.standard.string(forKey: "auraloop_web_url") ?? "https://aura-loop.vercel.app"
+    }
+
+    public static func open(action: String? = nil) {
+        var str = baseURL
+        if let action {
+            str += (str.contains("?") ? "&" : "?") + "action=\(action)"
+        }
+        if let url = URL(string: str) {
+            NSWorkspace.shared.open(url)
+        }
+    }
+}
 
 /// Cloud-synced user metadata (Pro Tier, UTR verification, and Favorites)
 public struct CloudUserData: Codable {

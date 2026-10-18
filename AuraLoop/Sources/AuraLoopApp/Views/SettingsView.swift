@@ -6,7 +6,7 @@ struct SettingsView: View {
     @EnvironmentObject var store: AppStore
 
     @AppStorage("showMenuBarIcon") private var showMenuBarIcon = true
-    @AppStorage("showDockIcon") private var showDockIcon = true
+    @AppStorage("showDockIcon") private var showDockIcon = false
     @AppStorage("defaultMode") private var defaultMode = "smooth"
     @AppStorage(MenuBarIconStyle.defaultsKey) private var menuBarIcon = MenuBarIconStyle.standard.rawValue
 
@@ -72,13 +72,13 @@ struct SettingsView: View {
                     }
                     divider
                     row(icon: .dockIcon, title: "Show Dock Icon",
-                        subtitle: "Off keeps AuraLoop in the menu bar only") {
+                        subtitle: "Off keeps AuraLoop in the menu bar only (like Dynamic Wallpaper Engine)") {
                         Toggle("", isOn: $showDockIcon)
                             .toggleStyle(.switch)
                             .tint(Color.AuraLoopSwitch)
                             .labelsHidden()
                             .onChange(of: showDockIcon) { _, on in
-                                NSApp.setActivationPolicy(on ? .regular : .accessory)
+                                AuraLoopAppDelegate.applyActivationPolicy()
                                 NSApp.activate(ignoringOtherApps: true)
                             }
                     }
@@ -523,7 +523,7 @@ struct SettingsView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "person.fill")
                                 .font(.system(size: 11))
-                            Text("Sign In / Sign Up")
+                            Text("Sign In")
                                 .font(.system(size: 12, weight: .semibold))
                         }
                         .foregroundStyle(Color.AuraLoopOnInk)

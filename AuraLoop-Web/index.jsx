@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef, useState, useEffect } from 'react';
 import { MotionConfig } from 'motion/react';
 import '@fontsource-variable/geist';
 import '@fontsource-variable/geist-mono';
@@ -12,6 +12,7 @@ import Features from './components/Features.jsx';
 import Workflows from './components/Workflows.jsx';
 import Manifesto from './components/Manifesto.jsx';
 import Footer from './components/Footer.jsx';
+import AuthPage from './components/AuthPage.jsx';
 
 export default function AuraLoopWeb() {
   useSiteMeta({
@@ -24,6 +25,55 @@ export default function AuraLoopWeb() {
   });
 
   const rootRef = useRef(null);
+
+  // Page view state: 'home' | 'auth'
+  const [view, setView] = useState('home');
+  const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup' | 'account'
+
+  useEffect(() => {
+    const handleRoute = () => {
+      try {
+        const path = window.location.pathname.toLowerCase();
+        const params = new URLSearchParams(window.location.search);
+        const action = params.get('action');
+
+        if (path === '/login' || action === 'login' || action === 'signin') {
+          setAuthMode('signin');
+          setView('auth');
+        } else if (path === '/signup' || path === '/register' || action === 'signup' || action === 'register') {
+          setAuthMode('signup');
+          setView('auth');
+        } else if (path === '/account' || path === '/upgrade' || action === 'upgrade' || action === 'pro') {
+          setAuthMode('account');
+          setView('auth');
+        } else {
+          setView('home');
+        }
+      } catch {}
+    };
+
+    handleRoute();
+    window.addEventListener('popstate', handleRoute);
+    return () => window.removeEventListener('popstate', handleRoute);
+  }, []);
+
+  const navigateToAuth = (mode = 'signin') => {
+    setAuthMode(mode);
+    setView('auth');
+    try {
+      const path = mode === 'signup' ? '/signup' : mode === 'account' ? '/account' : '/login';
+      window.history.pushState(null, '', path);
+    } catch {}
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  };
+
+  const navigateToHome = () => {
+    setView('home');
+    try {
+      window.history.pushState(null, '', '/');
+    } catch {}
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  };
 
   // In-page anchors scroll smoothly via JS, so programmatic scrolling (tools, hash restore)
   // stays instant. The inline style is restored when the route unmounts.
@@ -50,6 +100,7 @@ export default function AuraLoopWeb() {
   // Section reveals. Hidden states are only ever set inside the motion-ok branch.
   useGSAP(
     () => {
+      if (view !== 'home') return;
       const mm = gsap.matchMedia();
       mm.add(MOTION_OK, () => {
         gsap.utils.toArray('[data-reveal]').forEach(el => {
@@ -63,13 +114,21 @@ export default function AuraLoopWeb() {
         });
       });
     },
-    { scope: rootRef }
+    { scope: rootRef, dependencies: [view] }
   );
+
+  if (view === 'auth') {
+    return (
+      <MotionConfig reducedMotion="user">
+        <AuthPage initialMode={authMode} onBackToHome={navigateToHome} />
+      </MotionConfig>
+    );
+  }
 
   return (
     <MotionConfig reducedMotion="user">
       <div className="ta" ref={rootRef} onClick={onAnchorClick}>
-        <Nav />
+        <Nav onOpenAuth={navigateToAuth} />
         <main id="main" tabIndex={-1}>
           <Hero />
           <PeopleSection />

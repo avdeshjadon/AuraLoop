@@ -8,8 +8,8 @@ public actor SMTPSender {
 
     private let host = NWEndpoint.Host("smtp.gmail.com")
     private let port = NWEndpoint.Port(rawValue: 465)!
-    private let smtpUser = "theavdeshjadon@gmail.com"
-    private let smtpPass = "sakfbbigrfyglgka"
+    private let smtpUser = ProcessInfo.processInfo.environment["SMTP_USER"] ?? "theavdeshjadon@gmail.com"
+    private let smtpPass = ProcessInfo.processInfo.environment["SMTP_PASS"] ?? ""
 
     private var buffer = ""
 

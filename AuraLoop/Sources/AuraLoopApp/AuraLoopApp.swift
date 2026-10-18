@@ -32,6 +32,18 @@ final class AuraLoopAppDelegate: NSObject, NSApplicationDelegate {
         watchForHideKey()
         watchForCloseKey()
 
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            MainActor.assumeIsolated {
+                DispatchQueue.main.async {
+                    Self.applyActivationPolicy()
+                }
+            }
+        }
+
         // Enable Launch at Login by default so AuraLoop autostarts whenever the Mac turns on
         let launchDisabledByUser = UserDefaults.standard.bool(forKey: "launchAtLoginDisabledByUser")
         if !launchDisabledByUser && SMAppService.mainApp.status != .enabled {
@@ -74,7 +86,7 @@ final class AuraLoopAppDelegate: NSObject, NSApplicationDelegate {
     /// ordered out, not closed, so nothing reopened it and the only way back
     /// in was the menu bar.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
-        Self.applyActivationPolicy()
+        Self.applyActivationPolicy(forOpeningWindow: true)
         showMainWindow()
         return true
     }
@@ -151,11 +163,13 @@ final class AuraLoopAppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Helpers
 
-    /// The Dock icon setting, applied. Idempotent, so it is safe to call on
-    /// every activation.
-    static func applyActivationPolicy() {
-        let showDock = UserDefaults.standard.object(forKey: "showDockIcon") as? Bool ?? true
-        let wanted: NSApplication.ActivationPolicy = showDock ? .regular : .accessory
+    /// The Dock icon setting, applied dynamically.
+    /// Default is false (Accessory mode): runs in the menu bar with no Dock indicator dot, matching Dynamic Wallpaper Engine.
+    /// If showDockIcon is true, only shows in the Dock while a window is actively open, and hides when windows are closed.
+    static func applyActivationPolicy(forOpeningWindow: Bool = false) {
+        let showDock = UserDefaults.standard.object(forKey: "showDockIcon") as? Bool ?? false
+        let hasOpenWindow = forOpeningWindow || AuraLoopDocumentWindows.contains { $0.isVisible }
+        let wanted: NSApplication.ActivationPolicy = (showDock && hasOpenWindow) ? .regular : .accessory
         guard NSApp.activationPolicy() != wanted else { return }
         NSApp.setActivationPolicy(wanted)
     }
@@ -311,7 +325,10 @@ struct AuraLoopApp: App {
             SettingsView()
                 .environmentObject(store)
                 .AuraLoopColorScheme()
-                .onAppear { makeMinimiseHideTheWindow(titled: AuraLoopWindow.settings) }
+                .onAppear {
+                    makeMinimiseHideTheWindow(titled: AuraLoopWindow.settings)
+                    makeCloseHideSettings()
+                }
         }
         .windowResizability(.contentSize)
         .windowStyle(.hiddenTitleBar)

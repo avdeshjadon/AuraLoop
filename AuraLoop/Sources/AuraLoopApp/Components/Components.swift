@@ -480,6 +480,7 @@ func showMainWindow() {
     // one place that has to call off a login start's suppression. Without it
     // the window would be put away again in front of them.
     GalleryLaunchSuppressor.shared.stop()
+    AuraLoopAppDelegate.applyActivationPolicy(forOpeningWindow: true)
     NSApp.activate(ignoringOtherApps: true)
 
     // The window does not always exist yet. SwiftUI builds a `Window` scene's
@@ -496,14 +497,17 @@ func showMainWindow() {
         // keyboard has to wait for it. `openWindow` has already put it in
         // front, this is only insurance.
         DispatchQueue.main.async {
+            AuraLoopAppDelegate.applyActivationPolicy(forOpeningWindow: true)
             if let window = mainWindow { GallerySize.openAtOpeningSize(window) }
             mainWindow?.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
         }
         return
     }
     // Only when it opens: a window already on screen keeps the size it has.
     if !window.isVisible { GallerySize.openAtOpeningSize(window) }
     window.makeKeyAndOrderFront(nil)
+    NSApp.activate(ignoringOtherApps: true)
 }
 
 /// The gallery opens at its smallest size every time, on any Mac and any
@@ -577,10 +581,22 @@ func makeCloseHideTheGallery() {
     button.action = #selector(WindowButtonTarget.putAwayGallery(_:))
 }
 
-/// Put the gallery away, for its red button and Command-W (keeps background wallpaper and audio running).
+/// Put the gallery away, for its red button and Command-W (keeps background wallpaper and audio running, and hides the Dock dot).
 @MainActor
 func putGalleryAway() {
     mainWindow?.orderOut(nil)
+    AuraLoopAppDelegate.applyActivationPolicy()
+    if !AuraLoopDocumentWindows.contains(where: { $0.isVisible }) {
+        NSApp.setActivationPolicy(.accessory)
+    }
+}
+
+/// Make the settings window's red button put it away rather than close the app.
+@MainActor
+func makeCloseHideSettings() {
+    guard let button = window(titled: AuraLoopWindow.settings)?.standardWindowButton(.closeButton) else { return }
+    button.target = WindowButtonTarget.shared
+    button.action = #selector(WindowButtonTarget.putAwaySettings(_:))
 }
 
 /// Owns the retargeted button action. A plain function cannot be a `#selector`
@@ -593,16 +609,33 @@ final class WindowButtonTarget: NSObject {
     /// serve every window rather than one per scene.
     @objc func hideWindow(_ sender: Any?) {
         (sender as? NSView)?.window?.orderOut(nil)
+        MainActor.assumeIsolated {
+            AuraLoopAppDelegate.applyActivationPolicy()
+            if !AuraLoopDocumentWindows.contains(where: { $0.isVisible }) {
+                NSApp.setActivationPolicy(.accessory)
+            }
+        }
     }
 
     /// Hide window so live wallpaper keeps running in background.
     @objc func quitFromRedButton(_ sender: Any?) {
-        (sender as? NSView)?.window?.orderOut(nil) ?? mainWindow?.orderOut(nil)
+        putGalleryAway()
     }
 
     /// The gallery's red button: puts away the window so wallpaper stays running in background.
     @objc func putAwayGallery(_ sender: Any?) {
-        (sender as? NSView)?.window?.orderOut(nil) ?? mainWindow?.orderOut(nil)
+        putGalleryAway()
+    }
+
+    /// The settings red button: puts away the settings window so wallpaper stays running in background.
+    @objc func putAwaySettings(_ sender: Any?) {
+        window(titled: AuraLoopWindow.settings)?.orderOut(nil)
+        MainActor.assumeIsolated {
+            AuraLoopAppDelegate.applyActivationPolicy()
+            if !AuraLoopDocumentWindows.contains(where: { $0.isVisible }) {
+                NSApp.setActivationPolicy(.accessory)
+            }
+        }
     }
 }
 
@@ -693,6 +726,7 @@ func openSettingsWindow() {
     // registers it at launch. Activate first: called from the menu bar panel,
     // which never activates the app, the window would open behind everything
     // else.
+    AuraLoopAppDelegate.applyActivationPolicy(forOpeningWindow: true)
     NSApp.activate(ignoringOtherApps: true)
     WindowOpener.shared.settings?()
     // Settings reopened wherever it was last used, so on a Mac with two

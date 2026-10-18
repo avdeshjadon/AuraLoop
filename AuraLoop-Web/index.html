@@ -7,6 +7,19 @@
     <title>AuraLoop — High-Performance Native Live Wallpapers &amp; Screensavers for macOS</title>
     <meta name="description" content="AuraLoop brings continuous 4K looping video wallpapers and native ExtensionKit lock screen synchronization to macOS with near-zero CPU overhead." />
     <meta name="theme-color" content="#eeeae4" />
+    <style>
+      *, *::before, *::after {
+        box-sizing: border-box;
+      }
+      html, body, #root {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        min-height: 100%;
+        background-color: #eeeae4;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
