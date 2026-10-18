@@ -1,52 +1,51 @@
 #!/usr/bin/env node
 
-/**
- * AuraLoop R2 Batch Wallpaper Uploader
- * 
- * Safely uploads the 8 wallpaper categories (1,582 files, ~42.5 GB) to Cloudflare R2
- * with multi-threading, correct MIME headers, cache headers, and auto-resume.
- * 
- * Destination in R2:
- * - Abstract/<file>
- * - Anime/<file>
- * - Cars/<file>
- * - Movies/<file>
- * - Nature/<file>
- * - Premium/<character>/<file>
- * - Sci-fi/<file>
- * - Video_Games/<file>
- */
-
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
+import { parseArgs } from 'node:util';
+import { header, section, info, ok, warn, error, plain, kv, table, list } from './lib/log.mjs';
+import { formatBytes, formatDuration } from './lib/format.mjs';
+import { confirm, installSignalHandlers, PromptCancelled } from './lib/prompt.mjs';
+import { ProgressBar } from './lib/progress.mjs';
+import { discoverLibrary, pickLibraryScope } from './lib/library.mjs';
+import { walkFiles, UPLOADABLE_EXTENSIONS, VIDEO_EXTENSIONS, IMAGE_EXTENSIONS } from './lib/scan.mjs';
+import { mapPool, withRetry } from './lib/async.mjs';
+import {
+  DEFAULT_BUCKET,
+  findWrangler,
+  createRestClient,
+  wranglerPut,
+} from './lib/r2.mjs';
 
-const execFileAsync = promisify(execFile);
-
-// Load .env automatically if present
 if (typeof process.loadEnvFile === 'function') {
   try {
     process.loadEnvFile();
   } catch {}
 }
 
-const BUCKET = 'auraloop-wallpapers';
-const ROOT_DIR = path.join(os.homedir(), 'Downloads', 'AuraLoop-Wallpapers');
-const STATE_FILE = path.join(path.dirname(new URL(import.meta.url).pathname), 'upload_progress.json');
-const CONCURRENCY = 3; // 3 parallel uploads
+const { values: args } = parseArgs({
+  options: {
+    dir: { type: 'string' },
+    bucket: { type: 'string' },
+    'dry-run': { type: 'boolean' },
+    help: { type: 'boolean', short: 'h' },
+  },
+  strict: true,
+});
 
-const CATEGORIES = [
-  'Abstract',
-  'Anime',
-  'Cars',
-  'Movies',
-  'Nature',
-  'Premium',
-  'Sci-fi',
-  'Video_Games'
-];
+if (args.help) {
+  plain('Usage: node scripts/upload_wallpapers_to_r2.mjs [--dir <library-path>] [--bucket <name>] [--dry-run]');
+  plain('');
+  plain('Uploads wallpaper files (.mp4/.mov/.jpg/.jpeg/.png/.webp) to Cloudflare R2 via wrangler,');
+  plain('with resume state, bounded concurrency, retries, and remote duplicate detection.');
+  process.exit(0);
+}
+
+installSignalHandlers();
+
+const BUCKET = args.bucket ?? DEFAULT_BUCKET;
+const STATE_FILE = path.join(path.dirname(new URL(import.meta.url).pathname), 'upload_progress.json');
+const CONCURRENCY = 3;
 
 const MIME_MAP = {
   '.mp4': 'video/mp4',
@@ -54,7 +53,7 @@ const MIME_MAP = {
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.png': 'image/png',
-  '.webp': 'image/webp'
+  '.webp': 'image/webp',
 };
 
 function loadState() {
@@ -72,177 +71,241 @@ function saveState(state) {
   try {
     fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2), 'utf-8');
   } catch (err) {
-    console.error('Warning: could not save state file:', err.message);
+    warn(`Could not save state file: ${err.message}`);
   }
 }
 
-function collectFiles(dir, rel = '') {
-  const result = [];
-  const entries = fs.readdirSync(dir);
-
-  for (const entry of entries) {
-    if (entry.startsWith('.')) continue; // skip .DS_Store
-    const full = path.join(dir, entry);
-    const itemRel = rel ? `${rel}/${entry}` : entry;
-    const stat = fs.statSync(full);
-
-    if (stat.isDirectory()) {
-      result.push(...collectFiles(full, itemRel));
-    } else {
-      const ext = path.extname(entry).toLowerCase();
-      if (MIME_MAP[ext]) {
-        result.push({
-          fullPath: full,
-          relPath: itemRel,
-          size: stat.size,
-          ext
-        });
-      }
-    }
+function objectKeyFor(file, root, scopePath) {
+  const relFromRoot = path.relative(root, file.absPath);
+  if (!relFromRoot.startsWith('..') && !path.isAbsolute(relFromRoot)) {
+    return relFromRoot.split(path.sep).join('/');
   }
-
-  return result;
-}
-
-function formatBytes(bytes) {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-async function uploadFile(item, retries = 3) {
-  const r2Key = `${BUCKET}/${item.relPath}`;
-  const contentType = MIME_MAP[item.ext] || 'application/octet-stream';
-  const cacheControl = 'public, max-age=31536000, immutable';
-
-  const args = [
-    'r2', 'object', 'put',
-    r2Key,
-    '--file', item.fullPath,
-    '--remote',
-    '--content-type', contentType,
-    '--cache-control', cacheControl
-  ];
-
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      await execFileAsync('/usr/local/bin/wrangler', args, {
-        maxBuffer: 50 * 1024 * 1024,
-        timeout: 300000, // 5 minutes timeout
-        env: process.env
-      });
-      return;
-    } catch (err) {
-      if (attempt === retries) throw err;
-      const firstLine = (err.stderr || err.message || '').split('\n').filter(Boolean)[0] || 'Unknown error';
-      console.log(`⚠️  Upload glitch on ${item.relPath} (${attempt}/${retries}): ${firstLine}. Retrying in ${attempt * 2}s...`);
-      await new Promise(r => setTimeout(r, attempt * 2000));
-    }
-  }
+  const relFromScope = path.relative(scopePath, file.absPath);
+  return relFromScope.split(path.sep).join('/');
 }
 
 async function main() {
-  console.log('\n==========================================================');
-  console.log('       AuraLoop Cloudflare R2 Safe Wallpaper Uploader     ');
-  console.log('==========================================================\n');
-  console.log(`📁 Source: ${ROOT_DIR}`);
-  console.log(`🪣 Bucket: ${BUCKET}`);
-  console.log(`⚡ Concurrency: ${CONCURRENCY} parallel uploads\n`);
+  header('AuraLoop Cloudflare R2 Wallpaper Uploader');
 
-  if (!fs.existsSync(ROOT_DIR)) {
-    console.error(`❌ Source folder not found: ${ROOT_DIR}`);
+  const wranglerBin = findWrangler();
+  if (!wranglerBin) {
+    error('wrangler CLI not found. Install it with: npm install -g wrangler');
     process.exit(1);
   }
-
-  // Scan all categories
-  const allFiles = [];
-  for (const cat of CATEGORIES) {
-    const catDir = path.join(ROOT_DIR, cat);
-    if (fs.existsSync(catDir)) {
-      const catFiles = collectFiles(catDir, cat);
-      allFiles.push(...catFiles);
-    }
+  info(`wrangler: ${wranglerBin}`);
+  kv('Bucket', BUCKET);
+  kv('Concurrency', String(CONCURRENCY));
+  if (args['dry-run']) {
+    warn('Dry-run mode: no files will be uploaded.');
   }
 
-  const totalBytes = allFiles.reduce((sum, f) => sum + f.size, 0);
-  console.log(`🎬 Found ${allFiles.length} files to sync (${formatBytes(totalBytes)})\n`);
+  const { root } = await discoverLibrary({ overridePath: args.dir });
+  const scope = await pickLibraryScope(root, {
+    promptLabel: 'What would you like to upload?',
+  });
+  info(`Scope: ${scope.label}`);
+
+  const { files, errors } = await walkFiles(scope.path, { extensions: UPLOADABLE_EXTENSIONS });
+  if (errors.length > 0) {
+    warn(`${errors.length} locations could not be read (skipped).`);
+  }
+  if (files.length === 0) {
+    warn('No uploadable files (.mp4, .mov, .jpg, .jpeg, .png, .webp) found in scope.');
+    return;
+  }
+
+  const items = files.map((file) => ({
+    ...file,
+    key: objectKeyFor(file, root, scope.path),
+    contentType: MIME_MAP[file.ext] ?? 'application/octet-stream',
+  }));
+
+  const totalBytes = items.reduce((sum, item) => sum + item.size, 0);
+  const videoCount = items.filter((i) => VIDEO_EXTENSIONS.has(i.ext)).length;
+  const imageCount = items.filter((i) => IMAGE_EXTENSIONS.has(i.ext)).length;
+  section('Scan results');
+  kv('Files', `${items.length} (${formatBytes(totalBytes)})`);
+  kv('Videos', String(videoCount));
+  kv('Images', String(imageCount));
 
   const state = loadState();
-  const queue = [];
-  let alreadyUploadedBytes = 0;
+  const rest = await createRestClient();
 
-  for (const item of allFiles) {
-    if (state[item.relPath] && state[item.relPath].status === 'completed' && state[item.relPath].size === item.size) {
-      alreadyUploadedBytes += item.size;
-    } else {
-      queue.push(item);
+  let remoteSizes = null;
+  if (rest) {
+    try {
+      info('Fetching remote object inventory for duplicate detection...');
+      remoteSizes = new Map();
+      for await (const object of rest.iterateObjects(BUCKET, { perPage: 1000 })) {
+        remoteSizes.set(object.key, object.size);
+      }
+      info(`Remote inventory: ${remoteSizes.size} objects.`);
+    } catch (err) {
+      warn(`Remote inventory unavailable (${err.message}); falling back to local state only.`);
+      remoteSizes = null;
     }
+  } else {
+    info('No REST API credentials available; duplicate detection uses the local state file only.');
   }
 
-  const alreadyCount = allFiles.length - queue.length;
-  console.log(`⏮️  Already uploaded: ${alreadyCount} files (${formatBytes(alreadyUploadedBytes)})`);
-  console.log(`📤 Queue remaining: ${queue.length} files (${formatBytes(totalBytes - alreadyUploadedBytes)})\n`);
+  const queue = [];
+  const stateSkips = [];
+  const remoteSkips = [];
+  const overwrites = [];
+
+  for (const item of items) {
+    const stateEntry = state[item.key];
+    if (stateEntry && stateEntry.status === 'completed' && stateEntry.size === item.size) {
+      stateSkips.push(item);
+      continue;
+    }
+    if (remoteSizes && remoteSizes.has(item.key)) {
+      if (remoteSizes.get(item.key) === item.size) {
+        remoteSkips.push(item);
+        continue;
+      }
+      overwrites.push(item);
+      continue;
+    }
+    queue.push(item);
+  }
+
+  section('Upload plan');
+  kv('Already uploaded (local state)', `${stateSkips.length} files (${formatBytes(stateSkips.reduce((s, i) => s + i.size, 0))})`);
+  kv('Already on R2 (size verified)', `${remoteSkips.length} files (${formatBytes(remoteSkips.reduce((s, i) => s + i.size, 0))})`);
+  kv('New uploads', `${queue.length} files (${formatBytes(queue.reduce((s, i) => s + i.size, 0))})`);
+  kv('Exist with different size', `${overwrites.length} files (${formatBytes(overwrites.reduce((s, i) => s + i.size, 0))})`);
+
+  if (overwrites.length > 0) {
+    plain('');
+    list(overwrites.slice(0, 10).map((i) => `${i.key} (local ${formatBytes(i.size)} vs remote ${formatBytes(remoteSizes.get(i.key))})`));
+    if (overwrites.length > 10) plain(`    ... and ${overwrites.length - 10} more`);
+    const overwriteOk = await confirm(
+      `${overwrites.length} objects exist on R2 with different sizes. Re-upload and overwrite them?`,
+      { def: false },
+    );
+    if (!overwriteOk) {
+      info('Different-sized objects will be skipped.');
+    } else {
+      queue.push(...overwrites);
+    }
+  }
 
   if (queue.length === 0) {
-    console.log('🎉 All files are already uploaded to Cloudflare R2!');
-    process.exit(0);
+    ok('Everything in scope is already uploaded.');
+    return;
   }
 
-  let completedCount = alreadyCount;
-  let uploadedBytes = alreadyUploadedBytes;
-  let failedCount = 0;
-  const startTime = Date.now();
+  if (args['dry-run']) {
+    section('Dry-run preview (no uploads performed)');
+    table([['Object key', 'Size'], ...queue.slice(0, 20).map((i) => [i.key, formatBytes(i.size)])]);
+    if (queue.length > 20) plain(`    ... and ${queue.length - 20} more`);
+    kv('Total that would be uploaded', `${queue.length} files (${formatBytes(queue.reduce((s, i) => s + i.size, 0))})`);
+    return;
+  }
 
-  async function worker() {
-    while (queue.length > 0) {
-      const item = queue.shift();
-      if (!item) break;
+  if (!(await confirm(`Upload ${queue.length} files (${formatBytes(queue.reduce((s, i) => s + i.size, 0))}) to bucket "${BUCKET}"?`, { def: true }))) {
+    info('Cancelled. No files were uploaded.');
+    return;
+  }
 
-      const fileStart = Date.now();
-      const currentNum = completedCount + 1;
-      const progressPct = ((currentNum / allFiles.length) * 100).toFixed(1);
-      const sizeStr = formatBytes(item.size);
+  const controller = new AbortController();
+  let interrupting = false;
+  process.on('SIGINT', () => {
+    if (interrupting) process.exit(130);
+    interrupting = true;
+    warn('Interrupt received; workers will stop after the current upload...');
+    controller.abort();
+  });
 
-      console.log(`[${currentNum}/${allFiles.length}] (${progressPct}%) ⏳ Uploading: ${item.relPath} (${sizeStr})...`);
+  const queueBytes = queue.reduce((s, i) => s + i.size, 0);
+  const bar = new ProgressBar({ total: queueBytes, label: 'Starting...' });
+  const startedAt = Date.now();
+  let uploadedCount = 0;
+  let uploadedBytes = 0;
+  const failures = [];
+  let currentLabel = '';
 
+  const workQueue = [...queue];
+  const { errors: uploadErrors } = await mapPool(workQueue, CONCURRENCY, async (item) => {
+    if (controller.signal.aborted) throw new Error('Aborted.');
+    currentLabel = `Uploading ${item.key} (${formatBytes(item.size)})`;
+    bar.update({
+      label: currentLabel,
+      countText: countText(),
+    });
+
+    await withRetry(async (attempt) => {
       try {
-        await uploadFile(item);
-        const elapsedSec = ((Date.now() - fileStart) / 1000).toFixed(1);
-
-        completedCount++;
-        uploadedBytes += item.size;
-
-        state[item.relPath] = {
-          status: 'completed',
-          size: item.size,
-          uploadedAt: new Date().toISOString()
-        };
-        saveState(state);
-
-        console.log(`[${completedCount}/${allFiles.length}] (${progressPct}%) ✅ Uploaded: ${item.relPath} in ${elapsedSec}s`);
+        await wranglerPut(BUCKET, {
+          key: item.key,
+          filePath: item.absPath,
+          contentType: item.contentType,
+          cacheControl: 'public, max-age=31536000, immutable',
+          signal: controller.signal,
+        });
       } catch (err) {
-        failedCount++;
-        console.error(`❌ Error uploading ${item.relPath}:`, err.message);
+        if (attempt >= 3) throw err;
+        warn(`Upload glitch on ${item.key} (attempt ${attempt}/3): ${err.message.split('\n')[0]}`);
+        throw err;
       }
-    }
+    }, { retries: 3, baseDelayMs: 2000, signal: controller.signal });
+
+    uploadedCount += 1;
+    uploadedBytes += item.size;
+    state[item.key] = {
+      status: 'completed',
+      size: item.size,
+      uploadedAt: new Date().toISOString(),
+    };
+    saveState(state);
+    bar.update({
+      completed: uploadedBytes,
+      countText: countText(),
+      label: `Uploaded ${item.key}`,
+    });
+  });
+
+  function countText() {
+    const elapsed = (Date.now() - startedAt) / 1000;
+    const speed = elapsed > 0 ? uploadedBytes / elapsed : 0;
+    const remaining = Math.max(queueBytes - uploadedBytes, 0);
+    const eta = speed > 0 ? formatDuration(remaining / speed) : 'Calculating...';
+    return `${uploadedCount}/${queue.length} files | ${formatBytes(uploadedBytes)} / ${formatBytes(queueBytes)} | ${formatBytes(Math.round(speed))}/s | ETA ${eta}`;
   }
 
-  const workers = Array.from({ length: CONCURRENCY }, () => worker());
-  await Promise.all(workers);
+  for (const { item, error: err } of uploadErrors) {
+    if (controller.signal.aborted && err.message === 'Aborted.') continue;
+    failures.push({ key: item.key, reason: err.message });
+  }
 
-  const totalTimeSec = ((Date.now() - startTime) / 1000).toFixed(1);
+  const elapsed = (Date.now() - startedAt) / 1000;
+  bar.finish();
 
-  console.log('\n==========================================================');
-  console.log('                 Upload Process Finished                  ');
-  console.log('==========================================================');
-  console.log(`⏱️  Duration:        ${totalTimeSec}s`);
-  console.log(`✅ Uploaded:        ${completedCount - alreadyCount} files`);
-  console.log(`⏮️  Already Existed: ${alreadyCount} files`);
-  console.log(`❌ Failed:          ${failedCount} files`);
-  console.log(`💾 Total Uploaded:  ${formatBytes(uploadedBytes)}`);
-  console.log('==========================================================\n');
+  section('Upload summary');
+  kv('Duration', formatDuration(elapsed));
+  kv('Uploaded', `${uploadedCount} files (${formatBytes(uploadedBytes)})`);
+  kv('Skipped (local state)', `${stateSkips.length} files`);
+  kv('Skipped (verified on R2)', `${remoteSkips.length} files`);
+  kv('Failed', `${failures.length} files`);
+  if (elapsed > 0 && uploadedBytes > 0) {
+    kv('Average speed', `${formatBytes(Math.round(uploadedBytes / elapsed))}/s`);
+  }
+  if (failures.length > 0) {
+    plain('');
+    error('Failed uploads:');
+    list(failures.map((f) => `${f.key} - ${f.reason.split('\n')[0]}`));
+    process.exitCode = 1;
+  }
+  plain('');
 }
 
-main();
+main().catch((err) => {
+  if (err instanceof PromptCancelled) {
+    process.stdout.write('\n');
+    info(err.message);
+    process.exit(130);
+  }
+  error(err.message);
+  process.exit(1);
+});

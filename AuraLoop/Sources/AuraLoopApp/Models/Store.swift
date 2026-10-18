@@ -949,7 +949,7 @@ final class AppStore: ObservableObject {
     /// be caught by somebody else's block. The r2.dev endpoint stays enabled
     /// on the bucket permanently for installs that never update.
     static let defaultCatalogURL =
-        "https://cdn.murowallpaper.com/catalog.json"
+        "https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/catalog.json"
 
     /// Former defaults. An install that still has one of these stored gets
     /// migrated to `defaultCatalogURL`; anything else is treated as a
@@ -957,6 +957,7 @@ final class AppStore: ObservableObject {
     /// new default, so a URL retired without being listed here would keep
     /// every existing install on the old host for good.
     static let retiredCatalogURLs = [
+        "https://cdn.murowallpaper.com/catalog.json",
         "https://cdn.AuraLoopwallpaper.com/catalog.json",
         "https://raw.githubusercontent.com/AvdeshJadon/AuraLoop/main/catalog.json",
         "https://raw.githubusercontent.com/AvdeshJadon/AuraLoop-Wallpapers/main/catalog.json",

@@ -13,7 +13,7 @@ export const FEATURED_WALLPAPERS = [
     duration: '0:02',
     size: '2 MB',
     fps: 25,
-    thumb: 'https://cdn.murowallpaper.com/thumbs/0c68cfdf-0de9-4629-a8a6-51fd6d72ee92.jpg',
+    thumb: 'https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/Nature/Waterfall_Behind_the_Pines_thumb.jpg',
   },
   {
     id: '7f22ad52-9228-4de9-aa57-c15e93ed619e',
@@ -23,7 +23,7 @@ export const FEATURED_WALLPAPERS = [
     duration: '0:21',
     size: '40 MB',
     fps: 30,
-    thumb: 'https://cdn.murowallpaper.com/thumbs/7f22ad52-9228-4de9-aa57-c15e93ed619e.jpg',
+    thumb: 'https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/Nature/Moonlit_Shore_thumb.jpg',
   },
   {
     id: 'e4163448-3c37-4b25-bd12-a881af70bed4',
@@ -33,7 +33,7 @@ export const FEATURED_WALLPAPERS = [
     duration: '0:30',
     size: '55 MB',
     fps: 25,
-    thumb: 'https://cdn.murowallpaper.com/thumbs/e4163448-3c37-4b25-bd12-a881af70bed4.jpg',
+    thumb: 'https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/Nature/Aurora_Lake_thumb.jpg',
   },
   {
     id: '27413b79-8ee3-4c29-ab50-9f7fb9943289',
@@ -43,7 +43,7 @@ export const FEATURED_WALLPAPERS = [
     duration: '0:30',
     size: '119 MB',
     fps: 30,
-    thumb: 'https://cdn.murowallpaper.com/thumbs/27413b79-8ee3-4c29-ab50-9f7fb9943289.jpg',
+    thumb: 'https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/Nature/Moonlight_Lake_thumb.jpg',
   },
   {
     id: 'b09bb416-5cb6-4607-b611-c85a5e3edf15',
@@ -53,7 +53,7 @@ export const FEATURED_WALLPAPERS = [
     duration: '0:30',
     size: '31 MB',
     fps: 30,
-    thumb: 'https://cdn.murowallpaper.com/thumbs/b09bb416-5cb6-4607-b611-c85a5e3edf15.jpg',
+    thumb: 'https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/Nature/Sakura_Light_thumb.jpg',
   },
   {
     id: '77d3b04d-2d42-4870-9ef1-738b9faed0fb',
@@ -63,7 +63,7 @@ export const FEATURED_WALLPAPERS = [
     duration: '0:18',
     size: '88 MB',
     fps: 30,
-    thumb: 'https://cdn.murowallpaper.com/thumbs/77d3b04d-2d42-4870-9ef1-738b9faed0fb.jpg',
+    thumb: 'https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/Nature/Comet_Night_thumb.jpg',
   },
   {
     id: '4b24a85f-6aa4-4bde-b446-eec9e24f2d71',
@@ -73,7 +73,7 @@ export const FEATURED_WALLPAPERS = [
     duration: '0:50',
     size: '193 MB',
     fps: 37,
-    thumb: 'https://cdn.murowallpaper.com/thumbs/4b24a85f-6aa4-4bde-b446-eec9e24f2d71.jpg',
+    thumb: 'https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/Nature/Jungle_Fireplace_Porch_thumb.jpg',
   },
   {
     id: '6fe051c0-67f6-4593-ac90-2f21ac715ee9',
@@ -83,7 +83,7 @@ export const FEATURED_WALLPAPERS = [
     duration: '0:27',
     size: '50 MB',
     fps: 30,
-    thumb: 'https://cdn.murowallpaper.com/thumbs/6fe051c0-67f6-4593-ac90-2f21ac715ee9.jpg',
+    thumb: 'https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/Nature/Night_Shore_thumb.jpg',
   },
   {
     id: '60679567-7008-4f7b-81c3-7369f3e9871d',
@@ -93,7 +93,7 @@ export const FEATURED_WALLPAPERS = [
     duration: '0:27',
     size: '186 MB',
     fps: 60,
-    thumb: 'https://cdn.murowallpaper.com/thumbs/60679567-7008-4f7b-81c3-7369f3e9871d.jpg',
+    thumb: 'https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/Nature/Flight_Over_Snowy_Peaks_thumb.jpg',
   },
   {
     id: 'df6d9998-abe2-47f6-9c59-724d541228a4',
@@ -103,7 +103,7 @@ export const FEATURED_WALLPAPERS = [
     duration: '0:23',
     size: '26 MB',
     fps: 60,
-    thumb: 'https://cdn.murowallpaper.com/thumbs/df6d9998-abe2-47f6-9c59-724d541228a4.jpg',
+    thumb: 'https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/Nature/Milky_Way_Over_Fuji_thumb.jpg',
   },
 ];
 
@@ -118,7 +118,7 @@ export const NEW_WALLPAPERS = [
       res: '3840×2160',
       duration: '0:16',
       size: '41 MB',
-      thumb: 'https://cdn.murowallpaper.com/thumbs/1879b526-bec4-4a56-951c-c34abc7ef6ae.jpg',
+      thumb: 'https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/Anime/Zenitsu_Agatsuma_(Demon_Slayer)_thumb.jpg',
     },
     {
       id: '4378ed93-d644-41f3-8624-19c5c2e14e20',
@@ -128,7 +128,7 @@ export const NEW_WALLPAPERS = [
       res: '3840×2160',
       duration: '0:05',
       size: '9 MB',
-      thumb: 'https://cdn.murowallpaper.com/thumbs/4378ed93-d644-41f3-8624-19c5c2e14e20.jpg',
+      thumb: 'https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/Video_Games/Ghost_Face_(Dead_by_Daylight)_thumb.jpg',
     },
     {
       id: '21ed9728-6eeb-4c06-b108-5ffe5748a473',
@@ -138,7 +138,7 @@ export const NEW_WALLPAPERS = [
       res: '3840×2160',
       duration: '0:05',
       size: '18 MB',
-      thumb: 'https://cdn.murowallpaper.com/thumbs/21ed9728-6eeb-4c06-b108-5ffe5748a473.jpg',
+      thumb: 'https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/Cars/Lamborghini_Revuelto_thumb.jpg',
     },
   ],
   [
@@ -150,7 +150,7 @@ export const NEW_WALLPAPERS = [
       res: '3840×2160',
       duration: '0:22',
       size: '80 MB',
-      thumb: 'https://cdn.murowallpaper.com/thumbs/a26bb5af-f9e4-48b1-806f-dd9a498c6e81.jpg',
+      thumb: 'https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/Nature/Watercolor_Island_thumb.jpg',
     },
     {
       id: '311953c1-eec1-47e7-af4d-4d7b600626fc',
@@ -160,7 +160,7 @@ export const NEW_WALLPAPERS = [
       res: '3840×2160',
       duration: '0:10',
       size: '25 MB',
-      thumb: 'https://cdn.murowallpaper.com/thumbs/311953c1-eec1-47e7-af4d-4d7b600626fc.jpg',
+      thumb: 'https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/Sci-fi/Cyberpunk_Soldiers_thumb.jpg',
     },
     {
       id: '7eff1a50-72fc-4e04-9a7f-37ba36a04a22',
@@ -170,7 +170,7 @@ export const NEW_WALLPAPERS = [
       res: '3840×2160',
       duration: '0:08',
       size: '19 MB',
-      thumb: 'https://cdn.murowallpaper.com/thumbs/7eff1a50-72fc-4e04-9a7f-37ba36a04a22.jpg',
+      thumb: 'https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/Movies/Murder_Drones_thumb.jpg',
     },
   ],
 ];
@@ -186,7 +186,7 @@ export const PICKS_WALLPAPERS = [
       res: '3840×2160',
       duration: '0:14',
       size: '34 MB',
-      thumb: 'https://cdn.murowallpaper.com/thumbs/a7b055f8-2fce-4cff-8220-11768ac3307d.jpg',
+      thumb: 'https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/Video_Games/Simon_Riley_(Call_of_Duty)_thumb.jpg',
     },
     {
       id: 'c6a5c560-f510-40f4-b189-f95707432d3f',
@@ -196,7 +196,7 @@ export const PICKS_WALLPAPERS = [
       res: '3840×2160',
       duration: '0:10',
       size: '28 MB',
-      thumb: 'https://cdn.murowallpaper.com/thumbs/c6a5c560-f510-40f4-b189-f95707432d3f.jpg',
+      thumb: 'https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/Anime/Supra_Nights_thumb.jpg',
     },
     {
       id: '78ae0a32-1980-4302-a073-77ee2fc6581c',
@@ -206,7 +206,7 @@ export const PICKS_WALLPAPERS = [
       res: '3840×2160',
       duration: '0:12',
       size: '22 MB',
-      thumb: 'https://cdn.murowallpaper.com/thumbs/78ae0a32-1980-4302-a073-77ee2fc6581c.jpg',
+      thumb: 'https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/Movies/Silver_Surfer_in_Deep_Space_thumb.jpg',
     },
   ],
   [
@@ -218,7 +218,7 @@ export const PICKS_WALLPAPERS = [
       res: '3840×2160',
       duration: '0:18',
       size: '64 MB',
-      thumb: 'https://cdn.murowallpaper.com/thumbs/a9193ba6-eb4b-4937-9de6-62de88071850.jpg',
+      thumb: 'https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/Abstract/Pixelwave_Horizon_thumb.jpg',
     },
     {
       id: '6bdd2301-fc78-43fd-b4ce-40725de2d07f',
@@ -228,7 +228,7 @@ export const PICKS_WALLPAPERS = [
       res: '3840×2160',
       duration: '0:24',
       size: '93 MB',
-      thumb: 'https://cdn.murowallpaper.com/thumbs/6bdd2301-fc78-43fd-b4ce-40725de2d07f.jpg',
+      thumb: 'https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/Anime/Naruto_Uzumaki_(Naruto)_thumb.jpg',
     },
     {
       id: '7ce30b4b-bbe5-4655-a4c9-30b6ed6dacd9',
@@ -238,7 +238,8 @@ export const PICKS_WALLPAPERS = [
       res: '3840×2160',
       duration: '0:15',
       size: '42 MB',
-      thumb: 'https://cdn.murowallpaper.com/thumbs/7ce30b4b-bbe5-4655-a4c9-30b6ed6dacd9.jpg',
+      thumb:
+        "https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/Video_Games/Symbiote_Spider-Man_(Marvel's_Spider-Man_2)_thumb.jpg",
     },
   ],
 ];
@@ -316,9 +317,15 @@ export default function InboxWindow({ inbox, regionRef }) {
   };
 
   // Filter explore catalog
-  const exploreList = EXPLORE_DATA.filter(
-    item => exploreCategory === 'All' || item.category === exploreCategory
-  );
+  const exploreList = EXPLORE_DATA.filter(item => {
+    if (exploreCategory === 'Premium') {
+      return item.category === 'Premium';
+    }
+    if (exploreCategory === 'All') {
+      return item.category !== 'Premium';
+    }
+    return item.category === exploreCategory;
+  });
 
   // Filter favorites catalog
   const favoriteItems = allKnown.filter(item => likedMap[item.id]);
@@ -1100,47 +1107,102 @@ export default function InboxWindow({ inbox, regionRef }) {
         {/* ================= TAB 2: EXPLORE ================= */}
         {activeTab === 'explore' && (
           <div style={{ padding: '80px 44px 44px' }}>
-            {/* Category Segmented Pills */}
+            {/* Category Segmented Pills + Separate Oval Premium Pill */}
             <div
               style={{
                 display: 'flex',
-                gap: 8,
+                alignItems: 'center',
+                gap: 12,
                 overflowX: 'auto',
-                paddingBottom: 20,
+                paddingBottom: 22,
                 scrollbarWidth: 'none',
               }}
             >
-              {['All', 'Anime', 'Nature', 'Cars', 'Video Games', 'Sci-fi', 'Abstract', 'Movies'].map(cat => {
-                const on = exploreCategory === cat;
-                return (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setExploreCategory(cat)}
-                    style={{
-                      borderRadius: 999,
-                      padding: '8px 18px',
-                      fontSize: '13px',
-                      fontWeight: on ? 600 : 500,
-                      cursor: 'pointer',
-                      color: on ? '#0c0f14' : 'rgba(255, 255, 255, 0.75)',
-                      background: on ? '#ffffff' : 'rgba(255, 255, 255, 0.08)',
-                      border: on ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
-                      boxShadow: on ? '0 2px 10px rgba(0,0,0,0.3)' : 'none',
-                      whiteSpace: 'nowrap',
-                      transition: 'all 0.2s',
-                    }}
-                  >
-                    {cat}
-                  </button>
-                );
-              })}
+              {/* Main Categories Segmented Oval */}
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  padding: '3px 4px',
+                  borderRadius: 999,
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  backdropFilter: 'blur(16px)',
+                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 12px rgba(0,0,0,0.25)',
+                }}
+              >
+                {['All', 'Anime', 'Nature', 'Cars', 'Video Games', 'Sci-fi', 'Abstract', 'Movies'].map(cat => {
+                  const on = exploreCategory === cat;
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setExploreCategory(cat)}
+                      style={{
+                        border: 'none',
+                        borderRadius: 999,
+                        padding: '6px 16px',
+                        fontSize: '12.5px',
+                        fontWeight: on ? 600 : 500,
+                        cursor: 'pointer',
+                        color: on ? '#0c0f14' : 'rgba(255, 255, 255, 0.72)',
+                        background: on ? '#ffffff' : 'transparent',
+                        boxShadow: on ? '0 2px 8px rgba(0,0,0,0.25)' : 'none',
+                        whiteSpace: 'nowrap',
+                        transition: 'all 0.2s cubic-bezier(0.2, 0.7, 0.2, 1)',
+                      }}
+                    >
+                      {cat}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Dedicated Oval Shaped Div for Premium */}
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '3px 4px',
+                  borderRadius: 999,
+                  background: exploreCategory === 'Premium' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.08)',
+                  border: exploreCategory === 'Premium' ? '1px solid rgba(255, 255, 255, 0.28)' : '1px solid rgba(255, 255, 255, 0.12)',
+                  backdropFilter: 'blur(16px)',
+                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 12px rgba(0,0,0,0.25)',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setExploreCategory(prev => prev === 'Premium' ? 'All' : 'Premium')}
+                  style={{
+                    border: 'none',
+                    borderRadius: 999,
+                    padding: '6px 18px',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    color: exploreCategory === 'Premium' ? '#0c0f14' : 'rgba(255, 255, 255, 0.88)',
+                    background: exploreCategory === 'Premium' ? '#ffffff' : 'transparent',
+                    boxShadow: exploreCategory === 'Premium' ? '0 2px 8px rgba(0,0,0,0.25)' : 'none',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.2s cubic-bezier(0.2, 0.7, 0.2, 1)',
+                  }}
+                >
+                  <span style={{ fontSize: '11px', color: exploreCategory === 'Premium' ? '#0c0f14' : '#e2b34a' }}>✦</span>
+                  <span>Premium</span>
+                </button>
+              </div>
             </div>
 
             {/* Explore Grid: 3 columns */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18 }}>
               {exploreList.map(item => {
                 const isLiked = !!likedMap[item.id];
+                const isItemPremium = item.category === 'Premium';
                 return (
                   <div
                     key={item.id}
@@ -1154,12 +1216,12 @@ export default function InboxWindow({ inbox, regionRef }) {
                       borderRadius: 14,
                       overflow: 'hidden',
                       position: 'relative',
-                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      border: isItemPremium ? '1px solid rgba(226, 179, 74, 0.35)' : '1px solid rgba(255, 255, 255, 0.12)',
                       backgroundImage: `url(${item.thumb})`,
                       backgroundSize: 'cover',
                       backgroundPosition: 'center',
                       cursor: 'pointer',
-                      boxShadow: '0 6px 18px rgba(0,0,0,0.3)',
+                      boxShadow: isItemPremium ? '0 6px 20px rgba(0,0,0,0.4), 0 0 15px rgba(226, 179, 74, 0.1)' : '0 6px 18px rgba(0,0,0,0.3)',
                     }}
                   >
                     <div
@@ -1169,6 +1231,30 @@ export default function InboxWindow({ inbox, regionRef }) {
                         background: 'linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.75) 100%)',
                       }}
                     />
+                    {isItemPremium && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 10,
+                          left: 10,
+                          padding: '3px 8px',
+                          borderRadius: 999,
+                          background: 'rgba(0, 0, 0, 0.75)',
+                          border: '1px solid rgba(226, 179, 74, 0.45)',
+                          color: '#e2b34a',
+                          fontSize: '10.5px',
+                          fontWeight: 700,
+                          letterSpacing: '0.04em',
+                          backdropFilter: 'blur(8px)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        <span>✦</span>
+                        <span>PRO</span>
+                      </div>
+                    )}
                     <button
                       type="button"
                       onClick={e => toggleFavorite(item.id, e)}

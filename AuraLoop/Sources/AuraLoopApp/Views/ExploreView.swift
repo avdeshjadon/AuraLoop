@@ -44,7 +44,13 @@ struct ExploreView: View {
     /// replacing it, so a fresh batch is at the top of Cars as well as of All.
     private var filtered: [WallpaperItem] {
         store.exploreItems.filter { item in
-            if category != "All", item.category != category { return false }
+            if category == "Premium" {
+                if !item.isPremium && !item.category.localizedCaseInsensitiveContains("premium") { return false }
+            } else if category == "All" {
+                if item.isPremium || item.category.localizedCaseInsensitiveContains("premium") { return false }
+            } else {
+                if item.category != category || item.isPremium { return false }
+            }
             if resolution != "All", item.resolutionLabel != resolution { return false }
             if fps != "All", "\(standardFrameRate(item.fps))" != fps { return false }
             if !store.searchText.isEmpty,
@@ -111,21 +117,22 @@ struct ExploreView: View {
         // A category the catalog no longer has would leave the page filtered
         // to nothing, with no lit segment to say why.
         .onChange(of: store.categories) { _, list in
-            if category != "All", !list.contains(category) { category = "All" }
+            if category != "All" && category != "Premium", !list.contains(category) { category = "All" }
         }
     }
 
     // MARK: - Categories
 
     private var categoryOptions: [PillOption] {
-        [PillOption("All", "All")] + store.categories.map { PillOption($0, $0) }
+        let nonPremium = store.categories.filter { !$0.localizedCaseInsensitiveContains("premium") }
+        return [PillOption("All", "All")] + nonPremium.map { PillOption($0, $0) }
     }
 
     private var categorySegments: some View {
         PillSegments(
             options: categoryOptions,
             selection: Binding(
-                get: { category },
+                get: { category == "Premium" ? "" : category },
                 set: { new in
                     guard new != category else { return }
                     // Direction first, and outside the animation: the
@@ -145,19 +152,70 @@ struct ExploreView: View {
         )
     }
 
+    private var isPremiumActive: Bool { category == "Premium" }
+
+    private var premiumPill: some View {
+        Button(action: {
+            if isPremiumActive {
+                categoryShift = -1
+                category = "All"
+            } else {
+                categoryShift = 1
+                category = "Premium"
+            }
+        }) {
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 11.5, weight: .semibold))
+                Text("Premium")
+                    .font(.system(size: 13.5, weight: .semibold))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(isPremiumActive ? Color.AuraLoopOnInk : Color.AuraLoopInk.opacity(0.82))
+            .padding(.horizontal, 18)
+            .frame(height: 42)
+            .background {
+                if isPremiumActive {
+                    Capsule()
+                        .fill(Color.AuraLoopInk)
+                        .shadow(color: .black.opacity(0.35), radius: 4, x: 0, y: 2)
+                }
+            }
+            .background(Capsule().fill(Color.AuraLoopInk.opacity(0.06)))
+            .overlay(
+                Capsule()
+                    .strokeBorder(
+                        isPremiumActive
+                            ? Color.clear
+                            : Color.AuraLoopInk.opacity(0.13),
+                        lineWidth: 1
+                    )
+            )
+            .shadow(color: .black.opacity(0.30), radius: 9, x: 0, y: 4)
+        }
+        .buttonStyle(.plain)
+        .animation(.spring(response: 0.34, dampingFraction: 0.86), value: isPremiumActive)
+    }
+
     /// Centred like the Library's tabs. A library has four tabs and always
     /// fits; a catalog can grow a category at any time, so the row falls back
     /// to scrolling sideways rather than pushing its ends under the tray's
     /// edges.
     private var categoryRow: some View {
         ViewThatFits(in: .horizontal) {
-            HStack(spacing: 0) {
+            HStack(spacing: 10) {
                 Spacer(minLength: 0)
                 categorySegments
+                premiumPill
                 Spacer(minLength: 0)
             }
             ScrollView(.horizontal, showsIndicators: false) {
-                categorySegments.padding(.horizontal, 2).padding(.vertical, 3)
+                HStack(spacing: 10) {
+                    categorySegments
+                    premiumPill
+                }
+                .padding(.horizontal, 2)
+                .padding(.vertical, 3)
             }
         }
         .frame(height: 58)
