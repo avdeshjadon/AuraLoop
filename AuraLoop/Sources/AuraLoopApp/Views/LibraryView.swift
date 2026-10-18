@@ -34,6 +34,7 @@ struct LibraryView: View {
     @State private var automationTarget: AutomationEditorTarget?
     @State private var selecting = false
     @State private var selected: Set<String> = []
+    @State private var downloadPulse = false
     @AppStorage("libraryScheduleKind") private var scheduleKind: ScheduleKind = .playlists
 
     private let gridColumns = [
@@ -156,6 +157,7 @@ struct LibraryView: View {
                 VStack(alignment: .leading, spacing: 22) {
                     switch tab {
                     case .all:
+                        downloadingSection
                         if !selecting { dropZone }
                         grid(items: searched)
                         saverGroup(saversSearched)
@@ -189,7 +191,7 @@ struct LibraryView: View {
                 options: [
                     PillOption(
                         LibTab.all.rawValue, "Downloaded",
-                        count: store.localItems.count + store.appleLibraryItems.count + saverItems.count
+                        count: store.localItems.count + store.appleLibraryItems.count + saverItems.count + store.downloads.count
                     ),
                     PillOption(
                         LibTab.schedules.rawValue, "Playlists & Automations",
@@ -459,6 +461,38 @@ struct LibraryView: View {
             Task { @MainActor in take(urls) }
         }
         return found
+    }
+
+    // MARK: - Active downloads
+
+    @ViewBuilder private var downloadingSection: some View {
+        let active = store.downloadingWallpapers.filter { matchesSearch($0.item) }
+        if !active.isEmpty {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(Color.AuraLoopAccent)
+                        .frame(width: 8, height: 8)
+                        .scaleEffect(downloadPulse ? 1.25 : 0.8)
+                        .opacity(downloadPulse ? 1 : 0.6)
+                        .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: downloadPulse)
+
+                    SectionLabel("DOWNLOADING", trailing: "\(active.count) IN PROGRESS")
+                }
+                .onAppear { downloadPulse = true }
+
+                VStack(spacing: 12) {
+                    ForEach(active, id: \.item.id) { download in
+                        DownloadingWallpaperCard(item: download.item, progress: download.progress)
+                    }
+                }
+            }
+            .padding(.bottom, 6)
+            .transition(.asymmetric(
+                insertion: .opacity.combined(with: .move(edge: .top)),
+                removal: .opacity
+            ))
+        }
     }
 
     // MARK: - Wallpaper grid
@@ -1278,3 +1312,155 @@ extension View {
         }
     }
 }
+
+// MARK: - Downloading Wallpaper Card
+
+struct DownloadingWallpaperCard: View {
+    @EnvironmentObject var store: AppStore
+    let item: WallpaperItem
+    let progress: Double
+
+    @State private var hovering = false
+
+    private var percent: Int {
+        min(max(Int(progress * 100), 0), 100)
+    }
+
+    private var currentBytes: Int64 {
+        Int64(Double(item.sizeBytes) * progress)
+    }
+
+    var body: some View {
+        HStack(spacing: 20) {
+            // Left: Thumbnail preview with progress ring overlay
+            ZStack {
+                Color.black
+                ThumbImage(item: item)
+
+                // Dark glass overlay with centered progress ring
+                Color.black.opacity(0.35)
+
+                DownloadRing(progress: progress, size: 36)
+            }
+            .frame(width: 140, height: 78)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.3), radius: 6, y: 2)
+
+            // Middle: Category, Title, "This wallpaper is downloading...", progress bar, stats
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Text(item.category.uppercased())
+                        .font(.system(size: 9.5, weight: .bold))
+                        .tracking(1.2)
+                        .foregroundStyle(Color.AuraLoopAccent)
+
+                    Circle()
+                        .fill(Color.AuraLoopSecondary.opacity(0.5))
+                        .frame(width: 3, height: 3)
+
+                    Text("This wallpaper is downloading…")
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundStyle(Color.AuraLoopSecondary)
+                }
+
+                Text(item.title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Color.AuraLoopInk)
+                    .lineLimit(1)
+
+                // Linear progress bar
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Color.AuraLoopInk.opacity(0.08))
+
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.AuraLoopAccent, Color.AuraLoopAccent.opacity(0.8)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(width: max(geo.size.width * CGFloat(progress), 6))
+                            .animation(.easeOut(duration: 0.2), value: progress)
+                    }
+                }
+                .frame(height: 5)
+
+                // Stats row
+                HStack(spacing: 8) {
+                    Text("\(percent)% · \(formatSize(currentBytes)) of \(formatSize(item.sizeBytes))")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.AuraLoopSecondary)
+                        .monospacedDigit()
+
+                    Spacer()
+
+                    if item.width > 0 && item.height > 0 {
+                        Text("\(item.resolutionLabel) · \(item.width)×\(item.height)\(item.fps > 0 ? " · \(Int(item.fps)) fps" : "")")
+                            .font(.system(size: 10.5, weight: .medium))
+                            .foregroundStyle(Color.AuraLoopSecondary.opacity(0.75))
+                    }
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            // Right: Big percentage and Preview button
+            VStack(alignment: .trailing, spacing: 8) {
+                Text("\(percent)%")
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.AuraLoopAccent)
+                    .monospacedDigit()
+
+                Button {
+                    store.openPreview(item)
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "eye.fill")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text("Preview")
+                            .font(.system(size: 11.5, weight: .semibold))
+                    }
+                    .foregroundStyle(Color.AuraLoopInk)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(Capsule().fill(Color.AuraLoopInk.opacity(0.1)))
+                    .overlay(Capsule().strokeBorder(Color.AuraLoopInk.opacity(0.18), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .pointingCursor()
+            }
+            .padding(.trailing, 4)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .frame(height: 106)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(.glassSheen(hovering ? 0.11 : 0.075, hovering ? 0.05 : 0.03))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(
+                    hovering ? Color.AuraLoopAccent.opacity(0.55)
+                        : Color.AuraLoopAccent.opacity(0.28),
+                    lineWidth: 1
+                )
+        )
+        .shadow(color: hovering ? Color.AuraLoopAccent.opacity(0.16) : .clear, radius: 12, y: 3)
+        .scaleEffect(hovering ? 1.004 : 1)
+        .animation(.easeOut(duration: 0.18), value: hovering)
+        .contentShape(RoundedRectangle(cornerRadius: 18))
+        .onHover { hovering = $0 }
+        .onTapGesture {
+            store.openPreview(item)
+        }
+    }
+}
+

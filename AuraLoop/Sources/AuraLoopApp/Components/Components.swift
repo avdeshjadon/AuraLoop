@@ -233,7 +233,15 @@ struct TopBar: View {
                 actions
             }
             navPill
+                .overlay(alignment: .leading) {
+                    if store.isDownloading {
+                        DownloadNavBubble()
+                            .offset(x: -54)
+                            .transition(.scale(scale: 0.6).combined(with: .opacity))
+                    }
+                }
         }
+        .animation(.spring(response: 0.34, dampingFraction: 0.72), value: store.isDownloading)
         .padding(.leading, 92)   // clear of the traffic lights
         .padding(.trailing, 40)
         .padding(.top, 22)
@@ -435,6 +443,57 @@ struct ImportButton: View {
         ) { result in
             if case .success(let urls) = result { store.importFiles(urls) }
         }
+    }
+}
+
+/// Circular download badge in the top bar right beside Home.
+/// Appears when any wallpaper is actively downloading, displaying a smooth
+/// circular progress ring and percentage number (e.g. "45%").
+struct DownloadNavBubble: View {
+    @EnvironmentObject var store: AppStore
+    @State private var hovering = false
+    @Environment(\.AuraLoopOnMedia) private var onMedia
+
+    private var ink: Color { onMedia ? .white : Color.AuraLoopInk }
+    private var progress: Double { store.overallDownloadProgress }
+    private var percent: Int { min(max(Int(progress * 100), 0), 100) }
+
+    var body: some View {
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                store.switchTab(.library)
+                store.previewItem = nil
+            }
+        } label: {
+            ZStack {
+                // Background track
+                Circle()
+                    .strokeBorder(ink.opacity(0.14), lineWidth: 2.5)
+
+                // Animated progress ring
+                Circle()
+                    .inset(by: 1.25)
+                    .trim(from: 0, to: max(progress, 0.04))
+                    .stroke(
+                        Color.AuraLoopAccent,
+                        style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(-90))
+                    .animation(.easeOut(duration: 0.22), value: progress)
+
+                // Percentage inside circle
+                Text("\(percent)%")
+                    .font(.system(size: percent >= 100 ? 9.5 : 10.5, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(ink)
+                    .shadow(color: Color.AuraLoopAccent.opacity(hovering ? 0.6 : 0.2), radius: hovering ? 4 : 2)
+            }
+            .frame(width: 36, height: 36)
+        }
+        .buttonStyle(BubbleButtonStyle(size: 42, hovering: hovering, active: false, tint: .AuraLoopAccent))
+        .onHover { hovering = $0 }
+        .help(store.downloadStatusLabel.isEmpty ? "Downloading wallpapers… Click to view in Library" : "\(store.downloadStatusLabel) · Click to view in Library")
+        .pointingCursor()
     }
 }
 
@@ -1156,21 +1215,46 @@ struct SelectionTick: View {
 /// hover scale it drew a faint square box around the ring. This one is drawn,
 /// on the same dark circle as the download arrow it replaces, so the arrow
 /// turns into the ring in place and stays readable on a bright wallpaper.
+/// The progress ring on a wallpaper card that is actively downloading.
+/// Draws a dark translucent circle with a live circular progress ring and
+/// bold percentage number (e.g. "32%") inside the ring.
 struct DownloadRing: View {
     let progress: Double
-    var size: CGFloat = 30
+    var size: CGFloat = 34
+
+    private var percent: Int {
+        min(max(Int(progress * 100), 0), 100)
+    }
 
     var body: some View {
         ZStack {
-            Circle().stroke(Color.white.opacity(0.28), lineWidth: 2.5)
+            // Dark glass background
             Circle()
-                .trim(from: 0, to: min(max(progress, 0), 1))
-                .stroke(Color.white, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                .fill(Color.black.opacity(0.6))
+
+            // Background track ring
+            Circle()
+                .strokeBorder(Color.white.opacity(0.22), lineWidth: 2.2)
+
+            // Animated progress ring
+            Circle()
+                .inset(by: 1.1)
+                .trim(from: 0, to: max(CGFloat(progress), 0.04))
+                .stroke(
+                    Color.AuraLoopAccent,
+                    style: StrokeStyle(lineWidth: 2.2, lineCap: .round)
+                )
                 .rotationEffect(.degrees(-90))
+                .animation(.easeOut(duration: 0.2), value: progress)
+
+            // Percentage text inside the circle
+            Text("\(percent)%")
+                .font(.system(size: percent >= 100 ? 8.5 : 9.5, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(.white)
+                .shadow(color: Color.black.opacity(0.8), radius: 2, y: 1)
         }
-        .frame(width: size * 0.54, height: size * 0.54)
         .frame(width: size, height: size)
-        .background(Circle().fill(Color.black.opacity(0.4)))
     }
 }
 
@@ -1361,8 +1445,8 @@ struct WallpaperCard: View {
         if selecting {
             EmptyView()
         } else if let progress = store.downloads[item.id] {
-            DownloadRing(progress: progress)
-                .padding(12)
+            DownloadRing(progress: progress, size: 34)
+                .padding(10)
         } else if showsDelete && hovering && store.canDeleteScreenSaver(item.id) {
             // A screen saver the person added can go to the Trash, though
             // macOS draws it like Apple's below.

@@ -39,11 +39,19 @@ struct WhatsNewRelease: Identifiable {
 /// release is editing this one list.
 enum WhatsNew {
     static let current = WhatsNewRelease(
-        version: "6.8.0",
+        version: "6.9.0",
         date: "October 2026",
-        headline: "AuraLoop 6.5 refines settings, purges funding artifacts, and features streamlined documentation and architecture.",
+        headline: "AuraLoop 6.9 adds live download tracking in the navigation bar and Library, along with strict catalog deduplication.",
         sections: [
             WhatsNewSection(name: "New", tint: .AuraLoopAccent, entries: [
+                WhatsNewEntry(title: "Navbar Circular Download Ring",
+                              detail: "A circular glass progress ring with live percentage appears beside Home whenever wallpapers are downloading."),
+                WhatsNewEntry(title: "Library Download Tracker",
+                              detail: "Active downloads are highlighted in a dedicated section with live progress bars, byte counts, and instant preview access."),
+                WhatsNewEntry(title: "Live Percentage on Cards",
+                              detail: "Wallpaper card download indicators now display live completion percentages directly inside the ring."),
+                WhatsNewEntry(title: "Seamless Deduplication",
+                              detail: "Strict tri-factor deduplication guarantees no wallpaper ever repeats between local downloads and Explore."),
                 WhatsNewEntry(title: "Modular Codebase Architecture",
                               detail: "Streamlined Views, Models, Controllers, Icons, and Kits into a decoupled, highly maintainable structure."),
                 WhatsNewEntry(title: "Dedicated Asset Organization",

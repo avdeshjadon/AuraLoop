@@ -315,6 +315,45 @@ final class AppStore: ObservableObject {
     @Published var config = EngineConfig()
     @Published var playlists: [Playlist] = []
     @Published var downloads: [String: Double] = [:]        // id → 0…1
+
+    /// Whether any wallpaper is currently downloading.
+    var isDownloading: Bool {
+        !downloads.isEmpty
+    }
+
+    /// Overall progress across all in-flight downloads (0.0 ... 1.0).
+    var overallDownloadProgress: Double {
+        guard !downloads.isEmpty else { return 0 }
+        let total = downloads.values.reduce(0.0, +)
+        return total / Double(downloads.count)
+    }
+
+    /// All wallpapers currently in flight with their individual progress.
+    var downloadingWallpapers: [(item: WallpaperItem, progress: Double)] {
+        var results: [(item: WallpaperItem, progress: Double)] = []
+        for (id, progress) in downloads {
+            if let it = item(id: id) {
+                results.append((item: it, progress: progress))
+            } else if let cat = catalog.first(where: { $0.id == id }) {
+                let it = WallpaperItem(local: nil, remote: cat, liked: likedIDs.contains(cat.id))
+                results.append((item: it, progress: progress))
+            }
+        }
+        return results.sorted { $0.item.title < $1.item.title }
+    }
+
+    /// Short human label for the download tooltip or status badge.
+    var downloadStatusLabel: String {
+        let active = downloadingWallpapers
+        if active.isEmpty { return "" }
+        if active.count == 1 {
+            let pct = Int(active[0].progress * 100)
+            return "\(active[0].item.title) (\(pct)%)"
+        } else {
+            let pct = Int(overallDownloadProgress * 100)
+            return "\(active.count) downloads (\(pct)%)"
+        }
+    }
     @Published var generating: Set<String> = []             // efficient variants in flight
     @Published var importStatus: String?
     /// How far through the file being imported now, 0 to 1, or nil when no
@@ -588,25 +627,51 @@ final class AppStore: ObservableObject {
         var out: [WallpaperItem] = []
         out.reserveCapacity(manifest.wallpapers.count + catalog.count)
         let liked = likedIDs
-        for entry in manifest.wallpapers where seenIDs.insert(entry.id).inserted {
-            seenVideos.insert(entry.file)
+        let remoteByTitle = Dictionary(
+            catalog.map { ($0.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        var seenTitles = Set<String>()
+
+        // 1. Local downloaded wallpapers (manifest)
+        for entry in manifest.wallpapers {
+            let normTitle = entry.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if seenIDs.contains(entry.id) || (!normTitle.isEmpty && seenTitles.contains(normTitle)) {
+                continue
+            }
+            seenIDs.insert(entry.id)
+            if !normTitle.isEmpty { seenTitles.insert(normTitle) }
+
+            let matchedRemote = remoteByID[entry.id] ?? remoteByTitle[normTitle]
+            if let matchedRemote {
+                seenIDs.insert(matchedRemote.id)
+                seenVideos.insert(matchedRemote.video.lastPathComponent.lowercased())
+            }
+
             out.append(WallpaperItem(
-                local: entry, remote: remoteByID[entry.id], liked: liked.contains(entry.id)
+                local: entry,
+                remote: matchedRemote,
+                liked: liked.contains(entry.id) || (matchedRemote.map { liked.contains($0.id) } ?? false)
             ))
         }
-        for (index, remote) in catalog.enumerated() {
-            let videoKey = remote.video.lastPathComponent
-            if seenVideos.contains(videoKey) { continue }
+
+        // 2. Remote catalog wallpapers (only un-downloaded, non-duplicate entries)
+        for remote in catalog {
+            let normTitle = remote.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let videoKey = remote.video.lastPathComponent.lowercased()
+
+            // If this wallpaper was already loaded from local downloads or already seen, skip it!
+            if seenIDs.contains(remote.id) || (!normTitle.isEmpty && seenTitles.contains(normTitle)) || seenVideos.contains(videoKey) {
+                continue
+            }
+            seenIDs.insert(remote.id)
+            if !normTitle.isEmpty { seenTitles.insert(normTitle) }
             seenVideos.insert(videoKey)
 
-            var safeRemote = remote
-            if seenIDs.contains(safeRemote.id) {
-                safeRemote.id = "\(remote.id)-\(index)"
-            }
-            seenIDs.insert(safeRemote.id)
-
             out.append(WallpaperItem(
-                local: nil, remote: safeRemote, liked: liked.contains(remote.id) || liked.contains(safeRemote.id)
+                local: nil,
+                remote: remote,
+                liked: liked.contains(remote.id)
             ))
         }
         cachedItems = out
@@ -772,7 +837,11 @@ final class AppStore: ObservableObject {
         if let cachedItemsByID { return cachedItemsByID[id] }
         let byID = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         cachedItemsByID = byID
-        return byID[id]
+        if let it = byID[id] { return it }
+        if let cat = catalog.first(where: { $0.id == id }) {
+            return WallpaperItem(local: nil, remote: cat, liked: likedIDs.contains(cat.id))
+        }
+        return nil
     }
 
     /// One of Apple's aerials, read straight from Apple's manifest.
