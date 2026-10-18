@@ -1,8 +1,44 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { execFile, spawnSync } from 'node:child_process';
 import { parseCountString, parseSizeString, stripAnsi } from './format.mjs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+export const repoRoot = path.resolve(__dirname, '..', '..');
+
+export function loadEnvFiles() {
+  const envPaths = [
+    path.join(repoRoot, '.env'),
+    path.join(process.cwd(), '.env'),
+  ];
+  for (const p of envPaths) {
+    if (fs.existsSync(p)) {
+      if (typeof process.loadEnvFile === 'function') {
+        try { process.loadEnvFile(p); } catch {}
+      }
+      try {
+        const content = fs.readFileSync(p, 'utf8');
+        for (const line of content.split('\n')) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith('#')) continue;
+          const eq = trimmed.indexOf('=');
+          if (eq > 0) {
+            const k = trimmed.slice(0, eq).trim();
+            let v = trimmed.slice(eq + 1).trim();
+            if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+              v = v.slice(1, -1);
+            }
+            if (!process.env[k]) process.env[k] = v;
+          }
+        }
+      } catch {}
+    }
+  }
+}
+loadEnvFiles();
 
 export const DEFAULT_BUCKET = process.env.AURALOOP_R2_BUCKET || 'auraloop-wallpapers';
 const WRANGLER_CONFIG = path.join(os.homedir(), 'Library/Preferences/.wrangler/config/default.toml');
@@ -38,7 +74,11 @@ export async function wrangler(args, { timeoutMs = 300000, signal } = {}) {
     const child = execFile(bin, args, {
       maxBuffer: 50 * 1024 * 1024,
       timeout: timeoutMs,
-      env: process.env,
+      env: {
+        ...process.env,
+        ...(process.env.CLOUDFLARE_ACCOUNT_ID ? { CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID } : {}),
+        ...(process.env.CLOUDFLARE_API_TOKEN ? { CLOUDFLARE_API_TOKEN: process.env.CLOUDFLARE_API_TOKEN } : {}),
+      },
     }, (error, stdout, stderr) => {
       if (error) {
         const tail = stripAnsi(String(stderr || error.message || '')).split('\n').filter(Boolean).slice(-4).join(' | ');
@@ -63,6 +103,7 @@ export async function restAccountId() {
   const info = await whoami();
   const id = info.accounts?.[0]?.id;
   if (!id) throw new Error('No Cloudflare account found for the current wrangler login.');
+  process.env.CLOUDFLARE_ACCOUNT_ID = id;
   return id;
 }
 

@@ -5,7 +5,7 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { header, section, info, ok, warn, error, plain, kv, table, list } from './lib/log.mjs';
 import { formatBytes, formatDuration } from './lib/format.mjs';
-import { choose, ask, confirm, installSignalHandlers, PromptCancelled } from './lib/prompt.mjs';
+import { choose, ask, confirm, installSignalHandlers, PromptCancelled, closePrompt } from './lib/prompt.mjs';
 import { ProgressBar } from './lib/progress.mjs';
 import { mapPool, withRetry } from './lib/async.mjs';
 import {
@@ -399,7 +399,11 @@ async function main() {
   }
 }
 
-main().catch((err) => {
+main().then(() => {
+  closePrompt();
+  process.exit(process.exitCode || 0);
+}).catch((err) => {
+  closePrompt();
   if (err instanceof PromptCancelled) {
     process.stdout.write('\n');
     info(err.message);

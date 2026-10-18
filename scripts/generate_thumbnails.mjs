@@ -6,7 +6,7 @@ import os from 'node:os';
 import { parseArgs } from 'node:util';
 import { header, section, info, warn, error, plain, kv, list } from './lib/log.mjs';
 import { formatBytes, formatDuration } from './lib/format.mjs';
-import { confirm, installSignalHandlers, PromptCancelled } from './lib/prompt.mjs';
+import { confirm, installSignalHandlers, PromptCancelled, closePrompt } from './lib/prompt.mjs';
 import { ProgressBar } from './lib/progress.mjs';
 import { discoverLibrary, pickLibraryScope } from './lib/library.mjs';
 import { walkFiles } from './lib/scan.mjs';
@@ -285,7 +285,11 @@ async function main() {
   else if (failed > 0) process.exitCode = 1;
 }
 
-main().catch((err) => {
+main().then(() => {
+  closePrompt();
+  process.exit(process.exitCode || 0);
+}).catch((err) => {
+  closePrompt();
   if (err instanceof PromptCancelled) {
     process.stdout.write('\n');
     info(err.message);

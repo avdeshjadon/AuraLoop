@@ -1,4 +1,4 @@
-import { formatDuration, sanitizeLabel } from './format.mjs';
+import { formatDuration, sanitizeLabel, stripAnsi } from './format.mjs';
 
 const ESC = String.fromCharCode(27);
 const CLEAR_LINE = `${ESC}[2K`;
@@ -55,15 +55,33 @@ export class ProgressBar {
   }
 
   line() {
-    const ratio = this.completed / this.total;
+    const ratio = Math.min(Math.max(this.completed / this.total, 0), 1);
     const filled = Math.round(ratio * this.width);
     const bar = `${'#'.repeat(filled)}${'-'.repeat(this.width - filled)}`;
     const pct = (ratio * 100).toFixed(0).padStart(3);
-    const count = this.countText ?? `${this.completed}/${this.total}`;
-    const eta = this.etaSeconds();
-    const etaText = eta === null ? 'ETA Calculating...' : `ETA ${formatDuration(eta)}`;
-    const label = sanitizeLabel(this.label, Math.max(12, (this.stream.columns || 100) - 70));
-    return `[${bar}] ${pct}% | ${count} | ${etaText} | ${label}`;
+    const cols = (this.stream && this.stream.columns) || 80;
+
+    let text;
+    if (this.countText) {
+      text = `[${bar}] ${pct}% | ${this.countText}`;
+    } else {
+      const eta = this.etaSeconds();
+      const etaText = eta === null ? 'ETA Calculating...' : `ETA ${formatDuration(eta)}`;
+      text = `[${bar}] ${pct}% | ${this.completed}/${this.total} | ${etaText}`;
+    }
+
+    if (this.label) {
+      const curLen = stripAnsi(text).length;
+      const available = cols - curLen - 4;
+      if (available >= 10) {
+        text += ` | ${sanitizeLabel(this.label, available)}`;
+      }
+    }
+
+    if (stripAnsi(text).length >= cols) {
+      text = text.slice(0, cols - 2) + '…';
+    }
+    return text;
   }
 
   render() {

@@ -5,7 +5,7 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { header, section, info, ok, warn, error, plain, kv, table, list } from './lib/log.mjs';
 import { formatBytes, formatDuration } from './lib/format.mjs';
-import { confirm, installSignalHandlers, PromptCancelled } from './lib/prompt.mjs';
+import { confirm, installSignalHandlers, PromptCancelled, closePrompt } from './lib/prompt.mjs';
 import { ProgressBar } from './lib/progress.mjs';
 import { discoverLibrary, pickLibraryScope } from './lib/library.mjs';
 import { walkFiles, UPLOADABLE_EXTENSIONS, VIDEO_EXTENSIONS, IMAGE_EXTENSIONS } from './lib/scan.mjs';
@@ -27,6 +27,7 @@ const { values: args } = parseArgs({
   options: {
     dir: { type: 'string' },
     bucket: { type: 'string' },
+    concurrency: { type: 'string' },
     'dry-run': { type: 'boolean' },
     help: { type: 'boolean', short: 'h' },
   },
@@ -34,7 +35,7 @@ const { values: args } = parseArgs({
 });
 
 if (args.help) {
-  plain('Usage: node scripts/upload_wallpapers_to_r2.mjs [--dir <library-path>] [--bucket <name>] [--dry-run]');
+  plain('Usage: node scripts/upload_wallpapers_to_r2.mjs [--dir <library-path>] [--bucket <name>] [--concurrency <1-10>] [--dry-run]');
   plain('');
   plain('Uploads wallpaper files (.mp4/.mov/.jpg/.jpeg/.png/.webp) to Cloudflare R2 via wrangler,');
   plain('with resume state, bounded concurrency, retries, and remote duplicate detection.');
@@ -45,7 +46,7 @@ installSignalHandlers();
 
 const BUCKET = args.bucket ?? DEFAULT_BUCKET;
 const STATE_FILE = path.join(path.dirname(new URL(import.meta.url).pathname), 'upload_progress.json');
-const CONCURRENCY = 3;
+const CONCURRENCY = args.concurrency ? Math.max(1, Math.min(10, parseInt(args.concurrency, 10) || 3)) : 3;
 
 const MIME_MAP = {
   '.mp4': 'video/mp4',
@@ -95,6 +96,7 @@ async function main() {
   info(`wrangler: ${wranglerBin}`);
   kv('Bucket', BUCKET);
   kv('Concurrency', String(CONCURRENCY));
+  kv('Auth Mode', process.env.CLOUDFLARE_API_TOKEN ? 'API Token (permanent, no browser login)' : 'Wrangler OAuth session');
   if (args['dry-run']) {
     warn('Dry-run mode: no files will be uploaded.');
   }
@@ -129,17 +131,17 @@ async function main() {
   kv('Images', String(imageCount));
 
   const state = loadState();
+  info('Connecting to Cloudflare R2 and verifying remote inventory...');
   const rest = await createRestClient();
 
   let remoteSizes = null;
   if (rest) {
     try {
-      info('Fetching remote object inventory for duplicate detection...');
       remoteSizes = new Map();
       for await (const object of rest.iterateObjects(BUCKET, { perPage: 1000 })) {
         remoteSizes.set(object.key, object.size);
       }
-      info(`Remote inventory: ${remoteSizes.size} objects.`);
+      info(`Remote inventory: ${remoteSizes.size} objects found.`);
     } catch (err) {
       warn(`Remote inventory unavailable (${err.message}); falling back to local state only.`);
       remoteSizes = null;
@@ -229,6 +231,7 @@ async function main() {
   const workQueue = [...queue];
   const { errors: uploadErrors } = await mapPool(workQueue, CONCURRENCY, async (item) => {
     if (controller.signal.aborted) throw new Error('Aborted.');
+    const fileStart = Date.now();
     currentLabel = `Uploading ${item.key} (${formatBytes(item.size)})`;
     bar.update({
       label: currentLabel,
@@ -246,7 +249,7 @@ async function main() {
         });
       } catch (err) {
         if (attempt >= 3) throw err;
-        warn(`Upload glitch on ${item.key} (attempt ${attempt}/3): ${err.message.split('\n')[0]}`);
+        bar.note(`  [!] Retry on ${item.key} (${attempt}/3): ${err.message.split('\n')[0]}`);
         throw err;
       }
     }, { retries: 3, baseDelayMs: 2000, signal: controller.signal });
@@ -259,10 +262,13 @@ async function main() {
       uploadedAt: new Date().toISOString(),
     };
     saveState(state);
+
+    const fileSec = ((Date.now() - fileStart) / 1000).toFixed(1);
+    bar.note(`  [+] Uploaded: ${item.key} (${formatBytes(item.size)}) in ${fileSec}s`);
     bar.update({
       completed: uploadedBytes,
       countText: countText(),
-      label: `Uploaded ${item.key}`,
+      label: `${uploadedCount}/${queue.length} completed`,
     });
   });
 
@@ -271,7 +277,7 @@ async function main() {
     const speed = elapsed > 0 ? uploadedBytes / elapsed : 0;
     const remaining = Math.max(queueBytes - uploadedBytes, 0);
     const eta = speed > 0 ? formatDuration(remaining / speed) : 'Calculating...';
-    return `${uploadedCount}/${queue.length} files | ${formatBytes(uploadedBytes)} / ${formatBytes(queueBytes)} | ${formatBytes(Math.round(speed))}/s | ETA ${eta}`;
+    return `${uploadedCount}/${queue.length} files (${formatBytes(uploadedBytes)}/${formatBytes(queueBytes)}) | ${formatBytes(Math.round(speed))}/s | ETA ${eta}`;
   }
 
   for (const { item, error: err } of uploadErrors) {
@@ -300,7 +306,11 @@ async function main() {
   plain('');
 }
 
-main().catch((err) => {
+main().then(() => {
+  closePrompt();
+  process.exit(process.exitCode || 0);
+}).catch((err) => {
+  closePrompt();
   if (err instanceof PromptCancelled) {
     process.stdout.write('\n');
     info(err.message);

@@ -89,7 +89,7 @@ export async function choose(question, options) {
     process.stdout.write(`    ${index + 1}. ${option.label}\n`);
   });
   for (;;) {
-    const answer = (await questionOnce(`Enter a number (1-${options.length})`)).trim();
+    const answer = (await questionOnce(`Enter a number (1-${options.length}): `)).trim();
     const n = Number(answer);
     if (Number.isInteger(n) && n >= 1 && n <= options.length) {
       return options[n - 1].value;
@@ -107,8 +107,21 @@ export async function askPositiveNumber(question) {
   }
 }
 
+export function closePrompt() {
+  if (sharedRl) {
+    try {
+      sharedRl.close();
+    } catch {}
+    sharedRl = null;
+  }
+  try {
+    process.stdin.pause();
+  } catch {}
+}
+
 export function installSignalHandlers() {
   process.on('SIGINT', () => {
+    closePrompt();
     process.stdout.write('\n');
     process.stderr.write('Cancelled.\n');
     process.exit(130);

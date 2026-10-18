@@ -5,7 +5,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { header, section, info, warn, error, plain, kv, table, list } from './lib/log.mjs';
 import { formatBytes, formatDuration, formatPercent } from './lib/format.mjs';
-import { ask, confirm, installSignalHandlers, PromptCancelled } from './lib/prompt.mjs';
+import { ask, confirm, installSignalHandlers, PromptCancelled, closePrompt } from './lib/prompt.mjs';
 import { ProgressBar } from './lib/progress.mjs';
 import { discoverLibrary } from './lib/library.mjs';
 import {
@@ -434,7 +434,11 @@ async function main() {
   if (controller.signal.aborted) process.exitCode = 130;
 }
 
-main().catch((err) => {
+main().then(() => {
+  closePrompt();
+  process.exit(process.exitCode || 0);
+}).catch((err) => {
+  closePrompt();
   if (err instanceof PromptCancelled) {
     process.stdout.write('\n');
     info(err.message);
