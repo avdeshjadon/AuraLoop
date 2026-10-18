@@ -5,6 +5,8 @@ AuraLoop/Icon/out/
 AuraLoop/Icon/icongen
 .build/
 dist/
+.wrangler/
+scripts/*_progress.json
 
 # Test media and source videos — never in git. Wallpapers ship as GitHub
 # release assets and reach the app through catalog.json.
