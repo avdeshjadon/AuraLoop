@@ -53,6 +53,64 @@ struct WallpaperItem: Identifiable, Equatable {
         if let remote { return remote.publishedAt ?? .distantPast }
         return local?.dateAdded ?? .distantPast
     }
+
+    var isPremium: Bool {
+        category.localizedCaseInsensitiveContains("premium") || id.localizedCaseInsensitiveContains("premium")
+    }
+}
+
+enum ProTier: String, CaseIterable, Identifiable, Codable {
+    case none = "none"
+    case starter = "starter"      // ₹129 - 50 Wallpapers
+    case plus = "plus"            // ₹169 - 100 Wallpapers
+    case lifetime = "lifetime"    // ₹199 - Entire Library (300+ Wallpapers)
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .none: return "Free"
+        case .starter: return "Starter Pro"
+        case .plus: return "Plus Pro"
+        case .lifetime: return "Lifetime Pro"
+        }
+    }
+
+    var priceINR: Int {
+        switch self {
+        case .none: return 0
+        case .starter: return 129
+        case .plus: return 169
+        case .lifetime: return 199
+        }
+    }
+
+    var wallpaperLimit: Int {
+        switch self {
+        case .none: return 0
+        case .starter: return 50
+        case .plus: return 100
+        case .lifetime: return Int.max
+        }
+    }
+
+    var displayLimit: String {
+        switch self {
+        case .none: return "0 Wallpapers"
+        case .starter: return "50 Wallpapers"
+        case .plus: return "100 Wallpapers"
+        case .lifetime: return "Entire Wallpaper Library (300+ Wallpapers)"
+        }
+    }
+
+    var badgeText: String {
+        switch self {
+        case .none: return "FREE"
+        case .starter: return "STARTER"
+        case .plus: return "PLUS"
+        case .lifetime: return "LIFETIME"
+        }
+    }
 }
 
 enum ApplyTarget: Equatable {
@@ -273,6 +331,9 @@ final class AppStore: ObservableObject {
     /// after an update) has one switch to flip.
     @Published var whatsNewOpen = false
     @Published var authSheetOpen = false
+    @Published var proSheetOpen = false
+    @Published var proTier: ProTier = .none
+    @Published var verifiedUTRs: Set<String> = []
     /// Whether Home's banner is behind the top bar, for the light look's top
     /// bar, which stays white over the playing wallpaper and turns dark once
     /// the page scrolls under it. Set by Home only when it changes.
@@ -408,6 +469,13 @@ final class AppStore: ObservableObject {
         let storedCatalogURL = defaults.string(forKey: "catalogURL") ?? ""
         if storedCatalogURL.isEmpty || AppStore.retiredCatalogURLs.contains(storedCatalogURL) {
             defaults.set(AppStore.defaultCatalogURL, forKey: "catalogURL")
+        }
+        if let savedTierRaw = defaults.string(forKey: "auraLoop_pro_tier"),
+           let savedTier = ProTier(rawValue: savedTierRaw) {
+            proTier = savedTier
+        }
+        if let savedUTRs = defaults.stringArray(forKey: "auraLoop_verified_utrs") {
+            verifiedUTRs = Set(savedUTRs)
         }
         // The power toggles used to be @AppStorage-only (and did nothing).
         // They now live in config.json where the engine reads them — migrate
@@ -1144,6 +1212,46 @@ final class AppStore: ObservableObject {
     func openPreview(_ item: WallpaperItem) {
         previewItem = item
         previewMode = defaultMode(for: item)
+    }
+
+    // MARK: - Pro Tier Access & Verification
+
+    var allPremiumItems: [WallpaperItem] {
+        items.filter { $0.isPremium }.sorted { $0.id.localizedStandardCompare($1.id) == .orderedAscending }
+    }
+
+    func isWallpaperUnlocked(_ item: WallpaperItem) -> Bool {
+        guard item.isPremium else { return true }
+        if proTier == .lifetime { return true }
+        if proTier == .none { return false }
+        let premiumList = allPremiumItems
+        if let idx = premiumList.firstIndex(where: { $0.id == item.id }) {
+            return idx < proTier.wallpaperLimit
+        }
+        return false
+    }
+
+    @discardableResult
+    func verifyAndUnlockPro(utr: String, tier: ProTier) -> (success: Bool, message: String) {
+        let clean = utr.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: "-", with: "")
+
+        guard clean.count == 12, clean.allSatisfy({ $0.isNumber }) else {
+            return (false, "Please enter a valid 12-digit UTR number from your payment receipt.")
+        }
+
+        if verifiedUTRs.contains(clean) {
+            return (false, "This UTR number has already been claimed on this device.")
+        }
+
+        verifiedUTRs.insert(clean)
+        defaults.set(Array(verifiedUTRs), forKey: "auraLoop_verified_utrs")
+
+        proTier = tier
+        defaults.set(tier.rawValue, forKey: "auraLoop_pro_tier")
+
+        return (true, "Unlocked \(tier.title) successfully!")
     }
 
     /// The 59 / 30 switch in the detail bar.

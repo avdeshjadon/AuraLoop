@@ -376,6 +376,10 @@ struct RootView: View {
             AuthSheetView()
                 .environmentObject(store)
         }
+        .sheet(isPresented: $store.proSheetOpen) {
+            ProUpgradeSheet()
+                .environmentObject(store)
+        }
         // The lock screen is set, macOS just has not noticed. A dead-end
         // error here is what people reported; this says what finishes it and
         // offers the button that gets them there.

@@ -49,6 +49,8 @@ struct SettingsView: View {
 
                 accountSection
 
+                proSection
+
                 section("GENERAL") {
                     row(icon: .launchAtLogin, title: "Launch at Login",
                         subtitle: "Starts quietly in the background") {
@@ -430,6 +432,10 @@ struct SettingsView: View {
         .sheet(isPresented: $showAuthSheet) {
             AuthSheetView()
         }
+        .sheet(isPresented: $store.proSheetOpen) {
+            ProUpgradeSheet()
+                .environmentObject(store)
+        }
     }
 
     private var accountSection: some View {
@@ -535,6 +541,90 @@ struct SettingsView: View {
             .liquidGlass(cornerRadius: 16, tint: 0.16, stroke: 0.12)
         }
         .padding(.top, 22)
+    }
+
+    private var proSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("PRO MEMBERSHIP")
+                .font(.system(size: 11, weight: .bold))
+                .tracking(1.4)
+                .foregroundStyle(Color.AuraLoopSecondary.opacity(0.85))
+                .padding(.leading, 4)
+
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color(hex: 0xF59E0B), Color(hex: 0xD97706)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 44, height: 44)
+                        .shadow(color: Color(hex: 0xF59E0B).opacity(0.35), radius: 8, x: 0, y: 2)
+
+                    Image(systemName: "crown.fill")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(store.proTier != .none ? "AuraLoop \(store.proTier.title)" : "AuraLoop Free")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(Color.AuraLoopInk)
+
+                        if store.proTier != .none {
+                            Text(store.proTier.badgeText)
+                                .font(.system(size: 9, weight: .bold))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color(hex: 0xF59E0B).opacity(0.18))
+                                .foregroundStyle(Color(hex: 0xF59E0B))
+                                .clipShape(Capsule())
+                        }
+                    }
+
+                    Text(store.proTier != .none
+                         ? "\(store.proTier.displayLimit) unlocked · Unlimited 4K 60fps playback"
+                         : "Unlock up to 300+ 4K 60fps premium live wallpapers starting at ₹129")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(Color.AuraLoopSecondary)
+                }
+
+                Spacer()
+
+                Button {
+                    store.proSheetOpen = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: store.proTier != .none ? "sparkles" : "crown.fill")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text(store.proTier == .lifetime ? "Manage Plan" : (store.proTier != .none ? "Upgrade Plan" : "Upgrade to Pro"))
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundStyle(Color.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(
+                        LinearGradient(
+                            colors: [Color(hex: 0xF59E0B), Color(hex: 0xD97706)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .clipShape(Capsule())
+                    .shadow(color: Color(hex: 0xF59E0B).opacity(0.35), radius: 8, x: 0, y: 3)
+                }
+                .buttonStyle(.plain)
+                .pointingCursor()
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 16)
+            .liquidGlass(cornerRadius: 16, tint: 0.16, stroke: 0.12)
+        }
+        .padding(.top, 16)
     }
 
     /// Issue #3: a fast wallpaper is distracting, so let it move for a while

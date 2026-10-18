@@ -355,6 +355,17 @@ struct TopBar: View {
                 .pointingCursor()
 
             GlassBubbleButton(
+                systemName: store.proTier != .none ? "crown.fill" : "crown",
+                glyphScale: 0.44,
+                tint: store.proTier != .none ? Color(hex: 0xF59E0B) : .white,
+                active: store.proTier != .none,
+                help: store.proTier != .none ? "AuraLoop \(store.proTier.title)" : "Upgrade to Pro"
+            ) {
+                store.proSheetOpen = true
+            }
+            .pointingCursor()
+
+            GlassBubbleButton(
                 systemName: AuthService.shared.isAuthenticated ? "person.crop.circle.fill" : "person.crop.circle",
                 glyphScale: 0.44,
                 active: AuthService.shared.isAuthenticated,
@@ -992,6 +1003,38 @@ struct NewBadge: View {
     }
 }
 
+struct PremiumLockBadge: View {
+    var body: some View {
+        HStack(spacing: 4.5) {
+            Image(systemName: "crown.fill")
+                .font(.system(size: 9.5, weight: .bold))
+                .foregroundStyle(Color(hex: 0xF59E0B))
+            Text("PRO")
+                .font(.system(size: 9, weight: .heavy))
+                .tracking(0.6)
+                .foregroundStyle(Color(hex: 0xFBBF24))
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(
+            Capsule()
+                .fill(Color.black.opacity(0.68))
+                .overlay(
+                    Capsule()
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [Color(hex: 0xF59E0B).opacity(0.8), Color(hex: 0xF59E0B).opacity(0.3)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+        )
+        .shadow(color: Color.black.opacity(0.4), radius: 5, x: 0, y: 2)
+    }
+}
+
 struct HeartButton: View {
     @EnvironmentObject var store: AppStore
     let item: WallpaperItem
@@ -1154,7 +1197,11 @@ struct WallpaperCard: View {
                     if isSelected { selection.wrappedValue.remove(item.id) }
                     else { selection.wrappedValue.insert(item.id) }
                 } else {
-                    store.openPreview(item)
+                    if item.isPremium && !store.isWallpaperUnlocked(item) {
+                        store.proSheetOpen = true
+                    } else {
+                        store.openPreview(item)
+                    }
                 }
             }
             .glassContextMenu(width: 210) { selecting ? [] : menuOptions }
@@ -1252,7 +1299,10 @@ struct WallpaperCard: View {
     }
 
     @ViewBuilder private var topLeadingChip: some View {
-        if let label = store.appliedChipLabel(for: item.id) {
+        if item.isPremium && !store.isWallpaperUnlocked(item) {
+            PremiumLockBadge()
+                .padding(12)
+        } else if let label = store.appliedChipLabel(for: item.id) {
             AppliedChip(label: label)
                 .padding(12)
         } else if store.isNew(item) {

@@ -427,6 +427,10 @@ struct PreviewView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
             .background(Capsule().fill(Color.AuraLoopInk.opacity(0.14)))
+        } else if item.isPremium && !store.isWallpaperUnlocked(item) {
+            capsuleButton("Unlock with Pro", systemName: "crown.fill") {
+                store.proSheetOpen = true
+            }
         } else if !item.isDownloaded {
             // Preview and Download are ONE action wearing two words — both
             // pull the master. "Preview" is the smaller ask, and once someone
