@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Production build
+dist/
+
+# Local environment credentials - NEVER COMMIT
+.env
+.env.*
+*.env
+
+# Vite cache
+.vite/
+
+# OS files
+.DS_Store
+*.local

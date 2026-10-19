@@ -300,6 +300,3 @@ export const PRINCIPLES = [
   { n: '02', title: 'ExtensionKit Native', body: 'Renders through macOS system services for flawless lock screen and login window integration without hacky injection.' },
   { n: '03', title: '100% Offline & Private', body: 'Zero tracking, zero analytics, and zero telemetry. All wallpapers and solar ephemeris calculations operate entirely on your Mac.' },
 ];
-
-export const TEAM_SIZES = ['Apple Silicon M1/M2', 'Apple Silicon M3/M4 (Max/Ultra)', 'Intel Core i7/i9 (macOS 14+)', 'Pro Display XDR / Dual Displays'];
-export const CLIENTS = ['macOS 15 Sequoia', 'macOS 14 Sonoma', 'macOS 26+ (ExtensionKit)'];

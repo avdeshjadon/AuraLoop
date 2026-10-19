@@ -39,9 +39,9 @@ struct WhatsNewRelease: Identifiable {
 /// release is editing this one list.
 enum WhatsNew {
     static let current = WhatsNewRelease(
-        version: "6.9.0",
+        version: "6.10.0",
         date: "October 2026",
-        headline: "AuraLoop 6.9 adds live download tracking in the navigation bar and Library, along with strict catalog deduplication.",
+        headline: "AuraLoop 6.10 introduces the AuraLoop Admin suite, video compression tools, and enhanced Cloudflare R2 wallpaper sync.",
         sections: [
             WhatsNewSection(name: "New", tint: .AuraLoopAccent, entries: [
                 WhatsNewEntry(title: "Navbar Circular Download Ring",

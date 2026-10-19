@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import * as I from '../icons.jsx';
 import EXPLORE_DATA from '../explore_wallpapers.json';
@@ -276,6 +276,44 @@ export default function InboxWindow({ inbox, regionRef }) {
   const [newPage, setNewPage] = useState(0);
   const [picksPage, setPicksPage] = useState(0);
   const [exploreCategory, setExploreCategory] = useState('All');
+  const [exploreData, setExploreData] = useState(EXPLORE_DATA);
+
+  // Dynamically sync from live Cloudflare R2 catalog if available
+  useEffect(() => {
+    let active = true;
+    fetch('https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/catalog.json')
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        if (!active || !data?.wallpapers || !Array.isArray(data.wallpapers)) return;
+        const converted = data.wallpapers.map(w => ({
+          id: w.id,
+          title: w.title,
+          category: w.category,
+          fps: Math.round(w.fps || 30),
+          res: `${w.width || 3840}x${w.height || 2160}`,
+          duration: `${Math.round(w.duration || 0)}s`,
+          size: `${Math.round((w.sizeBytes || 0) / 1024 / 1024)} MB`,
+          thumb: w.thumbnail,
+          video: w.video,
+        }));
+        setExploreData(converted);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Compute categories dynamically from data instead of hardcoding
+  const exploreCategories = useMemo(() => {
+    const cats = new Set();
+    exploreData.forEach(item => {
+      if (item.category && !item.category.toLowerCase().includes('premium')) {
+        cats.add(item.category);
+      }
+    });
+    return ['All', ...Array.from(cats).sort((a, b) => a.localeCompare(b))];
+  }, [exploreData]);
 
   const scrollContainerRef = useRef(null);
 
@@ -292,7 +330,7 @@ export default function InboxWindow({ inbox, regionRef }) {
     ...FEATURED_WALLPAPERS,
     ...NEW_WALLPAPERS.flat(),
     ...PICKS_WALLPAPERS.flat(),
-    ...EXPLORE_DATA,
+    ...exploreData,
   ];
   const current = allKnown.find(w => w.id === selectedId) || FEATURED_WALLPAPERS[0];
   const isCurrentLiked = !!likedMap[current.id];
@@ -317,12 +355,12 @@ export default function InboxWindow({ inbox, regionRef }) {
   };
 
   // Filter explore catalog
-  const exploreList = EXPLORE_DATA.filter(item => {
+  const exploreList = exploreData.filter(item => {
     if (exploreCategory === 'Premium') {
-      return item.category === 'Premium';
+      return item.category === 'Premium' || item.category?.toLowerCase()?.includes('premium');
     }
     if (exploreCategory === 'All') {
-      return item.category !== 'Premium';
+      return item.category !== 'Premium' && !item.category?.toLowerCase()?.includes('premium');
     }
     return item.category === exploreCategory;
   });
@@ -1132,7 +1170,7 @@ export default function InboxWindow({ inbox, regionRef }) {
                   boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 12px rgba(0,0,0,0.25)',
                 }}
               >
-                {['All', 'Anime', 'Nature', 'Cars', 'Video Games', 'Sci-fi', 'Abstract', 'Movies'].map(cat => {
+                {exploreCategories.map(cat => {
                   const on = exploreCategory === cat;
                   return (
                     <button

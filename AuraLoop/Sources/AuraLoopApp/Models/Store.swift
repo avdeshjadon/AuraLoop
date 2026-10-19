@@ -808,19 +808,19 @@ final class AppStore: ObservableObject {
         return out
     }
 
-    /// Explore's category buttons, in the catalog's order.
-    ///
-    /// The order used to be first appearance in `items`, which lists what is
-    /// downloaded first, so downloading an Abstract wallpaper moved Abstract
-    /// to second place and deleting it moved it back: the buttons jumped
-    /// under the pointer (full check, 2026-10-01). The catalog decides now,
-    /// and a category only downloads still have (one the catalog dropped, or
-    /// any while offline) follows it.
+    /// Explore's category buttons, dynamically derived from the remote R2 catalog
+    /// and any locally downloaded wallpapers, with non-premium categories sorted
+    /// alphabetically and Premium at the end.
     var categories: [String] {
         if let cachedCategories { return cachedCategories }
         var seen = Set<String>()
         let local = items.filter { !$0.isPersonalImport }.map(\.category)
-        let out = (catalog.map(\.category) + local).filter { seen.insert($0).inserted }
+        let allCategories = (catalog.map(\.category) + local).filter { seen.insert($0).inserted }
+        let nonPremium = allCategories
+            .filter { !$0.localizedCaseInsensitiveContains("premium") }
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+        let premium = allCategories.filter { $0.localizedCaseInsensitiveContains("premium") }
+        let out = nonPremium + premium
         cachedCategories = out
         return out
     }
@@ -1375,7 +1375,22 @@ final class AppStore: ObservableObject {
             defaults.set(Array(likedIDs), forKey: "likedIDs")
             invalidateItemCache()
         }
+
+        // 4. Admin Suspension Check
+        if cloud.isSuspended == true {
+            for place in SchedulePlace.allCases {
+                stopPlaying(on: place)
+            }
+            DispatchQueue.main.async {
+                let alert = NSAlert()
+                alert.messageText = "You have been suspended by Admin."
+                alert.alertStyle = .critical
+                alert.addButton(withTitle: "OK")
+                alert.runModal()
+            }
+        }
     }
+
 
     /// The 59 / 30 switch in the detail bar.
     ///

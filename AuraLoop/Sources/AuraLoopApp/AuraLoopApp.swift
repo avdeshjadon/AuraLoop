@@ -249,7 +249,7 @@ final class AuraLoopAppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    fileprivate static let sessionEndedKey = "sessionEndedWithSystem"
+    nonisolated fileprivate static let sessionEndedKey = "sessionEndedWithSystem"
     fileprivate static let firstLaunchKey = "hasLaunchedBefore"
 
     /// Held for the life of the app. A local monitor is removed by handing this

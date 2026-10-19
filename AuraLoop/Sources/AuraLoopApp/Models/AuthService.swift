@@ -25,14 +25,18 @@ public struct CloudUserData: Codable {
     public var proTier: String?
     public var verifiedUTRs: [String]?
     public var favorites: [String]?
-    public var updatedAt: Double?
+    public var isSuspended: Bool?
+    public var suspensionReason: String?
 
-    public init(proTier: String? = nil, verifiedUTRs: [String]? = nil, favorites: [String]? = nil, updatedAt: Double? = nil) {
+    public init(proTier: String? = nil, verifiedUTRs: [String]? = nil, favorites: [String]? = nil, updatedAt: Double? = nil, isSuspended: Bool? = nil, suspensionReason: String? = nil) {
         self.proTier = proTier
         self.verifiedUTRs = verifiedUTRs
         self.favorites = favorites
         self.updatedAt = updatedAt
+        self.isSuspended = isSuspended
+        self.suspensionReason = suspensionReason
     }
+
 
     public func encodeToPayloadString() -> String {
         guard let data = try? JSONEncoder().encode(self) else { return "" }

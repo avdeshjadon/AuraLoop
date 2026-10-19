@@ -9,9 +9,10 @@ import { formatBytes, formatDuration } from './lib/format.mjs';
 import { confirm, installSignalHandlers, PromptCancelled, closePrompt } from './lib/prompt.mjs';
 import { ProgressBar } from './lib/progress.mjs';
 import { discoverLibrary, pickLibraryScope } from './lib/library.mjs';
-import { walkFiles } from './lib/scan.mjs';
+import { walkFiles, VIDEO_EXTENSIONS } from './lib/scan.mjs';
 import { findBinary, run } from './lib/media.mjs';
 import { pathExists } from './lib/fsutil.mjs';
+import { thumbPathFor, validateThumb } from './lib/thumbs.mjs';
 
 const { values: args } = parseArgs({
   options: {
@@ -25,25 +26,12 @@ const { values: args } = parseArgs({
 if (args.help) {
   plain('Usage: node scripts/generate_thumbnails.mjs [--dir <library-path>] [--skip-existing]');
   plain('');
-  plain('Generates 4K QuickLook thumbnails (.mp4 -> <name>_thumb.jpg) beside each video.');
+  plain('Generates 4K QuickLook thumbnails (.mp4/.mov -> <name>_thumb.jpg) beside each video.');
   plain('Scope can be the whole library, a single subfolder, or a custom directory.');
   process.exit(0);
 }
 
 installSignalHandlers();
-
-function thumbPathFor(videoPath) {
-  const base = path.basename(videoPath).slice(0, -4);
-  return path.join(path.dirname(videoPath), `${base}_thumb.jpg`);
-}
-
-function validateThumb(p) {
-  try {
-    return fs.statSync(p).size > 1024;
-  } catch {
-    return false;
-  }
-}
 
 async function processFolder(folderPath, { ffmpeg, signal, onFile }) {
   let entries;
@@ -53,8 +41,8 @@ async function processFolder(folderPath, { ffmpeg, signal, onFile }) {
     return { total: 0, created: 0, skipped: 0, failed: 1, failures: [{ name: folderPath, reason: err.message }] };
   }
 
-  const mp4Files = entries
-    .filter((e) => e.isFile() && !e.name.startsWith('.') && e.name.endsWith('.mp4'))
+  const videoFiles = entries
+    .filter((e) => e.isFile() && !e.name.startsWith('.') && VIDEO_EXTENSIONS.has(path.extname(e.name).toLowerCase()))
     .map((e) => e.name)
     .sort();
 
@@ -176,10 +164,9 @@ async function main() {
   info(`Scope: ${scope.label}`);
   info(`Mode: ${args['skip-existing'] ? 'skip existing valid thumbnails' : 'regenerate all thumbnails'}`);
 
-  const { files } = await walkFiles(scope.path, { extensions: new Set(['.mp4']) });
+  const { files } = await walkFiles(scope.path, { extensions: VIDEO_EXTENSIONS });
   if (files.length === 0) {
-    warn(`No .mp4 videos found under ${scope.label}.`);
-    info('Note: this generator processes .mp4 videos (the project thumbnail format). .mov files are not processed.');
+    warn(`No video files (.mp4 or .mov) found under ${scope.label}.`);
     return;
   }
 

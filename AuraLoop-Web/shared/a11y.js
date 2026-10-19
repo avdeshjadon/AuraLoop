@@ -1,7 +1,5 @@
 import { useEffect } from 'react';
 
-export const isEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v).trim());
-
 export function useEscape(active, onEscape) {
   useEffect(() => {
     if (!active) return;

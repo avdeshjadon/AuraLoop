@@ -48,5 +48,11 @@ dist/
 AuraLoop-Web/node_modules/
 AuraLoop-Web/.vite/
 AuraLoop-Web/dist/
+AuraLoop-Admin/node_modules/
+AuraLoop-Admin/.vite/
+AuraLoop-Admin/dist/
+AuraLoop-Admin/.env
+AuraLoop-Admin/.env.*
 scripts/upload_progress.json
 upload_progress.json
+
