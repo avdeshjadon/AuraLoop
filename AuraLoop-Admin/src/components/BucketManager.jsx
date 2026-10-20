@@ -717,7 +717,7 @@ export default function BucketManager({
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, paddingRight: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
             {currentFolder
               ? `Showing ${Math.min((currentPage - 1) * pageSize + 1, totalItems)}–${Math.min(currentPage * pageSize, totalItems)} of ${totalItems} wallpapers`

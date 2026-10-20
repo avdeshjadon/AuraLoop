@@ -291,7 +291,7 @@ export default function UserManagement({
       <div className="table-card">
         <div className="table-header-row">
           <h2 className="table-title">Authenticated Users ({filteredUsers.length})</h2>
-          <div className="table-controls" style={{ paddingRight: 10 }}>
+          <div className="table-controls">
             <input
               type="text"
               placeholder="Search real user, email, Mac..."
