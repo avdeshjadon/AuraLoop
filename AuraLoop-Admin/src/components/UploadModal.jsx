@@ -17,6 +17,8 @@ export default function UploadModal({
   const [thumbnailFile, setThumbnailFile] = useState(null);
   const [thumbnailPreview, setThumbnailPreview] = useState(null);
   const [videoDuration, setVideoDuration] = useState(15);
+  const [videoWidth, setVideoWidth] = useState(3840);
+  const [videoHeight, setVideoHeight] = useState(2160);
   const [fps, setFps] = useState(60);
   const [isCapturing, setIsCapturing] = useState(false);
 
@@ -34,12 +36,21 @@ export default function UploadModal({
       setTitle(file.name.replace(/\.[^/.]+$/, '').replace(/_/g, ' '));
     }
 
+    // Auto-detect FPS from filename if indicated (e.g. 30fps, 60fps, 120fps)
+    const fpsMatch = file.name.match(/(\d{2,3})\s*fps/i);
+    if (fpsMatch) {
+      setFps(parseInt(fpsMatch[1], 10));
+    }
+
     const url = URL.createObjectURL(file);
     const tempVideo = document.createElement('video');
     tempVideo.src = url;
+    tempVideo.muted = true;
+    tempVideo.playsInline = true;
     tempVideo.onloadedmetadata = () => {
       setVideoDuration(Math.round(tempVideo.duration) || 15);
-      // Automatically grab a frame at 1s for the thumbnail
+      if (tempVideo.videoWidth) setVideoWidth(tempVideo.videoWidth);
+      if (tempVideo.videoHeight) setVideoHeight(tempVideo.videoHeight);
       tempVideo.currentTime = Math.min(1.0, tempVideo.duration / 2);
     };
     tempVideo.onseeked = () => {
@@ -51,6 +62,30 @@ export default function UploadModal({
       const thumbData = canvas.toDataURL('image/jpeg', 0.9);
       setThumbnailPreview(thumbData);
     };
+
+    // Auto-measure frame timing if supported and not found in filename
+    if ('requestVideoFrameCallback' in HTMLVideoElement.prototype && !fpsMatch) {
+      let frames = 0;
+      let start = null;
+      const countFrames = (now) => {
+        if (!start) start = now;
+        frames++;
+        if (frames < 18 && !tempVideo.paused) {
+          tempVideo.requestVideoFrameCallback(countFrames);
+        } else {
+          const delta = (now - start) / 1000;
+          if (delta > 0) {
+            const calculated = Math.round(frames / delta);
+            const standard = calculated >= 90 ? 120 : calculated >= 45 ? 60 : (calculated >= 20 ? 30 : calculated);
+            if (standard > 0) setFps(standard);
+          }
+          tempVideo.pause();
+        }
+      };
+      tempVideo.play().then(() => {
+        tempVideo.requestVideoFrameCallback(countFrames);
+      }).catch(() => {});
+    }
   };
 
   const handleThumbnailChange = (e) => {
@@ -89,8 +124,8 @@ export default function UploadModal({
           id: `wp_${Date.now()}`,
           title: title.trim(),
           category: targetFolder,
-          width: 3840,
-          height: 2160,
+          width: videoWidth || 3840,
+          height: videoHeight || 2160,
           fps: Number(fps) || 60,
           duration: Number(videoDuration) || 15,
           sizeBytes: videoFile ? videoFile.size : 45200000,
@@ -177,6 +212,34 @@ export default function UploadModal({
             </label>
           </div>
 
+          {videoFile && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '10px 14px',
+                borderRadius: 'var(--radius-sm)',
+                background: 'var(--bg-card-subtle)',
+                border: '1px solid var(--border-color)',
+                fontSize: 12,
+              }}
+            >
+              <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Detected Video Specs:</span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <span style={{ background: 'var(--bg-input)', padding: '3px 8px', borderRadius: 4, fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {videoWidth}×{videoHeight}
+                </span>
+                <span style={{ background: 'var(--accent-orange-light)', padding: '3px 8px', borderRadius: 4, fontWeight: 700, color: 'var(--accent-orange)' }}>
+                  {fps} FPS (Native)
+                </span>
+                <span style={{ background: 'var(--bg-input)', padding: '3px 8px', borderRadius: 4, fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {videoDuration}s
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Title input (Automatically populated from video file name, editable) */}
           <div>
             <label style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6, display: 'block' }}>
@@ -205,7 +268,7 @@ export default function UploadModal({
             <label style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6, display: 'block' }}>
               Category Folder
             </label>
-            <div style={{ paddingRight: 4 }}>
+            <div>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}

@@ -85,28 +85,7 @@ guard let index = manifest.wallpapers.firstIndex(where: { $0.id == matches.first
 }
 var entry = manifest.wallpapers[index]
 
-// Efficient mode: generate the 30 fps variant once if the master is >40 fps.
 var mode = "smooth"
-if efficient {
-    mode = "efficient"
-    if entry.fps > 40, entry.efficientFile == nil {
-        let variantRelative = "Masters/\(entry.id)-eff.mov"
-        let variantURL = root.appendingPathComponent(variantRelative)
-        print("generating 30 fps variant of \"\(entry.title)\"…")
-        do {
-            _ = try transcodeToHEVC(
-                source: root.appendingPathComponent(entry.file),
-                destination: variantURL,
-                halveFrameRate: true
-            )
-            entry.efficientFile = variantRelative
-            manifest.wallpapers[index] = entry
-            try manifest.save(root: root)
-        } catch {
-            fail("variant generation failed: \(error)")
-        }
-    }
-}
 
 let assignment = EngineConfig.Assignment(wallpaperID: entry.id, mode: mode)
 

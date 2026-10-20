@@ -40,7 +40,7 @@ export default function VideoPreviewModal({ wallpaper, onClose, showToast }) {
             <div>
               <h3 className="modal-title">{wallpaper.title}</h3>
               <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                {wallpaper.category} • {wallpaper.fps || 60} FPS • {wallpaper.duration || 15}s
+                {wallpaper.category} • {Math.round(wallpaper.fps || 60)} FPS • {Math.round((wallpaper.duration || 15) * 10) / 10}s
               </p>
             </div>
           </div>

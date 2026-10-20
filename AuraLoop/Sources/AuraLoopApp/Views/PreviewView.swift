@@ -190,8 +190,8 @@ struct PreviewView: View {
                 .task(id: url) { shareFile = ShareFile.prepare(url, title: item.title) }
             }
 
-            if item.fps > 40, !isAerial {
-                fpsToggle(item)
+            if item.fps > 0 {
+                fpsBadge(item)
             }
 
             if item.isDownloaded, !isAerial { pauseAfterPill(item) }
@@ -324,29 +324,22 @@ struct PreviewView: View {
         .frame(width: 40, height: 40)
     }
 
-    // MARK: - Smooth / Efficient toggle
+    // MARK: - Native FPS display badge
 
-    private func fpsToggle(_ item: WallpaperItem) -> some View {
-        HStack(spacing: 2) {
-            fpsSegment("\(standardFrameRate(item.fps))", mode: "smooth", hint: "Higher CPU", item: item)
-            fpsSegment("30", mode: "efficient", hint: "Lower CPU", item: item)
+    private func fpsBadge(_ item: WallpaperItem) -> some View {
+        let fpsVal = standardFrameRate(item.fps)
+        return HStack(spacing: 5) {
+            Image(systemName: "gauge.with.needle")
+                .font(.system(size: 11, weight: .semibold))
+            Text("\(fpsVal) FPS")
+                .font(.system(size: 11, weight: .semibold))
         }
-        .padding(3)
+        .foregroundStyle(Color.AuraLoopInk.opacity(0.75))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .background(Capsule().fill(Color.AuraLoopInk.opacity(0.08)))
         .overlay(Capsule().strokeBorder(Color.AuraLoopInk.opacity(0.14), lineWidth: 1))
-    }
-
-    private func fpsSegment(_ label: String, mode: String, hint: String, item: WallpaperItem) -> some View {
-        let selected = store.previewMode == mode
-        return Text(label)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(selected ? Color.AuraLoopOnInk : Color.AuraLoopInk.opacity(0.7))
-            .padding(.horizontal, 11)
-            .padding(.vertical, 6)
-            .background { if selected { Capsule().fill(Color.AuraLoopInk) } }
-            .contentShape(Capsule())
-            .onTapGesture { store.setPreviewMode(mode, for: item) }
-            .help("\(label) fps · \(hint)")
+        .help("Native \(fpsVal) FPS playback")
     }
 
     // MARK: - Pause after (per wallpaper)
@@ -446,14 +439,6 @@ struct PreviewView: View {
                     store.download(item)
                 }
             }
-        } else if store.generating.contains(item.id) {
-            Text("Preparing 30 fps…")
-                .font(.system(size: 13, weight: .semibold))
-                .lineLimit(1)
-                .foregroundStyle(Color.AuraLoopInk.opacity(0.75))
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .background(Capsule().fill(Color.AuraLoopInk.opacity(0.14)))
         } else if store.applyingLockScreen {
             settingFace
         } else if store.appliedFullLabel(for: item.id) != nil {

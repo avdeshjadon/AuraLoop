@@ -27,6 +27,7 @@ public struct CloudUserData: Codable {
     public var favorites: [String]?
     public var isSuspended: Bool?
     public var suspensionReason: String?
+    public var updatedAt: Double?
 
     public init(proTier: String? = nil, verifiedUTRs: [String]? = nil, favorites: [String]? = nil, updatedAt: Double? = nil, isSuspended: Bool? = nil, suspensionReason: String? = nil) {
         self.proTier = proTier

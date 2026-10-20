@@ -446,7 +446,7 @@ export default function Overview({
           >
             <div className="table-header-row">
               <h2 className="table-title">Recent Real Activities</h2>
-              <div className="table-controls" style={{ paddingRight: 4, gap: 10 }}>
+              <div className="table-controls">
                 <input
                   type="text"
                   placeholder="Search activity..."

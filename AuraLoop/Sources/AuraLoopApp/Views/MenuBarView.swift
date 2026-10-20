@@ -92,12 +92,7 @@ struct MenuBarView: View {
     private func statusLine(_ item: WallpaperItem) -> String {
         let displays = store.appliedDisplays(for: item.id).count
         let state = store.isPaused || store.desktopResting ? "PAUSED" : "PLAYING"
-        // Look up the mode on a display actually showing this wallpaper —
-        // the bare all-displays entry can be stale after per-display applies.
-        let mode = store.displays
-            .compactMap { store.config.assignment(forDisplayUUID: $0.id) }
-            .first { $0.wallpaperID == item.id }?.mode
-        let fps = mode == "efficient" ? 30 : standardFrameRate(item.fps)
+        let fps = standardFrameRate(item.fps)
         let base = "\(state) · \(displays) DISPLAY\(displays == 1 ? "" : "S") · \(fps) FPS"
         // While something is scheduling the wallpaper, its name matters more
         // than the frame rate does.

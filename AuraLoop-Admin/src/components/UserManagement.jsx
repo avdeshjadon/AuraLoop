@@ -14,6 +14,7 @@ import {
   Plus,
   KeyRound,
   CheckCircle,
+  AlertCircle,
 } from 'lucide-react';
 import {
   fetchRealFirestoreUsers,
@@ -290,7 +291,7 @@ export default function UserManagement({
       <div className="table-card">
         <div className="table-header-row">
           <h2 className="table-title">Authenticated Users ({filteredUsers.length})</h2>
-          <div className="table-controls">
+          <div className="table-controls" style={{ paddingRight: 10 }}>
             <input
               type="text"
               placeholder="Search real user, email, Mac..."
@@ -470,7 +471,29 @@ export default function UserManagement({
                 />
               </div>
               {authError && (
-                <div style={{ color: '#DC2626', fontSize: 12 }}>{authError}</div>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '10px 14px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'rgba(239, 68, 68, 0.08)',
+                    backdropFilter: 'blur(12px)',
+                    WebkitBackdropFilter: 'blur(12px)',
+                    border: '1px solid rgba(239, 68, 68, 0.22)',
+                    color: 'var(--text-primary)',
+                    fontSize: 12.5,
+                    fontWeight: 500,
+                  }}
+                >
+                  <AlertCircle size={16} style={{ color: '#EF4444', flexShrink: 0 }} />
+                  <span>
+                    {authError.includes('invalid-credential') || authError.includes('wrong-password')
+                      ? 'Invalid admin credentials. Please double-check your email and password.'
+                      : authError.replace(/^Firebase:\s*(Error\s*)?(\(auth\/)?|\)\.?$/gi, '').replace(/-/g, ' ')}
+                  </span>
+                </div>
               )}
               <div className="modal-footer" style={{ marginTop: 8 }}>
                 <button type="button" className="btn-secondary" onClick={() => setIsAuthModalOpen(false)}>Cancel</button>

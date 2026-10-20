@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { CheckCircle2 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Overview from './components/Overview';
@@ -351,6 +352,7 @@ export default function App() {
                 wallpapers={wallpapers}
                 onRefresh={handleRefresh}
                 showToast={showToast}
+                onTriggerConfirmation={handleTriggerConfirmation}
                 onOpenVideoPreview={(wp) => setPreviewWallpaper(wp)}
               />
             </motion.div>
@@ -428,6 +430,22 @@ export default function App() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Admin Footer */}
+        <footer
+          style={{
+            marginTop: 48,
+            paddingTop: 22,
+            paddingBottom: 28,
+            borderTop: '1px solid var(--border-color)',
+            textAlign: 'center',
+            fontSize: 12.5,
+            color: 'var(--text-muted)',
+            letterSpacing: 0.1,
+          }}
+        >
+          <span>This admin panel is belongs to <strong style={{ color: 'var(--text-secondary)' }}>Avdesh Jadon</strong></span>
+        </footer>
       </main>
 
       {/* Confirmation Modal */}
@@ -497,7 +515,7 @@ export default function App() {
             className="toast-container"
           >
             <div className="toast-item">
-              <span>⚡</span>
+              <CheckCircle2 size={15} style={{ color: '#10B981', flexShrink: 0 }} />
               <span>{toastMessage}</span>
             </div>
           </motion.div>

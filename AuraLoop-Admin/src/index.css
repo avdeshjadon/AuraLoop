@@ -589,6 +589,7 @@ input, select, textarea {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  white-space: nowrap;
 }
 
 .btn-light-pill:hover {
@@ -1030,7 +1031,7 @@ input, select, textarea {
   background: var(--bg-card);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-color);
-  padding: 24px;
+  padding: 24px 28px;
   box-shadow: var(--shadow-card);
 }
 
@@ -1038,7 +1039,10 @@ input, select, textarea {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  row-gap: 12px;
   margin-bottom: 20px;
+  padding-right: 8px;
 }
 
 .table-title {
@@ -1050,7 +1054,14 @@ input, select, textarea {
 .table-controls {
   display: flex;
   align-items: center;
-  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-right: 8px;
+}
+
+.table-controls > *:last-child {
+  margin-right: 6px;
 }
 
 .table-search-input {
@@ -1064,20 +1075,26 @@ input, select, textarea {
 }
 
 .filter-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
+  gap: 8px;
+  padding: 7px 16px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border-color);
   background: var(--bg-card);
   font-size: 12.5px;
   font-weight: 600;
   color: var(--text-secondary);
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
 }
 
 .filter-btn:hover {
   background: var(--bg-hover);
+  border-color: var(--border-hover);
+  color: var(--text-primary);
 }
 
 /* Data Table */
@@ -1300,17 +1317,30 @@ input, select, textarea {
 }
 
 .toast-item {
-  background: #14171A;
+  background: rgba(18, 21, 24, 0.78);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   color: #FFFFFF;
-  padding: 12px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 12px 22px;
   border-radius: var(--radius-pill);
   font-size: 13px;
   font-weight: 600;
   display: flex;
   align-items: center;
   gap: 10px;
-  box-shadow: var(--shadow-dropdown);
-  animation: toastIn 0.25s ease;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+  letter-spacing: -0.2px;
+  animation: toastIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-theme="light"] .toast-item {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  color: #14171A;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(255, 255, 255, 0.7) inset;
 }
 
 @keyframes toastIn {

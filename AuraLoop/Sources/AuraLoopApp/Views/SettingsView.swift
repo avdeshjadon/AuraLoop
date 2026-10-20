@@ -157,14 +157,7 @@ struct SettingsView: View {
                             .glassCapsule(fill: 0.09, stroke: 0.15)
                         }
                     }
-                    divider
-                    row(icon: .defaultQuality, title: "Default Quality",
-                        subtitle: "Efficient caps at 30 fps for lower CPU") {
-                        CapsuleSegments(
-                            options: [("Smooth", "smooth"), ("Efficient", "efficient")],
-                            selection: $defaultMode
-                        )
-                    }
+
                     divider
                     row(icon: .pauseAfter, title: "Pause After",
                         subtitle: pauseAfterSubtitle) {

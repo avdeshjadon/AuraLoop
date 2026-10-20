@@ -1403,30 +1403,11 @@ final class AppStore: ObservableObject {
     /// screen saver keep the copy they were given; they play for seconds at a
     /// time.
     func setPreviewMode(_ mode: String, for item: WallpaperItem) {
-        previewMode = mode
-        guard let entry = item.local, !AppleAerials.isAppleID(entry.id), entry.fps > 40 else { return }
-        let onScreen = (config.allDisplays.map { $0.wallpaperID == entry.id && $0.mode != mode } ?? false)
-            || config.perDisplay.values.contains { $0.wallpaperID == entry.id && $0.mode != mode }
-        guard onScreen else { return }
-        Task {
-            if mode == "efficient", entry.efficientFile == nil {
-                guard await ensureEfficientVariant(entry) else { return }
-            }
-            // Read again after the copy is made: the desktop may have moved on.
-            if config.allDisplays?.wallpaperID == entry.id { config.allDisplays?.mode = mode }
-            for (key, assignment) in config.perDisplay where assignment.wallpaperID == entry.id {
-                config.perDisplay[key]?.mode = mode
-            }
-            saveConfig()
-        }
+        previewMode = "smooth"
     }
 
     func defaultMode(for item: WallpaperItem) -> String {
-        // See `applyWallpaper`: an Apple aerial has no Efficient variant and
-        // must never be offered one.
-        if AppleAerials.isAppleID(item.id) { return "smooth" }
-        let def = defaults.string(forKey: "defaultMode") ?? "smooth"
-        return (def == "efficient" && item.fps > 40) ? "efficient" : "smooth"
+        return "smooth"
     }
 
     /// Lock screens need macOS 26 and the embedded extension.
@@ -1498,21 +1479,12 @@ final class AppStore: ObservableObject {
         surface explicitSurface: ApplySurface?,
         fromSchedule: Bool = false
     ) async {
-        guard var entry = item.local else { return }
+        guard let entry = item.local else { return }
         let surface = explicitSurface ?? .desktop
         // Apple ships these at 240 fps, so the Efficient rule below would fire
         // on every one of them, transcode 170 MB of somebody else's video and
         // write the result into `library.json`. Smooth only.
-        let resolvedMode = AppleAerials.isAppleID(entry.id)
-            ? "smooth"
-            : (entry.fps > 40 ? mode : "smooth")
-
-        if resolvedMode == "efficient", entry.efficientFile == nil {
-            guard await ensureEfficientVariant(entry),
-                  let refreshed = manifest.wallpapers.first(where: { $0.id == entry.id })
-            else { return }
-            entry = refreshed
-        }
+        let resolvedMode = "smooth"
 
         // An All apply is committed to the desktop engine only after the
         // Apple-side transaction succeeds, so a failed extension/store write
@@ -1610,14 +1582,8 @@ final class AppStore: ObservableObject {
         on role: AppleWallpaperStore.Surface
     ) async {
         guard lockScreenAvailable else { return }
-        var entry = original
-        let resolvedMode = entry.fps > 40 ? mode : "smooth"
-        if resolvedMode == "efficient", entry.efficientFile == nil {
-            guard await ensureEfficientVariant(entry),
-                  let refreshed = manifest.wallpapers.first(where: { $0.id == entry.id })
-            else { return }
-            entry = refreshed
-        }
+        let entry = original
+        let resolvedMode = "smooth"
         ensureAerialThumbnail(entry)
         let videoURL = resolveVideoURL(entry: entry, mode: resolvedMode, root: root)
         let thumbnailURL = resolveLibraryFile(entry.thumbnail, root: root)
@@ -2232,29 +2198,10 @@ final class AppStore: ObservableObject {
         }
     }
 
-    // MARK: - Efficient variant
+    // MARK: - Efficient variant (No-op: native framerates preserved)
 
     func ensureEfficientVariant(_ entry: WallpaperEntry) async -> Bool {
-        guard entry.fps > 40, entry.efficientFile == nil else { return true }
-        generating.insert(entry.id)
-        defer { generating.remove(entry.id) }
-        let root = self.root
-        let relative = "Masters/\(entry.id)-eff.mov"
-        let source = root.appendingPathComponent(entry.file)
-        let destination = root.appendingPathComponent(relative)
-        do {
-            _ = try await Task.detached(priority: .userInitiated) {
-                try transcodeToHEVC(source: source, destination: destination, halveFrameRate: true)
-            }.value
-            manifest = try LibraryWriter.update(root: root) { fresh in
-                guard let index = fresh.wallpapers.firstIndex(where: { $0.id == entry.id })
-                else { return }
-                fresh.wallpapers[index].efficientFile = relative
-            }
-            return true
-        } catch {
-            return false
-        }
+        return true
     }
 
     // MARK: - Playlists

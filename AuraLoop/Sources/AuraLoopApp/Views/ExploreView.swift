@@ -224,7 +224,7 @@ struct ExploreView: View {
     // MARK: - Filters
 
     private var filterRow: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             if store.searchActive {
                 SearchField()
             } else {

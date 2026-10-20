@@ -58,6 +58,28 @@ export default function BucketManager({
     setFolderSearch('');
   }, [initialFolder]);
 
+  // Format FPS cleanly (e.g. 60 fps or 30 fps instead of 59.9799919128418 fps)
+  const formatFps = (val) => {
+    if (!val) return '60 fps';
+    const num = Number(val);
+    if (isNaN(num)) return '60 fps';
+    const rounded = Math.round(num);
+    if (rounded >= 58 && rounded <= 62) return '60 fps';
+    if (rounded >= 28 && rounded <= 32) return '30 fps';
+    if (rounded >= 118 && rounded <= 122) return '120 fps';
+    if (rounded >= 23 && rounded <= 25) return `${rounded} fps`;
+    return `${rounded} fps`;
+  };
+
+  // Format Duration cleanly without multi-decimal fractions (e.g. 24s or 8.1s)
+  const formatDuration = (val) => {
+    if (!val) return '15s';
+    const num = Number(val);
+    if (isNaN(num)) return '15s';
+    const rounded = Math.round(num * 10) / 10;
+    return `${rounded}s`;
+  };
+
   // Persist view mode preference
   const handleToggleViewMode = (mode) => {
     setViewMode(mode);
@@ -695,7 +717,7 @@ export default function BucketManager({
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, paddingRight: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, paddingRight: 24 }}>
           <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
             {currentFolder
               ? `Showing ${Math.min((currentPage - 1) * pageSize + 1, totalItems)}–${Math.min(currentPage * pageSize, totalItems)} of ${totalItems} wallpapers`
@@ -1066,7 +1088,7 @@ export default function BucketManager({
                         </span>
                       </td>
                       <td style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
-                        {item.fps || 60} fps • {item.duration || 15}s
+                        {formatFps(item.fps)} • {formatDuration(item.duration)}
                       </td>
                       <td style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
                         {formatBytes(item.sizeBytes)}

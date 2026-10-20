@@ -78,12 +78,7 @@ public struct EngineConfig: Codable {
     }
 }
 
-/// Picks the actual video file for an assignment: the Efficient variant when
-/// requested and available, otherwise the master.
 public func resolveVideoURL(entry: WallpaperEntry, mode: String, root: URL) -> URL {
-    if mode == "efficient", let efficient = entry.efficientFile {
-        return resolveLibraryFile(efficient, root: root)
-    }
     return resolveLibraryFile(entry.file, root: root)
 }
 
