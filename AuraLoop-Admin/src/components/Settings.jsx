@@ -34,8 +34,8 @@ export default function Settings({ showToast, theme, setTheme }) {
     const existingPassword =
       localStorage.getItem('auraloop_custom_admin_password') ||
       import.meta.env.VITE_ADMIN_PASSWORD ||
-      'TheMe@6201';
-    const altPassword = import.meta.env.VITE_ADMIN_PASSWORD_ALT || 'THEME@6201';
+      'Avdesh@6201979695';
+    const altPassword = import.meta.env.VITE_ADMIN_PASSWORD_ALT || 'Avdesh@6201979695';
 
     if (currentPassword !== existingPassword && currentPassword !== altPassword) {
       showToast('Current password does not match.');
