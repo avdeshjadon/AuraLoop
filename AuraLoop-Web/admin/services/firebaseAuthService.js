@@ -70,7 +70,7 @@ export async function fetchRealFirestoreUsers() {
             lastSeen: d.updatedAt ? new Date(d.updatedAt * 1000).toLocaleDateString() : 'Active',
             avatar: (d.displayName || d.email || 'U').slice(0, 2).toUpperCase(),
             joined: d.createdAt ? new Date(d.createdAt).toLocaleDateString() : '2026',
-            verified: Array.isArray(d.verifiedUTRs) && d.verifiedUTRs.length > 0,
+            verified: Boolean(d.proTier && d.proTier !== 'none'),
           });
         }
       });

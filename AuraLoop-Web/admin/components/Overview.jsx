@@ -59,6 +59,9 @@ export default function Overview({
     return matchesSearch && matchesCategory;
   });
 
+  // Limit to top 4 recent activities on Overview page to align with Featured Wallpapers height
+  const displayedActivities = filteredActivities.slice(0, 4);
+
   const toggleSelectAll = () => {
     if (selectedActivities.size === filteredActivities.length) {
       setSelectedActivities(new Set());
@@ -445,7 +448,28 @@ export default function Overview({
             className="table-card"
           >
             <div className="table-header-row">
-              <h2 className="table-title">Recent Real Activities</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <h2 className="table-title" style={{ margin: 0 }}>Recent Real Activities</h2>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab && setActiveTab('activity')}
+                  style={{
+                    background: 'var(--accent-orange-light)',
+                    border: 'none',
+                    color: 'var(--accent-orange)',
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    padding: '3px 10px',
+                    borderRadius: 999,
+                    transition: 'opacity 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.8')}
+                  onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+                >
+                  See More →
+                </button>
+              </div>
               <div className="table-controls">
                 <input
                   type="text"
@@ -504,14 +528,14 @@ export default function Overview({
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredActivities.length === 0 ? (
+                  {displayedActivities.length === 0 ? (
                     <tr>
                       <td colSpan="7" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
                         No recent activities found matching your filters.
                       </td>
                     </tr>
                   ) : (
-                    filteredActivities.map((act) => (
+                    displayedActivities.map((act) => (
                       <tr key={act.id}>
                         <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)' }}>
                           {act.id}
@@ -597,6 +621,45 @@ export default function Overview({
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* View Full Activity Page Footer */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 18px',
+                borderTop: '1px solid var(--border-color)',
+                background: 'var(--bg-main)',
+                borderRadius: '0 0 var(--border-radius-card) var(--border-radius-card)',
+              }}
+            >
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>
+                Showing top {displayedActivities.length} of {filteredActivities.length} recent activities
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab && setActiveTab('activity')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--accent-orange)',
+                  fontWeight: 700,
+                  fontSize: 12.5,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '4px 6px',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
+              >
+                <span>View Full Activity Log ({activities.length})</span>
+                <span style={{ fontSize: 14 }}>→</span>
+              </button>
             </div>
           </motion.div>
         </div>

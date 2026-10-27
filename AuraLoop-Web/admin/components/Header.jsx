@@ -15,6 +15,7 @@ export default function Header({
   theme = 'light',
   onLogout,
   onNavigateManage,
+  onBackToSite,
 }) {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
@@ -176,6 +177,34 @@ export default function Header({
           )}
         </AnimatePresence>
 
+        {onBackToSite && (
+          <motion.button
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.96 }}
+            onClick={onBackToSite}
+            style={{
+              height: '40px',
+              padding: '0 16px',
+              borderRadius: '999px',
+              border: '1px solid var(--border-color)',
+              background: 'var(--bg-card)',
+              color: 'var(--text-primary)',
+              fontSize: '13px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '7px',
+              boxShadow: 'var(--shadow-sm)',
+              boxSizing: 'border-box'
+            }}
+          >
+            <span style={{ fontSize: '14px', lineHeight: 1 }}>←</span>
+            <span>Public Site</span>
+          </motion.button>
+        )}
+
         {/* Animated Refresh Button */}
         <motion.button
           whileHover={{ scale: 1.08 }}
@@ -205,8 +234,8 @@ export default function Header({
             whileTap={{ scale: 0.94 }}
             onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
             style={{
-              width: 38,
-              height: 38,
+              width: 40,
+              height: 40,
               borderRadius: '50%',
               background: 'linear-gradient(135deg, #222630 0%, #151820 100%)',
               border: '2px solid rgba(255, 91, 38, 0.45)',
@@ -215,9 +244,10 @@ export default function Header({
               alignItems: 'center',
               justifyContent: 'center',
               fontWeight: 700,
-              fontSize: 13,
+              fontSize: 13.5,
               cursor: 'pointer',
               boxShadow: '0 2px 8px rgba(0, 0, 0, 0.12)',
+              boxSizing: 'border-box'
             }}
             title="Account Menu"
           >

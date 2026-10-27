@@ -3,7 +3,8 @@ import { useEscape, useFocusTrap, useScrollLock } from '../../../shared/a11y.js'
 import { prefersReducedMotion } from '../../../shared/gsap.js';
 import { goToWaitlist, useMedia } from '../lib.js';
 import { Bolt, Close, Menu, ArrowRight } from '../icons.jsx';
-import { onAuthStateChanged } from '../lib/auth.js';
+import { subscribeAuth, signOutUser } from '../lib/firebase.js';
+import { usePricing } from '../lib/pricingService.js';
 
 const MENU = [
   { href: '#wallpapers', label: '4K Wallpapers' },
@@ -12,14 +13,25 @@ const MENU = [
   { href: '#manifesto', label: 'Architecture' },
 ];
 
-export default function Nav({ onOpenAuth }) {
+export default function Nav({ user: propUser, onOpenAuth, onOpenAccount, onNavigateToAdmin, onSignOut }) {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [user, setUser] = useState(null);
+  const [localUser, setLocalUser] = useState(null);
   const ringRef = useRef(null);
   const desktop = useMedia('(min-width: 860px)', true);
 
-  useEffect(() => onAuthStateChanged(setUser), []);
+  const user = propUser !== undefined ? propUser : localUser;
+  const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || 'theavdeshjadon@gmail.com').toLowerCase();
+  const isAdmin = user?.email?.toLowerCase() === adminEmail || sessionStorage.getItem('auraloop_admin_session') === 'authenticated';
+  const pricing = usePricing();
+
+  useEffect(() => {
+    if (propUser === undefined) {
+      return subscribeAuth(setLocalUser);
+    }
+  }, [propUser]);
+
+
 
   useEscape(open, () => setOpen(false));
   useFocusTrap(ringRef, open);
@@ -94,86 +106,177 @@ export default function Nav({ onOpenAuth }) {
           <div className="ta-nav__actions">
             {user ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={onNavigateToAdmin}
+                    style={{
+                      height: '36px',
+                      padding: '0 16px',
+                      borderRadius: '999px',
+                      background: '#17130f',
+                      border: '1px solid rgba(23, 19, 15, 0.2)',
+                      color: '#ffffff',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#2a241f')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '#17130f')}
+                  >
+                    Admin
+                  </button>
+                )}
+
+                {user.proTier === 'none' && (
+                  <button
+                    type="button"
+                    onClick={onOpenAccount}
+                    style={{
+                      height: '36px',
+                      padding: '0 16px',
+                      borderRadius: '999px',
+                      background: 'linear-gradient(135deg, #e4572e 0%, #b93c18 100%)',
+                      border: 'none',
+                      color: '#ffffff',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '5px',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(228,87,46,0.3)',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.08)')}
+                    onMouseLeave={e => (e.currentTarget.style.filter = 'brightness(1)')}
+                  >
+                    <span>✦</span>
+                    <span>Upgrade {pricing.currency}{pricing.price}</span>
+                  </button>
+                )}
+
                 <button
                   type="button"
-                  className="ta-btn"
-                  onClick={() => onOpenAuth?.('account')}
-                  style={{
-                    background: user.proTier !== 'none'
-                      ? 'linear-gradient(135deg, #e4572e 0%, #b93c18 100%)'
-                      : 'rgba(23, 19, 15, 0.06)',
-                    border: user.proTier !== 'none' ? 'none' : '1px solid rgba(23, 19, 15, 0.12)',
-                    borderRadius: '999px',
-                    padding: '7px 15px',
-                    color: user.proTier !== 'none' ? '#ffffff' : '#17130f',
-                    fontSize: '12.5px',
-                    fontWeight: '600',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {user.proTier !== 'none' ? '✦ Lifetime VIP' : '✦ Upgrade to Pro'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onOpenAuth?.('account')}
+                  onClick={onOpenAccount}
                   title="My Account"
                   style={{
-                    width: '34px',
-                    height: '34px',
-                    borderRadius: '50%',
-                    background: '#17130f',
-                    color: '#ffffff',
-                    border: 'none',
-                    fontWeight: '700',
-                    fontSize: '13px',
+                    height: '36px',
+                    padding: '0 14px 0 4px',
+                    borderRadius: '999px',
+                    background: 'rgba(23, 19, 15, 0.06)',
+                    border: '1px solid rgba(23, 19, 15, 0.12)',
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    cursor: 'pointer'
+                    gap: '8px',
+                    cursor: 'pointer',
+                    boxSizing: 'border-box',
+                    transition: 'all 0.15s ease'
                   }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(23, 19, 15, 0.1)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'rgba(23, 19, 15, 0.06)')}
                 >
-                  {user.displayName ? user.displayName[0].toUpperCase() : 'A'}
+                  <div
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '50%',
+                      background: user.proTier !== 'none'
+                        ? 'linear-gradient(135deg, #e4572e 0%, #b93c18 100%)'
+                        : '#17130f',
+                      color: '#ffffff',
+                      fontWeight: '700',
+                      fontSize: '12.5px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}
+                  >
+                    {user.displayName ? user.displayName[0].toUpperCase() : 'A'}
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      color: '#17130f',
+                      maxWidth: '110px',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}
+                  >
+                    {user.displayName ? user.displayName.split(' ')[0] : 'Account'}
+                  </span>
+                  {user.proTier !== 'none' && (
+                    <span
+                      style={{
+                        width: '6px',
+                        height: '6px',
+                        borderRadius: '50%',
+                        backgroundColor: '#e4572e',
+                        boxShadow: '0 0 6px #e4572e',
+                        display: 'inline-block'
+                      }}
+                      title="Lifetime VIP"
+                    />
+                  )}
                 </button>
               </div>
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <button
                   type="button"
-                  className="ta-btn"
                   onClick={() => onOpenAuth?.('signin')}
                   style={{
+                    height: '36px',
+                    padding: '0 16px',
+                    borderRadius: '999px',
                     background: 'transparent',
                     border: '1px solid rgba(23, 19, 15, 0.14)',
-                    borderRadius: '999px',
-                    padding: '7px 14px',
                     color: '#17130f',
-                    fontSize: '12.5px',
+                    fontSize: '13px',
                     fontWeight: '600',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    cursor: 'pointer'
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
                   }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(23, 19, 15, 0.05)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
                   Sign In
                 </button>
                 <button
                   type="button"
-                  className="ta-btn ta-btn--ember"
                   onClick={() => onOpenAuth?.('signup')}
                   style={{
+                    height: '36px',
+                    padding: '0 16px',
                     borderRadius: '999px',
-                    padding: '7px 16px',
-                    fontSize: '12.5px',
+                    background: 'linear-gradient(135deg, #e4572e 0%, #b93c18 100%)',
+                    border: 'none',
+                    color: '#ffffff',
+                    fontSize: '13px',
                     fontWeight: '600',
                     display: 'inline-flex',
                     alignItems: 'center',
+                    justifyContent: 'center',
                     gap: '5px',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(228,87,46,0.3)',
+                    transition: 'all 0.15s ease'
                   }}
+                  onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.08)')}
+                  onMouseLeave={e => (e.currentTarget.style.filter = 'brightness(1)')}
                 >
                   <span>Sign Up</span>
                   <span style={{ fontSize: '11px' }}>↗</span>
@@ -209,14 +312,131 @@ export default function Nav({ onOpenAuth }) {
           </nav>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
             {user ? (
-              <button
-                type="button"
-                className="ta-btn ta-btn--ember"
-                style={{ width: '100%', padding: '12px', borderRadius: '12px', fontSize: '14px', fontWeight: '600' }}
-                onClick={() => { setOpen(false); onOpenAuth?.('account'); }}
-              >
-                {user.proTier !== 'none' ? '✦ Lifetime VIP Member' : '✦ Upgrade to Pro'}
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '12px 14px',
+                    background: 'rgba(23, 19, 15, 0.04)',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(23, 19, 15, 0.08)'
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '50%',
+                      background: user.proTier !== 'none'
+                        ? 'linear-gradient(135deg, #e4572e 0%, #b93c18 100%)'
+                        : '#17130f',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: '700',
+                      fontSize: '14px'
+                    }}
+                  >
+                    {user.displayName ? user.displayName[0].toUpperCase() : 'A'}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#17130f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {user.displayName || 'AuraLoop User'}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#6e655d', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {user.email}
+                    </div>
+                  </div>
+                </div>
+
+                {isAdmin && (
+                  <button
+                    type="button"
+                    className="ta-btn"
+                    style={{
+                      width: '100%',
+                      padding: '11px',
+                      borderRadius: '12px',
+                      background: 'linear-gradient(135deg, #17130f 0%, #2f2721 100%)',
+                      border: '1px solid rgba(228,87,46,0.4)',
+                      color: '#ffffff',
+                      fontSize: '13.5px',
+                      fontWeight: '700',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px'
+                    }}
+                    onClick={() => {
+                      setOpen(false);
+                      onNavigateToAdmin?.();
+                    }}
+                  >
+                    <span>⚡️</span>
+                    <span>Admin Dashboard (/admin)</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  className="ta-btn ta-btn--ember"
+                  style={{ width: '100%', padding: '12px', borderRadius: '12px', fontSize: '14px', fontWeight: '600' }}
+                  onClick={() => {
+                    setOpen(false);
+                    onOpenAccount?.();
+                  }}
+                >
+                  👤 My Profile & Account Settings
+                </button>
+
+                {user.proTier === 'none' && (
+                  <button
+                    type="button"
+                    className="ta-btn"
+                    style={{
+                      width: '100%',
+                      padding: '11px',
+                      borderRadius: '12px',
+                      border: '1.5px solid #e4572e',
+                      background: '#fff',
+                      color: '#e4572e',
+                      fontSize: '14px',
+                      fontWeight: '700'
+                    }}
+                    onClick={() => {
+                      setOpen(false);
+                      onOpenAccount?.();
+                    }}
+                  >
+                    ✦ Upgrade to Lifetime Pro ({pricing.currency}{pricing.price})
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  className="ta-btn"
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(239,68,68,0.2)',
+                    background: 'rgba(239,68,68,0.06)',
+                    color: '#b91c1c',
+                    fontSize: '13.5px',
+                    fontWeight: '600'
+                  }}
+                  onClick={async () => {
+                    setOpen(false);
+                    await signOutUser();
+                    if (onSignOut) onSignOut();
+                  }}
+                >
+                  Sign Out
+                </button>
+              </div>
             ) : (
               <>
                 <button

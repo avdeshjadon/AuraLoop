@@ -9,6 +9,7 @@ import {
   Mail,
 } from 'lucide-react';
 import { getR2Config, saveR2Config, testR2Connection } from '../services/r2Service';
+import { getPricingConfig, savePricingConfig } from '../../lib/pricingService';
 
 export default function Settings({ showToast, theme, setTheme }) {
   const [config, setConfig] = useState(getR2Config());
@@ -17,11 +18,30 @@ export default function Settings({ showToast, theme, setTheme }) {
 
   // Admin Security State
   const [adminEmail, setAdminEmail] = useState(
-    () => localStorage.getItem('auraloop_custom_admin_email') || import.meta.env.VITE_ADMIN_EMAIL || 'theavdeshjadon@gmail.com'
+    () => localStorage.getItem('auraloop_custom_admin_email') || import.meta.env.VITE_ADMIN_EMAIL || ''
   );
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  // Pricing & UPI Membership Settings State
+  const [pricing, setPricing] = useState(getPricingConfig);
+  const [savingPricing, setSavingPricing] = useState(false);
+
+  const handleSavePricing = async (e) => {
+    e.preventDefault();
+    setSavingPricing(true);
+    await savePricingConfig({
+      price: Number(pricing.price) || 0,
+      originalPrice: Number(pricing.originalPrice) || 0,
+      currency: pricing.currency || '₹',
+      upiId: (pricing.upiId || '').trim(),
+      planTitle: (pricing.planTitle || '').trim(),
+      description: (pricing.description || '').trim(),
+    });
+    setSavingPricing(false);
+    showToast('Pricing updated! Reflecting live on the website in real-time.');
+  };
 
   const handleSaveR2 = (e) => {
     e.preventDefault();
@@ -34,10 +54,9 @@ export default function Settings({ showToast, theme, setTheme }) {
     const existingPassword =
       localStorage.getItem('auraloop_custom_admin_password') ||
       import.meta.env.VITE_ADMIN_PASSWORD ||
-      'Avdesh@6201979695';
-    const altPassword = import.meta.env.VITE_ADMIN_PASSWORD_ALT || 'Avdesh@6201979695';
+      '';
 
-    if (currentPassword !== existingPassword && currentPassword !== altPassword) {
+    if (existingPassword && currentPassword !== existingPassword) {
       showToast('Current password does not match.');
       return;
     }
@@ -86,8 +105,78 @@ export default function Settings({ showToast, theme, setTheme }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 24 }}>
-        {/* LEFT COLUMN: R2 CONFIG & SECURITY */}
+        {/* LEFT COLUMN: PRICING, SECURITY & R2 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          {/* MEMBERSHIP PRICING CONTROL CARD */}
+          <div className="admin-card">
+            <div style={{ marginBottom: 20 }}>
+              <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
+                Membership Pricing
+              </h2>
+              <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--text-secondary)' }}>
+                Configure the subscription price and plan title shown to users.
+              </p>
+            </div>
+
+            <form onSubmit={handleSavePricing} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6, display: 'block' }}>
+                    Active Selling Price (₹ INR)
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    step="1"
+                    value={pricing.price}
+                    onChange={(e) => setPricing({ ...pricing, price: Number(e.target.value) })}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'var(--bg-input)', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6, display: 'block' }}>
+                    Original Strikethrough Price (₹ INR)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={pricing.originalPrice}
+                    onChange={(e) => setPricing({ ...pricing, originalPrice: Number(e.target.value) })}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'var(--bg-input)', fontSize: 13, color: 'var(--text-muted)', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6, display: 'block' }}>
+                  Plan Title / Display Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={pricing.planTitle}
+                  onChange={(e) => setPricing({ ...pricing, planTitle: e.target.value })}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'var(--bg-input)', fontSize: 13, color: 'var(--text-primary)', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+                <button
+                  type="submit"
+                  disabled={savingPricing}
+                  className="primary-cta-btn"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, opacity: savingPricing ? 0.7 : 1 }}
+                >
+                  <Save size={15} />
+                  <span>{savingPricing ? 'Saving...' : 'Save Pricing'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
           {/* ADMIN CREDENTIALS CARD */}
           <div className="admin-card">
             <div style={{ marginBottom: 20 }}>

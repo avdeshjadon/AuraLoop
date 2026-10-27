@@ -581,7 +581,7 @@ struct SettingsView: View {
 
                     Text(store.proTier != .none
                          ? "\(store.proTier.displayLimit) unlocked · Unlimited 4K 60fps playback"
-                         : "Unlock up to 300+ 4K 60fps premium live wallpapers starting at ₹129")
+                         : "Unlock 1,582+ 4K 60fps premium live wallpapers & features")
                         .font(.system(size: 11.5))
                         .foregroundStyle(Color.AuraLoopSecondary)
                 }

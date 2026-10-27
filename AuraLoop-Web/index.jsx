@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, useEffect } from 'react';
+import { useLayoutEffect, useRef, useState, useEffect, useCallback } from 'react';
 import { MotionConfig } from 'motion/react';
 import '@fontsource-variable/geist';
 import '@fontsource-variable/geist-mono';
@@ -13,6 +13,9 @@ import Workflows from './components/Workflows.jsx';
 import Manifesto from './components/Manifesto.jsx';
 import Footer from './components/Footer.jsx';
 import AuthPage from './components/AuthPage.jsx';
+import AccountPage from './components/AccountPage.jsx';
+import AdminDashboard from './admin/AdminDashboard.jsx';
+import { subscribeAuth } from './lib/firebase.js';
 
 export default function AuraLoopWeb() {
   useSiteMeta({
@@ -26,9 +29,31 @@ export default function AuraLoopWeb() {
 
   const rootRef = useRef(null);
 
-  // Page view state: 'home' | 'auth'
+  // User auth state
+  const [user, setUser] = useState(null);
+
+  // Page view state: 'home' | 'account' | 'auth' | 'admin'
   const [view, setView] = useState('home');
-  const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup' | 'account'
+  const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup'
+
+  // Toast notification
+  const [toast, setToast] = useState(null);
+
+  const showToast = useCallback((message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(current => (current?.message === message ? null : current));
+    }, 4500);
+  }, []);
+
+  // Listen to Firebase auth state
+  useEffect(() => {
+    return subscribeAuth(currentUser => {
+      setUser(currentUser);
+    });
+  }, []);
+
+  const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || 'theavdeshjadon@gmail.com').toLowerCase();
 
   useEffect(() => {
     const handleRoute = () => {
@@ -37,15 +62,37 @@ export default function AuraLoopWeb() {
         const params = new URLSearchParams(window.location.search);
         const action = params.get('action');
 
-        if (path === '/login' || action === 'login' || action === 'signin') {
-          setAuthMode('signin');
-          setView('auth');
+        if (path === '/admin' || action === 'admin') {
+          const isSessionAuthed = sessionStorage.getItem('auraloop_admin_session') === 'authenticated';
+          const isUserAdmin = user?.email?.toLowerCase() === adminEmail;
+          if (isSessionAuthed || isUserAdmin) {
+            setView('admin');
+          } else {
+            setAuthMode('signin');
+            setView('auth');
+            showToast('Please sign in with administrator credentials.', 'error');
+          }
+        } else if (path === '/account' || path === '/profile' || action === 'account' || action === 'profile' || path === '/upgrade' || action === 'upgrade' || action === 'pro') {
+          if (user) {
+            setView('account');
+          } else {
+            setAuthMode('signin');
+            setView('auth');
+          }
+        } else if (path === '/login' || action === 'login' || action === 'signin') {
+          if (user) {
+            setView('account');
+          } else {
+            setAuthMode('signin');
+            setView('auth');
+          }
         } else if (path === '/signup' || path === '/register' || action === 'signup' || action === 'register') {
-          setAuthMode('signup');
-          setView('auth');
-        } else if (path === '/account' || path === '/upgrade' || action === 'upgrade' || action === 'pro') {
-          setAuthMode('account');
-          setView('auth');
+          if (user) {
+            setView('account');
+          } else {
+            setAuthMode('signup');
+            setView('auth');
+          }
         } else {
           setView('home');
         }
@@ -55,13 +102,17 @@ export default function AuraLoopWeb() {
     handleRoute();
     window.addEventListener('popstate', handleRoute);
     return () => window.removeEventListener('popstate', handleRoute);
-  }, []);
+  }, [user, adminEmail, showToast]);
 
   const navigateToAuth = (mode = 'signin') => {
+    if (user && mode === 'account') {
+      navigateToAccount();
+      return;
+    }
     setAuthMode(mode);
     setView('auth');
     try {
-      const path = mode === 'signup' ? '/signup' : mode === 'account' ? '/account' : '/login';
+      const path = mode === 'signup' ? '/signup' : '/login';
       window.history.pushState(null, '', path);
     } catch {}
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -73,6 +124,63 @@ export default function AuraLoopWeb() {
       window.history.pushState(null, '', '/');
     } catch {}
     window.scrollTo({ top: 0, behavior: 'instant' });
+  };
+
+  const navigateToAccount = () => {
+    if (user) {
+      setView('account');
+      try {
+        window.history.pushState(null, '', '/account');
+      } catch {}
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    } else {
+      navigateToAuth('signin');
+    }
+  };
+
+  const navigateToAdmin = () => {
+    const isSessionAuthed = sessionStorage.getItem('auraloop_admin_session') === 'authenticated';
+    const isUserAdmin = user?.email?.toLowerCase() === adminEmail;
+    if (isSessionAuthed || isUserAdmin) {
+      setView('admin');
+      try {
+        window.history.pushState(null, '', '/admin');
+      } catch {}
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    } else {
+      navigateToAuth('signin');
+      showToast('Please sign in with administrator credentials.', 'error');
+    }
+  };
+
+  const handleAuthSuccess = (authUser, welcomeMsg) => {
+    setUser(authUser);
+    const isUserAdmin = authUser?.email?.toLowerCase() === adminEmail || sessionStorage.getItem('auraloop_admin_session') === 'authenticated';
+
+    if (isUserAdmin) {
+      setView('admin');
+      try {
+        window.history.pushState(null, '', '/admin');
+      } catch {}
+    } else {
+      setView('home');
+      try {
+        window.history.pushState(null, '', '/');
+      } catch {}
+    }
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    showToast(welcomeMsg || `Welcome back, ${authUser?.displayName || 'friend'}!`);
+  };
+
+  const handleSignOutSuccess = () => {
+    sessionStorage.removeItem('auraloop_admin_session');
+    sessionStorage.removeItem('auraloop_admin_email');
+    setUser(null);
+    setView('home');
+    try {
+      window.history.pushState(null, '', '/');
+    } catch {}
+    showToast('Signed out of AuraLoop successfully.', 'info');
   };
 
   // In-page anchors scroll smoothly via JS, so programmatic scrolling (tools, hash restore)
@@ -117,18 +225,102 @@ export default function AuraLoopWeb() {
     { scope: rootRef, dependencies: [view] }
   );
 
-  if (view === 'auth') {
+  // 1. Merged Admin Dashboard Route (/admin)
+  if (view === 'admin') {
     return (
       <MotionConfig reducedMotion="user">
-        <AuthPage initialMode={authMode} onBackToHome={navigateToHome} />
+        <AdminDashboard
+          onBackToSite={navigateToHome}
+          currentUser={user}
+        />
       </MotionConfig>
     );
   }
 
+  // 2. Separate Detailed Account Page Route (/account)
+  if (view === 'account') {
+    return (
+      <MotionConfig reducedMotion="user">
+        <AccountPage
+          user={user}
+          onBackToHome={navigateToHome}
+          onNavigateToAdmin={navigateToAdmin}
+          onUserUpdated={setUser}
+          onSignOutSuccess={handleSignOutSuccess}
+        />
+      </MotionConfig>
+    );
+  }
+
+  // 3. Auth Page Route (/login, /signup)
+  if (view === 'auth') {
+    return (
+      <MotionConfig reducedMotion="user">
+        <AuthPage
+          initialMode={authMode}
+          onBackToHome={navigateToHome}
+          onAuthSuccess={handleAuthSuccess}
+        />
+      </MotionConfig>
+    );
+  }
+
+  // 4. Main Home Page Route (/)
   return (
     <MotionConfig reducedMotion="user">
       <div className="ta" ref={rootRef} onClick={onAnchorClick}>
-        <Nav onOpenAuth={navigateToAuth} />
+        {/* Floating Toast Notification */}
+        {toast && (
+          <div
+            style={{
+              position: 'fixed',
+              top: '20px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 999999,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '12px 22px',
+              borderRadius: '999px',
+              background: toast.type === 'error' ? '#991b1b' : '#17130f',
+              color: '#ffffff',
+              fontSize: '13.5px',
+              fontWeight: '600',
+              boxShadow: '0 12px 36px -8px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.15)',
+              backdropFilter: 'blur(12px)',
+              animation: 'toastSlideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+              pointerEvents: 'auto'
+            }}
+          >
+            <span>{toast.type === 'error' ? '⚠️' : '✨'}</span>
+            <span>{toast.message}</span>
+            <button
+              type="button"
+              onClick={() => setToast(null)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'rgba(255, 255, 255, 0.7)',
+                fontSize: '14px',
+                cursor: 'pointer',
+                padding: '0 4px',
+                marginLeft: '4px'
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        <Nav
+          user={user}
+          onOpenAuth={navigateToAuth}
+          onOpenAccount={navigateToAccount}
+          onNavigateToAdmin={navigateToAdmin}
+          onSignOut={handleSignOutSuccess}
+        />
+
         <main id="main" tabIndex={-1}>
           <Hero />
           <PeopleSection />
@@ -136,6 +328,7 @@ export default function AuraLoopWeb() {
           <Workflows />
           <Manifesto />
         </main>
+        
         <Footer />
       </div>
     </MotionConfig>

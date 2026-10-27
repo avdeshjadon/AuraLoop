@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2 } from 'lucide-react';
+import './admin.css';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Overview from './components/Overview';
@@ -17,11 +18,22 @@ import SineWaveTransition from './components/SineWaveTransition';
 import { fetchCatalog, saveCatalogToStorage, getCatalogStats, fallbackWallpapers } from './services/catalogService';
 import { getActivities, logActivity } from './services/activityService';
 
-export default function App() {
+export default function AdminDashboard({ onBackToSite, currentUser }) {
   // Authentication session check (persists across refreshes, requires login on fresh browser window)
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return sessionStorage.getItem('auraloop_admin_session') === 'authenticated';
+    const isSessionAuthed = sessionStorage.getItem('auraloop_admin_session') === 'authenticated';
+    const isUserAdmin = currentUser?.email?.toLowerCase() === (import.meta.env.VITE_ADMIN_EMAIL || 'theavdeshjadon@gmail.com').toLowerCase();
+    return isSessionAuthed || isUserAdmin;
   });
+
+  useEffect(() => {
+    if (currentUser?.email?.toLowerCase() === (import.meta.env.VITE_ADMIN_EMAIL || 'theavdeshjadon@gmail.com').toLowerCase()) {
+      setIsAuthenticated(true);
+      sessionStorage.setItem('auraloop_admin_session', 'authenticated');
+      sessionStorage.setItem('auraloop_admin_email', currentUser.email);
+    }
+  }, [currentUser]);
+
 
   const [activeTab, setActiveTab] = useState('overview');
   const [theme, setTheme] = useState(() => localStorage.getItem('auraloop_theme') || 'light');
@@ -264,6 +276,7 @@ export default function App() {
       <LoginPage
         onLoginSuccess={() => setIsAuthenticated(true)}
         showToast={showToast}
+        onBackToSite={onBackToSite}
       />
     );
   }
@@ -307,6 +320,7 @@ export default function App() {
           theme={theme}
           onLogout={handleLogout}
           onNavigateManage={handleNavigateToManage}
+          onBackToSite={onBackToSite}
         />
 
         {/* Tab Views with Fluid Smooth Page Transition */}
