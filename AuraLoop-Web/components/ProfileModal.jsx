@@ -535,41 +535,6 @@ export default function ProfileModal({ isOpen, onClose, user, onUserUpdated, onS
                 padding: '20px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '14px',
-                boxShadow: '0 8px 24px -6px rgba(228,87,46,0.15)'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                <div>
-                  <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#17130f' }}>
-                    Upgrade to {pricing.planTitle}
-                  </h4>
-                  <p style={{ margin: '3px 0 0', fontSize: '13px', color: '#6e655d' }}>
-                    {pricing.description || 'Unlock all 1,582+ 4K wallpapers in the macOS app & Web'}
-                  </p>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-                  <div style={{ fontSize: '24px', fontWeight: '800', color: '#e4572e' }}>
-                    {pricing.currency}{pricing.price}
-                  </div>
-                  {pricing.originalPrice > pricing.price && (
-                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#8c827a', textDecoration: 'line-through' }}>
-                      {pricing.currency}{pricing.originalPrice}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-            </div>
-          ) : (
-            <div
-              style={{
-                background: '#ffffff',
-                border: '1.5px solid #e4572e',
-                borderRadius: '18px',
-                padding: '20px',
-                display: 'flex',
-                flexDirection: 'column',
                 gap: '16px',
                 boxShadow: '0 8px 24px -6px rgba(228,87,46,0.15)'
               }}
