@@ -1,18 +1,20 @@
 // AuraLoop Catalog Service
-// Loads real wallpapers from /catalog.json (785+ wallpapers in Cloudflare R2)
-import bundledCatalog from '../data/catalog.json';
-
+// Loads real wallpapers from Cloudflare R2 / catalog.json (785+ wallpapers in Cloudflare R2)
+const R2_CATALOG_URL = 'https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/catalog.json';
 const STORAGE_KEY = 'auraloop_catalog_custom';
-export const fallbackWallpapers = bundledCatalog?.wallpapers || [];
+export const fallbackWallpapers = [];
 
 export async function fetchCatalog() {
   try {
-    const res = await fetch('/catalog.json');
+    let res = await fetch('/catalog.json');
+    if (!res.ok) {
+      res = await fetch(R2_CATALOG_URL);
+    }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const baseWallpapers = (data.wallpapers && data.wallpapers.length > 0)
       ? data.wallpapers
-      : fallbackWallpapers;
+      : [];
 
     // Check if there are local overrides/additions
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -28,7 +30,17 @@ export async function fetchCatalog() {
     }
     return baseWallpapers;
   } catch (err) {
-    console.warn('Network fetch for /catalog.json failed, using bundled catalog:', err);
+    console.warn('Network fetch for /catalog.json failed, checking R2 fallback:', err);
+    try {
+      const res = await fetch(R2_CATALOG_URL);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.wallpapers && data.wallpapers.length > 0) {
+          return data.wallpapers;
+        }
+      }
+    } catch (e) {}
+
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
