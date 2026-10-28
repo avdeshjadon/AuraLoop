@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { usePricing } from '../lib/pricingService.js';
 import { startCashfreeCheckout, startCashfreeDonation } from '../lib/paymentService.js';
-import { Check, Sparkles, Heart, Shield, ArrowRight } from 'lucide-react';
+import { Check, Heart, Shield, ArrowRight } from 'lucide-react';
 
 export default function PricingSection({ user, onOpenAuth, onUserUpdated }) {
   const pricing = usePricing();
@@ -95,11 +95,6 @@ export default function PricingSection({ user, onOpenAuth, onUserUpdated }) {
         
         {/* Section Header */}
         <div style={{ textAlign: 'center', maxWidth: '780px', margin: '0 auto 64px auto' }} data-reveal>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 14px', borderRadius: '999px', background: 'rgba(228,87,46,0.1)', color: '#b93c18', fontSize: '12.5px', fontWeight: '700', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '18px' }}>
-            <Sparkles size={14} />
-            <span>Transparent Pricing & Open Access</span>
-          </div>
-          
           <h2 style={{ fontSize: 'clamp(28px, 4vw, 44px)', fontWeight: '800', letterSpacing: '-0.025em', color: '#17130f', lineHeight: 1.15, margin: '0 0 18px 0' }}>
             Most of AuraLoop is 100% Free.<br />Support the Craft If You Wish.
           </h2>

@@ -7,7 +7,7 @@ export default function Manifesto() {
       <div className="ta-wrap">
         <div className="ta-about__top" data-reveal>
           <p className="ta-eyebrow">
-            <span>04</span> Manifesto
+            <span>02</span> Manifesto
           </p>
           <h2 id="ta-about-title" className="ta-about__name">
             <span className="sr-only">Manifesto: why we are called AuraLoop</span>

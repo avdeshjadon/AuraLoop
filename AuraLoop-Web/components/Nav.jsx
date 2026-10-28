@@ -7,9 +7,9 @@ import { subscribeAuth, signOutUser } from '../lib/firebase.js';
 import { usePricing } from '../lib/pricingService.js';
 
 const MENU = [
-  { href: '#wallpapers', label: '4K Wallpapers' },
-  { href: '#pricing', label: 'Pricing & Support' },
-  { href: '#manifesto', label: 'Architecture' },
+  { href: '#wallpapers', label: 'Wallpapers' },
+  { href: '#pricing', label: 'Pricing' },
+  { href: '#manifesto', label: 'Manifesto' },
 ];
 
 export default function Nav({ user: propUser, onOpenAuth, onOpenAccount, onNavigateToAdmin, onSignOut }) {
@@ -97,9 +97,8 @@ export default function Nav({ user: propUser, onOpenAuth, onOpenAccount, onNavig
           </a>
           <nav className="ta-nav__links" aria-label="Primary">
             <a href="#wallpapers">Wallpapers</a>
-            <a href="#features">Engine</a>
-            <a href="#workflows">Automation</a>
-            <a href="#manifesto">Architecture</a>
+            <a href="#pricing">Pricing</a>
+            <a href="#manifesto">Manifesto</a>
           </nav>
 
           <div className="ta-nav__actions">
