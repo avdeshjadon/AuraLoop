@@ -15,7 +15,8 @@ import Footer from './components/Footer.jsx';
 import AuthPage from './components/AuthPage.jsx';
 import AccountPage from './components/AccountPage.jsx';
 import AdminDashboard from './admin/AdminDashboard.jsx';
-import { subscribeAuth } from './lib/firebase.js';
+import FreePremiumModal from './components/FreePremiumModal.jsx';
+import { subscribeAuth, markFreePremiumNotifiedWeb } from './lib/firebase.js';
 
 export default function AuraLoopWeb() {
   useSiteMeta({
@@ -39,6 +40,7 @@ export default function AuraLoopWeb() {
 
   // Toast notification
   const [toast, setToast] = useState(null);
+  const [showRootGiftModal, setShowRootGiftModal] = useState(false);
 
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type });
@@ -51,8 +53,22 @@ export default function AuraLoopWeb() {
   useEffect(() => {
     return subscribeAuth(currentUser => {
       setUser(currentUser);
+      if (currentUser?.isGiftedPro || currentUser?.proTier === 'lifetime') {
+        const seen = localStorage.getItem(`auraloop_gifted_pro_seen_${currentUser.uid}`) === 'true';
+        if (!seen && !currentUser.freePremiumNotifiedWeb) {
+          setShowRootGiftModal(true);
+        }
+      }
     });
   }, []);
+
+  const handleRootDismissGiftModal = async () => {
+    setShowRootGiftModal(false);
+    if (user?.uid) {
+      await markFreePremiumNotifiedWeb(user.uid);
+      setUser(prev => prev ? { ...prev, freePremiumNotifiedWeb: true } : prev);
+    }
+  };
 
   const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || 'theavdeshjadon@gmail.com').toLowerCase();
 
@@ -303,6 +319,13 @@ export default function AuraLoopWeb() {
   return (
     <MotionConfig reducedMotion="user">
       <div className="ta" ref={rootRef} onClick={onAnchorClick}>
+        {/* Free Premium Celebration Popup */}
+        <FreePremiumModal
+          isOpen={showRootGiftModal}
+          onClose={handleRootDismissGiftModal}
+          user={user}
+        />
+
         {/* Floating Toast Notification */}
         {toast && (
           <div

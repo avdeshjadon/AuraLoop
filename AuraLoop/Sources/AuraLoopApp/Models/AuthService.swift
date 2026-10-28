@@ -28,14 +28,27 @@ public struct CloudUserData: Codable {
     public var isSuspended: Bool?
     public var suspensionReason: String?
     public var updatedAt: Double?
+    public var isGiftedPro: Bool?
+    public var freePremiumNotifiedApp: Bool?
 
-    public init(proTier: String? = nil, verifiedUTRs: [String]? = nil, favorites: [String]? = nil, updatedAt: Double? = nil, isSuspended: Bool? = nil, suspensionReason: String? = nil) {
+    public init(
+        proTier: String? = nil,
+        verifiedUTRs: [String]? = nil,
+        favorites: [String]? = nil,
+        updatedAt: Double? = nil,
+        isSuspended: Bool? = nil,
+        suspensionReason: String? = nil,
+        isGiftedPro: Bool? = nil,
+        freePremiumNotifiedApp: Bool? = nil
+    ) {
         self.proTier = proTier
         self.verifiedUTRs = verifiedUTRs
         self.favorites = favorites
         self.updatedAt = updatedAt
         self.isSuspended = isSuspended
         self.suspensionReason = suspensionReason
+        self.isGiftedPro = isGiftedPro
+        self.freePremiumNotifiedApp = freePremiumNotifiedApp
     }
 
 
@@ -437,18 +450,56 @@ public final class AuthService: ObservableObject {
     }
 
     public func fetchCloudData(idToken: String, uid: String) async -> CloudUserData? {
-        // 1. Try Firebase Auth accounts:lookup
-        if let photoUrl = await fetchProfilePhotoUrl(idToken: idToken),
+        // 1. Try Firestore direct user doc
+        var cloud = await readFromFirestore(uid: uid, idToken: idToken)
+
+        // 2. Check settings/users_registry (shared Firestore registry)
+        if let reg = await readFromRegistry(uid: uid, idToken: idToken) {
+            if cloud == nil {
+                cloud = reg
+            } else {
+                if reg.isGiftedPro == true {
+                    cloud?.isGiftedPro = true
+                    cloud?.proTier = "lifetime"
+                }
+            }
+        }
+
+        // 3. Fallback to Firebase Auth accounts:lookup
+        if cloud == nil, let photoUrl = await fetchProfilePhotoUrl(idToken: idToken),
            let decoded = CloudUserData.decode(from: photoUrl) {
-            return decoded
+            cloud = decoded
         }
 
-        // 2. Fallback to Firestore if available
-        if let firestore = await readFromFirestore(uid: uid, idToken: idToken) {
-            return firestore
+        return cloud
+    }
+
+    private func readFromRegistry(uid: String, idToken: String) async -> CloudUserData? {
+        guard let url = URL(string: "https://firestore.googleapis.com/v1/projects/\(projectId)/databases/(default)/documents/settings/users_registry?key=\(apiKey)") else { return nil }
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        if !idToken.isEmpty {
+            req.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
         }
 
-        return nil
+        guard let (data, resp) = try? await URLSession.shared.data(for: req),
+              let http = resp as? HTTPURLResponse, http.statusCode == 200,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let fields = json["fields"] as? [String: Any],
+              let userMapObj = (fields[uid] as? [String: Any])?["mapValue"] as? [String: Any],
+              let userFields = userMapObj["fields"] as? [String: Any] else {
+            return nil
+        }
+
+        let tier = (userFields["proTier"] as? [String: Any])?["stringValue"] as? String
+        let isGifted = (userFields["isGiftedPro"] as? [String: Any])?["booleanValue"] as? Bool
+        let isNotified = (userFields["freePremiumNotifiedApp"] as? [String: Any])?["booleanValue"] as? Bool
+
+        return CloudUserData(
+            proTier: (isGifted == true) ? "lifetime" : tier,
+            isGiftedPro: isGifted,
+            freePremiumNotifiedApp: isNotified
+        )
     }
 
     private func updateProfilePhotoUrl(idToken: String, photoUrl: String) async {
@@ -495,6 +546,9 @@ public final class AuthService: ObservableObject {
         if let tier = data.proTier {
             fields["proTier"] = ["stringValue": tier]
         }
+        if let isGifted = data.isGiftedPro {
+            fields["isGiftedPro"] = ["booleanValue": isGifted]
+        }
         if let utrs = data.verifiedUTRs {
             fields["verifiedUTRs"] = ["arrayValue": ["values": utrs.map { ["stringValue": $0] }]]
         }
@@ -524,12 +578,20 @@ public final class AuthService: ObservableObject {
         }
 
         let tier = (fields["proTier"] as? [String: Any])?["stringValue"] as? String
+        let isGifted = (fields["isGiftedPro"] as? [String: Any])?["booleanValue"] as? Bool
+        let isNotified = (fields["freePremiumNotifiedApp"] as? [String: Any])?["booleanValue"] as? Bool
         let utrObj = (fields["verifiedUTRs"] as? [String: Any])?["arrayValue"] as? [String: Any]
         let utrList = (utrObj?["values"] as? [[String: Any]])?.compactMap { $0["stringValue"] as? String }
         let favObj = (fields["favorites"] as? [String: Any])?["arrayValue"] as? [String: Any]
         let favList = (favObj?["values"] as? [[String: Any]])?.compactMap { $0["stringValue"] as? String }
 
-        return CloudUserData(proTier: tier, verifiedUTRs: utrList, favorites: favList)
+        return CloudUserData(
+            proTier: (isGifted == true) ? "lifetime" : tier,
+            verifiedUTRs: utrList,
+            favorites: favList,
+            isGiftedPro: isGifted,
+            freePremiumNotifiedApp: isNotified
+        )
     }
 
     // MARK: - Error Mapping

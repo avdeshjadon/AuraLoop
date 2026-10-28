@@ -383,6 +383,7 @@ final class AppStore: ObservableObject {
     @Published var whatsNewOpen = false
     @Published var authSheetOpen = false
     @Published var proSheetOpen = false
+    @Published var showFreePremiumGiftAlert = false
     @Published var proTier: ProTier = .none
     @Published var verifiedUTRs: Set<String> = []
     /// Whether Home's banner is behind the top bar, for the light look's top
@@ -1406,6 +1407,27 @@ final class AppStore: ObservableObject {
                 alert.alertStyle = .critical
                 alert.addButton(withTitle: "OK")
                 alert.runModal()
+            }
+        }
+
+        // 5. Free Premium Gifted Popup & Automatic Upgrade
+        if cloud.isGiftedPro == true {
+            self.proTier = .lifetime
+            defaults.set(ProTier.lifetime.rawValue, forKey: "auraLoop_pro_tier")
+
+            let notifiedKey = "auraloop_gifted_pro_notified_v1"
+            if !defaults.bool(forKey: notifiedKey) {
+                defaults.set(true, forKey: notifiedKey)
+                DispatchQueue.main.async {
+                    self.showFreePremiumGiftAlert = true
+
+                    let alert = NSAlert()
+                    alert.messageText = "🎉 You Got Free Premium!"
+                    alert.informativeText = "Congratulations! Super Admin has granted your account complimentary AuraLoop Lifetime Pro access.\n\nAll 1,582+ 4K live wallpapers, screensavers, and audio sync are now fully unlocked."
+                    alert.alertStyle = .informational
+                    alert.addButton(withTitle: "Start Exploring 4K")
+                    alert.runModal()
+                }
             }
         }
     }

@@ -397,6 +397,13 @@ struct RootView: View {
             ProUpgradeSheet()
                 .environmentObject(store)
         }
+        .alert("🎉 You Got Free Premium!", isPresented: $store.showFreePremiumGiftAlert) {
+            Button("Start Exploring 4K", role: .cancel) {
+                store.showFreePremiumGiftAlert = false
+            }
+        } message: {
+            Text("Congratulations! Super Admin has granted your account complimentary AuraLoop Lifetime Pro access.\n\nAll 1,582+ 4K live wallpapers, screensavers, and audio sync are now fully unlocked.")
+        }
         // The lock screen is set, macOS just has not noticed. A dead-end
         // error here is what people reported; this says what finishes it and
         // offers the button that gets them there.

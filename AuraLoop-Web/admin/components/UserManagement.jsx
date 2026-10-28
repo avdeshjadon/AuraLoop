@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users,
@@ -15,12 +15,18 @@ import {
   KeyRound,
   CheckCircle,
   AlertCircle,
+  Crown,
+  Gift,
 } from 'lucide-react';
 import {
   fetchRealFirestoreUsers,
   saveRealUsers,
   REAL_ADMIN_USER,
   adminSignIn,
+  adminGrantFreePremium,
+  adminRevokePro,
+  adminToggleUserStatus,
+  subscribeRealUsers,
 } from '../services/firebaseAuthService';
 
 export default function UserManagement({
@@ -47,23 +53,46 @@ export default function UserManagement({
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPlan, setNewUserPlan] = useState('Pro Plan');
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
+  const loadUsers = useCallback(async (showNotification = false) => {
+    setLoading(true);
+    try {
       const data = await fetchRealFirestoreUsers();
       setUsers(data);
+      if (showNotification) {
+        showToast(`Refreshed ${data.length} registered accounts.`);
+      }
+    } catch (err) {
+      console.warn('Failed to load users:', err);
+    } finally {
       setLoading(false);
     }
-    load();
-  }, []);
+  }, [showToast]);
+
+  useEffect(() => {
+    loadUsers();
+    // Subscribe to live cloud updates
+    const unsubscribe = subscribeRealUsers((freshUsers) => {
+      if (freshUsers && freshUsers.length > 0) {
+        setUsers(freshUsers);
+      }
+    });
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, [loadUsers]);
 
   const filteredUsers = users.filter((u) => {
     const matchesSearch =
-      u.name.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase()) ||
-      u.device.toLowerCase().includes(search.toLowerCase());
+      (u.name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (u.email || '').toLowerCase().includes(search.toLowerCase()) ||
+      (u.device || '').toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'All' || u.status === statusFilter;
-    const matchesPlan = planFilter === 'All' || u.plan.includes(planFilter);
+    const isPro = u.plan?.includes('Pro') || u.isGiftedPro;
+    const matchesPlan =
+      planFilter === 'All' ||
+      (planFilter === 'Pro' && isPro) ||
+      (planFilter === 'Free' && !isPro && u.plan !== 'Super Admin') ||
+      (planFilter === 'Super Admin' && u.plan === 'Super Admin');
     return matchesSearch && matchesStatus && matchesPlan;
   });
 
@@ -75,8 +104,7 @@ export default function UserManagement({
       await adminSignIn(authEmail, authPassword);
       showToast('Firebase Admin Session Authenticated!');
       setIsAuthModalOpen(false);
-      const updated = await fetchRealFirestoreUsers();
-      setUsers(updated);
+      await loadUsers();
     } catch (err) {
       setAuthError(err.message);
     } finally {
@@ -93,27 +121,33 @@ export default function UserManagement({
 
     onTriggerConfirmation({
       title: 'Register Real AuraLoop Account',
-      message: `Confirm creating real user record for "${newUserEmail}" with ${newUserPlan}?`,
+      message: `Confirm creating user record for "${newUserEmail}" with ${newUserPlan}?`,
       targetName: newUserEmail,
       actionType: 'primary',
       confirmText: 'Create Account',
-      onConfirm: () => {
+      onConfirm: async () => {
+        const isPro = newUserPlan === 'Pro Plan';
         const newUserObj = {
           id: `USR_${Date.now()}`,
           name: newUserName.trim() || newUserEmail.split('@')[0],
           email: newUserEmail.trim(),
-          role: newUserPlan === 'Pro Plan' ? 'Pro Member' : 'Free User',
+          role: isPro ? 'Pro Member' : 'Free User',
           status: 'Active',
           plan: newUserPlan,
+          isGiftedPro: isPro,
           device: 'MacBook Pro (Apple Silicon macOS)',
           downloads: 0,
           lastSeen: 'Registered Today',
           avatar: (newUserName || newUserEmail).slice(0, 2).toUpperCase(),
           joined: new Date().toLocaleDateString(),
-          verified: true,
+          verified: isPro,
         };
 
-        const updated = [newUserObj, ...users];
+        if (isPro) {
+          await adminGrantFreePremium(newUserObj);
+        }
+
+        const updated = [newUserObj, ...users.filter(u => u.email.toLowerCase() !== newUserEmail.toLowerCase())];
         setUsers(updated);
         saveRealUsers(updated);
         showToast(`Account created for ${newUserEmail}`);
@@ -145,30 +179,14 @@ export default function UserManagement({
       actionType: nextStatus === 'Active' ? 'success' : 'danger',
       confirmText: `${nextStatus} Account`,
       onConfirm: async () => {
-        const isSuspended = nextStatus === 'Suspended';
-        const updated = users.map((u) =>
-          u.id === user.id ? { ...u, status: nextStatus, isSuspended } : u
-        );
+        const updatedUser = await adminToggleUserStatus(user);
+        const updated = users.map((u) => (u.id === user.id ? updatedUser : u));
         setUsers(updated);
-        saveRealUsers(updated);
 
-        // Sync with Firestore if possible
-        try {
-          const { doc, updateDoc } = await import('firebase/firestore');
-          const { db } = await import('../services/firebaseAuthService');
-          await updateDoc(doc(db, 'users', user.id), {
-            isSuspended,
-            status: nextStatus,
-            updatedAt: Date.now() / 1000,
-          });
-        } catch (e) {
-          // If offline or permission requires admin token, local storage is updated
-        }
-
-        showToast(`User ${isSuspended ? 'suspended' : 'activated'}. Client sync triggered.`);
+        showToast(`User ${updatedUser.status === 'Suspended' ? 'suspended' : 'activated'}. Client sync triggered.`);
         logActivity({
           title: user.name,
-          action: isSuspended ? 'Account Suspended (Screen Blackout)' : 'Account Re-activated',
+          action: updatedUser.status === 'Suspended' ? 'Account Suspended (Screen Blackout)' : 'Account Re-activated',
           category: 'User Sync',
           size: user.plan,
           type: 'user',
@@ -177,56 +195,106 @@ export default function UserManagement({
     });
   };
 
+  /**
+   * Grant Free Lifetime Pro without Payment
+   */
+  const handleGrantFreePro = (user) => {
+    if (user.email === REAL_ADMIN_USER.email) {
+      showToast('Super Admin already has permanent full access.');
+      return;
+    }
 
-  const handleTogglePlan = (user) => {
+    onTriggerConfirmation({
+      title: '🎁 Grant Free Lifetime Pro',
+      message: `Confirm granting complimentary Lifetime Pro access to "${user.name}" (${user.email}) without payment? They will immediately receive full 4K access, and when they log in to the website or macOS app, they will see a celebration popup saying they got Free Premium!`,
+      targetName: `${user.name} (${user.email})`,
+      actionType: 'primary',
+      confirmText: 'Grant Free Lifetime Pro',
+      onConfirm: async () => {
+        try {
+          const updatedUser = await adminGrantFreePremium(user);
+          const updated = users.map((u) => (u.id === user.id ? updatedUser : u));
+          setUsers(updated);
+          showToast(`✨ Free Lifetime Pro granted to ${user.email}!`);
+          logActivity({
+            title: user.name,
+            action: 'Granted Free Lifetime Pro (Admin Gift)',
+            category: 'User Sync',
+            size: 'Lifetime Pro',
+            type: 'user',
+          });
+        } catch (err) {
+          showToast(`Failed to grant Pro: ${err.message}`);
+        }
+      },
+    });
+  };
+
+  /**
+   * Downgrade user back to Free Tier
+   */
+  const handleRevokePro = (user) => {
     if (user.email === REAL_ADMIN_USER.email) {
       showToast('Super Admin subscription tier is permanent.');
       return;
     }
 
-    const nextPlan = user.plan === 'Pro Plan' ? 'Free Tier' : 'Pro Plan';
     onTriggerConfirmation({
-      title: 'Update User Subscription Tier',
-      message: `Confirm changing subscription for "${user.name}" from ${user.plan} to ${nextPlan}?`,
+      title: 'Revoke Pro Subscription',
+      message: `Revert "${user.name}" (${user.email}) back to Free Tier?`,
       targetName: `${user.name} (${user.email})`,
-      actionType: 'primary',
-      confirmText: `Switch to ${nextPlan}`,
-      onConfirm: () => {
-        const updated = users.map((u) =>
-          u.id === user.id ? { ...u, plan: nextPlan } : u
-        );
+      actionType: 'danger',
+      confirmText: 'Switch to Free Tier',
+      onConfirm: async () => {
+        const updatedUser = await adminRevokePro(user);
+        const updated = users.map((u) => (u.id === user.id ? updatedUser : u));
         setUsers(updated);
-        saveRealUsers(updated);
-        showToast(`User upgraded to ${nextPlan}`);
+        showToast(`User switched to Free Tier`);
         logActivity({
           title: user.name,
-          action: `Switched tier to ${nextPlan}`,
+          action: 'Revoked Pro tier (Switched to Free)',
           category: 'User Sync',
-          size: nextPlan,
+          size: 'Free Tier',
           type: 'user',
         });
       },
     });
   };
 
+  const proCount = users.filter((u) => u.plan?.includes('Pro') || u.isGiftedPro).length;
+  const giftedCount = users.filter((u) => u.isGiftedPro).length;
+
   return (
     <div className="users-page">
       {/* Page Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 14 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: -0.5 }}>
-            Real User Directory & Firebase Auth
+            User Directory & Real-Time Sync
           </h1>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
+            Manage registered accounts, grant complimentary Lifetime Pro access, and sync live state with macOS & Web.
+          </p>
         </div>
 
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            className="btn-light-pill"
+            onClick={() => loadUsers(true)}
+            title="Reload users from cloud database"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          >
+            <RefreshCw size={14} className={loading ? 'spin' : ''} />
+            <span>Refresh</span>
+          </motion.button>
           <motion.button
             whileTap={{ scale: 0.95 }}
             className="btn-light-pill"
             onClick={() => setIsAuthModalOpen(true)}
           >
             <KeyRound size={15} />
-            <span>Firebase Login</span>
+            <span>Firebase Auth</span>
           </motion.button>
           <motion.button
             whileTap={{ scale: 0.95 }}
@@ -234,7 +302,7 @@ export default function UserManagement({
             onClick={() => setIsAddUserOpen(true)}
           >
             <Plus size={15} />
-            <span>Add Real User</span>
+            <span>Add User</span>
           </motion.button>
         </div>
       </div>
@@ -243,7 +311,7 @@ export default function UserManagement({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
           gap: 16,
           marginBottom: 24,
         }}
@@ -254,47 +322,50 @@ export default function UserManagement({
             <div className="metric-box-icon"><Users size={14} /></div>
           </div>
           <div className="metric-box-value">{users.length}</div>
-          <div className="metric-box-sub green">Real Firebase & local records</div>
+          <div className="metric-box-sub green">Real Firestore & Cloud Registry</div>
+        </div>
+
+        <div className="metric-box">
+          <div className="metric-box-header">
+            <span className="metric-box-label">Lifetime Pro Members</span>
+            <div className="metric-box-icon"><Crown size={14} /></div>
+          </div>
+          <div className="metric-box-value" style={{ color: 'var(--accent-orange)' }}>{proCount}</div>
+          <div className="metric-box-sub">Full 4K Unlocked Access</div>
         </div>
 
         <div className="metric-box orange-accent">
           <div className="metric-box-header">
-            <span className="metric-box-label">Primary Super Admin</span>
-            <div className="metric-box-icon"><Shield size={14} /></div>
+            <span className="metric-box-label">Complimentary Pro (Gifted)</span>
+            <div className="metric-box-icon"><Gift size={14} /></div>
           </div>
-          <div className="metric-box-value" style={{ fontSize: 18, fontWeight: 700 }}>
-            Avdesh Jadon
+          <div className="metric-box-value" style={{ fontSize: 24, fontWeight: 800 }}>
+            {giftedCount}
           </div>
-          <div className="metric-box-sub">theavdeshjadon@gmail.com</div>
+          <div className="metric-box-sub">Admin-granted Free Premium</div>
         </div>
 
         <div className="metric-box">
           <div className="metric-box-header">
-            <span className="metric-box-label">macOS Native Client</span>
+            <span className="metric-box-label">macOS Client Sync</span>
             <div className="metric-box-icon"><Laptop size={14} /></div>
           </div>
-          <div className="metric-box-value">M-Series</div>
-          <div className="metric-box-sub green">Apple Silicon Hardware Active</div>
-        </div>
-
-        <div className="metric-box">
-          <div className="metric-box-header">
-            <span className="metric-box-label">Library Masters Sync</span>
-            <div className="metric-box-icon"><Sparkles size={14} /></div>
-          </div>
-          <div className="metric-box-value">785 UHD</div>
-          <div className="metric-box-sub green">Synchronized with R2 Catalog</div>
+          <div className="metric-box-value">Active</div>
+          <div className="metric-box-sub green">Instant Cloud Sync On Login</div>
         </div>
       </div>
 
       {/* User Directory Table Card */}
       <div className="table-card">
         <div className="table-header-row">
-          <h2 className="table-title">Authenticated Users ({filteredUsers.length})</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <h2 className="table-title">Registered Users ({filteredUsers.length})</h2>
+            {loading && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Syncing...</span>}
+          </div>
           <div className="table-controls">
             <input
               type="text"
-              placeholder="Search real user, email, Mac..."
+              placeholder="Search by name, email, client..."
               className="table-search-input"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -328,110 +399,183 @@ export default function UserManagement({
               <tr>
                 <th>User & Email</th>
                 <th>Hardware & Client</th>
-                <th>Tier</th>
-                <th>Library Favorites</th>
+                <th>Subscription Tier</th>
+                <th>Favorites</th>
                 <th>Status</th>
-                <th>Session</th>
+                <th>Activity</th>
                 <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredUsers.map((u) => (
-                <tr key={u.id}>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: '50%',
-                          background: u.plan === 'Super Admin' ? '#14171A' : u.plan === 'Pro Plan' ? 'var(--accent-orange)' : '#4B5563',
-                          color: 'white',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 700,
-                          fontSize: 12,
-                        }}
-                      >
-                        {u.avatar}
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span>{u.name}</span>
-                          {u.plan === 'Super Admin' && (
-                            <span style={{ fontSize: 10, background: 'var(--accent-orange-light)', color: 'var(--accent-orange)', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>
-                              ADMIN
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{u.email}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}>
-                      <Laptop size={14} color="var(--text-muted)" />
-                      <span>{u.device}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <span
-                      style={{
-                        fontSize: 11.5,
-                        fontWeight: 700,
-                        padding: '3px 8px',
-                        borderRadius: 'var(--radius-pill)',
-                        background: u.plan === 'Super Admin' ? '#14171A' : u.plan.includes('Pro') ? 'var(--accent-orange-light)' : 'var(--bg-card-subtle)',
-                        color: u.plan === 'Super Admin' ? '#FFFFFF' : u.plan.includes('Pro') ? 'var(--accent-orange)' : 'var(--text-secondary)',
-                      }}
-                    >
-                      {u.plan}
-                    </span>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
-                      <Download size={13} color="var(--text-muted)" />
-                      <span>{u.downloads}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <span
-                      className={`status-pill ${
-                        u.status === 'Active' ? 'completed' : 'failed'
-                      }`}
-                    >
-                      <span className="status-dot" />
-                      {u.status}
-                    </span>
-                  </td>
-                  <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{u.lastSeen}</td>
-                  <td style={{ textAlign: 'right' }}>
-                    {u.email !== REAL_ADMIN_USER.email && (
-                      <div style={{ display: 'inline-flex', gap: 6 }}>
-                        <button
-                          className="btn-light-pill"
-                          style={{ padding: '4px 10px', fontSize: 11 }}
-                          onClick={() => handleTogglePlan(u)}
-                        >
-                          {u.plan === 'Pro Plan' ? 'Downgrade' : 'Upgrade Pro'}
-                        </button>
-                        <button
-                          className="btn-light-pill"
+              {filteredUsers.map((u) => {
+                const isUserPro = u.plan?.includes('Pro') || u.isGiftedPro;
+                const isSuperAdmin = u.email === REAL_ADMIN_USER.email || u.plan === 'Super Admin';
+
+                return (
+                  <tr key={u.id || u.email}>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div
                           style={{
-                            padding: '4px 10px',
-                            fontSize: 11,
-                            color: u.status === 'Active' ? '#DC2626' : '#10B981',
+                            width: 34,
+                            height: 34,
+                            borderRadius: '50%',
+                            background: isSuperAdmin
+                              ? '#14171A'
+                              : isUserPro
+                              ? 'linear-gradient(135deg, #e4572e 0%, #b93c18 100%)'
+                              : '#6b7280',
+                            color: 'white',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 700,
+                            fontSize: 12,
+                            boxShadow: isUserPro ? '0 2px 8px rgba(228, 87, 46, 0.25)' : 'none',
                           }}
-                          onClick={() => handleToggleStatus(u)}
                         >
-                          {u.status === 'Active' ? 'Suspend' : 'Activate'}
-                        </button>
+                          {u.avatar || (u.name || u.email || 'U').slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span>{u.name || 'AuraLoop User'}</span>
+                            {isSuperAdmin && (
+                              <span style={{ fontSize: 10, background: 'var(--accent-orange-light)', color: 'var(--accent-orange)', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>
+                                ADMIN
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{u.email}</div>
+                        </div>
                       </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}>
+                        <Laptop size={14} color="var(--text-muted)" />
+                        <span>{u.device || 'macOS Native Client'}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <span
+                          style={{
+                            fontSize: 11.5,
+                            fontWeight: 700,
+                            padding: '3px 10px',
+                            borderRadius: 'var(--radius-pill)',
+                            background: isSuperAdmin
+                              ? '#14171A'
+                              : isUserPro
+                              ? 'var(--accent-orange-light)'
+                              : 'var(--bg-card-subtle)',
+                            color: isSuperAdmin
+                              ? '#FFFFFF'
+                              : isUserPro
+                              ? 'var(--accent-orange)'
+                              : 'var(--text-secondary)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}
+                        >
+                          {isUserPro && <Crown size={12} />}
+                          {isSuperAdmin ? 'Super Admin' : (isUserPro ? 'Pro Plan' : 'Free Tier')}
+                        </span>
+
+                        {u.isGiftedPro && !isSuperAdmin && (
+                          <span
+                            style={{
+                              fontSize: 10.5,
+                              fontWeight: 700,
+                              padding: '2px 8px',
+                              borderRadius: 'var(--radius-pill)',
+                              background: '#fef3c7',
+                              color: '#b45309',
+                              border: '1px solid #fde68a',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 3,
+                            }}
+                            title="Complimentary Lifetime Pro access granted by Admin without payment"
+                          >
+                            <Gift size={11} />
+                            Gifted Free
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
+                        <Download size={13} color="var(--text-muted)" />
+                        <span>{u.downloads || 0}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span
+                        className={`status-pill ${
+                          u.status === 'Active' ? 'completed' : 'failed'
+                        }`}
+                      >
+                        <span className="status-dot" />
+                        {u.status || 'Active'}
+                      </span>
+                    </td>
+                    <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{u.lastSeen || 'Active'}</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {!isSuperAdmin && (
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          {!isUserPro ? (
+                            <motion.button
+                              whileHover={{ scale: 1.03 }}
+                              whileTap={{ scale: 0.95 }}
+                              style={{
+                                padding: '5px 12px',
+                                fontSize: 11.5,
+                                fontWeight: 700,
+                                background: 'linear-gradient(135deg, #e4572e 0%, #b93c18 100%)',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: 999,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 5,
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 8px rgba(228, 87, 46, 0.3)',
+                              }}
+                              onClick={() => handleGrantFreePro(u)}
+                              title="Make this user Premium without payment"
+                            >
+                              <Sparkles size={12} />
+                              <span>Gift Free Pro</span>
+                            </motion.button>
+                          ) : (
+                            <button
+                              className="btn-light-pill"
+                              style={{ padding: '4px 10px', fontSize: 11 }}
+                              onClick={() => handleRevokePro(u)}
+                              title="Revert back to Free Tier"
+                            >
+                              Downgrade
+                            </button>
+                          )}
+
+                          <button
+                            className="btn-light-pill"
+                            style={{
+                              padding: '4px 10px',
+                              fontSize: 11,
+                              color: u.status === 'Active' ? '#DC2626' : '#10B981',
+                            }}
+                            onClick={() => handleToggleStatus(u)}
+                          >
+                            {u.status === 'Active' ? 'Suspend' : 'Activate'}
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -543,7 +687,7 @@ export default function UserManagement({
                   onChange={(e) => setNewUserPlan(e.target.value)}
                   style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-input)' }}
                 >
-                  <option value="Pro Plan">Pro Plan (Full 4K Access)</option>
+                  <option value="Pro Plan">Pro Plan (Complimentary 4K Access)</option>
                   <option value="Free Tier">Free Tier</option>
                 </select>
               </div>

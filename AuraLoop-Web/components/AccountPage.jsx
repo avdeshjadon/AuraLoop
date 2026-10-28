@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import {
   updateUserProfileName,
   setUserPassword,
-  signOutUser
+  signOutUser,
+  markFreePremiumNotifiedWeb
 } from '../lib/firebase.js';
 import { usePricing } from '../lib/pricingService.js';
 import { startCashfreeCheckout, startCashfreeDonation } from '../lib/paymentService.js';
+import FreePremiumModal from './FreePremiumModal.jsx';
 
 export default function AccountPage({
   user,
@@ -30,6 +32,9 @@ export default function AccountPage({
   const [donateLoading, setDonateLoading] = useState(false);
   const [showDonateForm, setShowDonateForm] = useState(false);
 
+  // Free Premium Celebration Modal
+  const [showGiftModal, setShowGiftModal] = useState(false);
+
   // Feedback states
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -42,13 +47,30 @@ export default function AccountPage({
       setEditName(user.displayName);
     }
     window.scrollTo({ top: 0, behavior: 'instant' });
+
+    // Check if user was granted Free Premium and hasn't seen the popup yet
+    if (user?.isGiftedPro || user?.proTier === 'lifetime') {
+      const alreadySeen = localStorage.getItem(`auraloop_gifted_pro_seen_${user.uid}`) === 'true';
+      if (!alreadySeen && !user?.freePremiumNotifiedWeb) {
+        setShowGiftModal(true);
+      }
+    }
   }, [user]);
+
+  const handleDismissGiftModal = async () => {
+    setShowGiftModal(false);
+    if (user?.uid) {
+      await markFreePremiumNotifiedWeb(user.uid);
+      if (onUserUpdated) {
+        onUserUpdated({ ...user, freePremiumNotifiedWeb: true });
+      }
+    }
+  };
 
   const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || 'theavdeshjadon@gmail.com').toLowerCase();
   const isAdmin = user?.email?.toLowerCase() === adminEmail || sessionStorage.getItem('auraloop_admin_session') === 'authenticated';
-  const isPro = user?.proTier && user?.proTier !== 'none';
+  const isPro = user?.proTier === 'lifetime' || user?.isGiftedPro || (user?.proTier && user?.proTier !== 'none');
   const avatarLetter = (user?.displayName || user?.email || 'A')[0].toUpperCase();
-
 
   const handleSaveName = async () => {
     if (!editName.trim()) return;
@@ -82,7 +104,7 @@ export default function AccountPage({
     setBusy(true);
     try {
       await setUserPassword(newPassword);
-      setSuccess('Desktop app password saved! You can now use your email & this password to sign into the macOS app.');
+      setSuccess('macOS desktop password saved! You can now use your email & password to sign into the native macOS app.');
       setNewPassword('');
       setConfirmPassword('');
       setShowPasswordForm(false);
@@ -93,7 +115,6 @@ export default function AccountPage({
       setBusy(false);
     }
   };
-
 
   const handleSignOut = async () => {
     setError('');
@@ -111,7 +132,7 @@ export default function AccountPage({
   if (!user) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#eeeae4', fontFamily: 'var(--ta-font, sans-serif)' }}>
-        <p>Loading your profile…</p>
+        <p style={{ color: '#5f564e', fontWeight: 600 }}>Loading your AuraLoop account…</p>
       </div>
     );
   }
@@ -122,11 +143,18 @@ export default function AccountPage({
         minHeight: '100vh',
         background: '#eeeae4',
         color: '#17130f',
-        fontFamily: 'var(--ta-font, sans-serif)',
+        fontFamily: 'var(--ta-font, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif)',
         paddingBottom: '80px',
-        boxSizing: 'border-box'
+        boxSizing: 'border-box',
       }}
     >
+      {/* Free Premium Celebration Popup */}
+      <FreePremiumModal
+        isOpen={showGiftModal}
+        onClose={handleDismissGiftModal}
+        user={user}
+      />
+
       {/* Top Header Bar */}
       <header
         style={{
@@ -134,22 +162,22 @@ export default function AccountPage({
           top: 0,
           zIndex: 100,
           background: 'rgba(238, 234, 228, 0.88)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
           borderBottom: '1px solid rgba(23, 19, 15, 0.08)',
-          padding: '14px 24px'
+          padding: '12px 24px',
         }}
       >
         <div
           style={{
-            maxWidth: '960px',
+            maxWidth: '860px',
             margin: '0 auto',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between'
+            justifyContent: 'space-between',
           }}
         >
-          {/* Back to Wallpapers button (Equal 36px height) */}
+          {/* Back to Wallpapers button */}
           <button
             type="button"
             onClick={onBackToHome}
@@ -157,8 +185,8 @@ export default function AccountPage({
               height: '36px',
               padding: '0 16px',
               borderRadius: '999px',
-              background: 'rgba(23, 19, 15, 0.06)',
-              border: '1px solid rgba(23, 19, 15, 0.12)',
+              background: 'rgba(23, 19, 15, 0.05)',
+              border: '1px solid rgba(23, 19, 15, 0.1)',
               color: '#17130f',
               fontSize: '13px',
               fontWeight: '600',
@@ -167,10 +195,10 @@ export default function AccountPage({
               justifyContent: 'center',
               gap: '6px',
               cursor: 'pointer',
-              transition: 'all 0.15s ease'
+              transition: 'all 0.15s ease',
             }}
             onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(23, 19, 15, 0.1)')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(23, 19, 15, 0.06)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(23, 19, 15, 0.05)')}
           >
             <span style={{ fontSize: '14px' }}>←</span>
             <span>Wallpapers</span>
@@ -179,12 +207,12 @@ export default function AccountPage({
           {/* AuraLoop Wordmark Logo */}
           <div onClick={onBackToHome} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
             <svg
-              width="130"
-              height="24"
+              width="125"
+              height="22"
               viewBox="0 0 1200 220"
               role="img"
               aria-label="AuraLoop"
-              style={{ display: 'block', height: '24px', width: 'auto' }}
+              style={{ display: 'block', height: '22px', width: 'auto' }}
             >
               <g fill="#0A0C10" fontFamily="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', Roboto, sans-serif" fontSize="128" fontWeight="700" letterSpacing="0.08em" textAnchor="middle">
                 <text x="110" y="152">A</text>
@@ -205,7 +233,7 @@ export default function AccountPage({
             </svg>
           </div>
 
-          {/* Right Header Actions (All equal 36px height) */}
+          {/* Right Header Actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {isAdmin && (
               <button
@@ -224,13 +252,13 @@ export default function AccountPage({
                   alignItems: 'center',
                   justifyContent: 'center',
                   cursor: 'pointer',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                  transition: 'all 0.15s ease'
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+                  transition: 'all 0.15s ease',
                 }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = '#2a241f')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = '#17130f')}
               >
-                Admin Dashboard
+                Admin Panel
               </button>
             )}
 
@@ -251,9 +279,9 @@ export default function AccountPage({
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
-                transition: 'all 0.15s ease'
+                transition: 'all 0.15s ease',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)')}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(239, 68, 68, 0.14)')}
               onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)')}
             >
               Sign Out
@@ -263,7 +291,7 @@ export default function AccountPage({
       </header>
 
       {/* Main Content Area */}
-      <main style={{ maxWidth: '820px', margin: '36px auto 0', padding: '0 20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <main style={{ maxWidth: '820px', margin: '32px auto 0', padding: '0 20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
         
         {/* Notifications */}
         {error && (
@@ -271,13 +299,14 @@ export default function AccountPage({
             style={{
               background: '#fef2f2',
               border: '1px solid #fecaca',
-              borderRadius: '14px',
+              borderRadius: '16px',
               padding: '12px 18px',
               color: '#991b1b',
               fontSize: '13.5px',
               display: 'flex',
               alignItems: 'center',
-              gap: '10px'
+              gap: '10px',
+              boxShadow: '0 2px 8px rgba(220, 38, 38, 0.08)',
             }}
           >
             <span>⚠️</span>
@@ -290,13 +319,14 @@ export default function AccountPage({
             style={{
               background: '#f0fdf4',
               border: '1px solid #bbf7d0',
-              borderRadius: '14px',
+              borderRadius: '16px',
               padding: '12px 18px',
               color: '#166534',
               fontSize: '13.5px',
               display: 'flex',
               alignItems: 'center',
-              gap: '10px'
+              gap: '10px',
+              boxShadow: '0 2px 8px rgba(22, 101, 52, 0.08)',
             }}
           >
             <span>✨</span>
@@ -304,22 +334,25 @@ export default function AccountPage({
           </div>
         )}
 
-        {/* 1. Cohesive User Profile Card */}
+        {/* 1. Redesigned User Profile Card */}
         <div
           style={{
-            background: '#ffffff',
-            border: '1px solid #dcd5cc',
-            borderRadius: '20px',
-            padding: '24px 28px',
-            boxShadow: '0 2px 12px rgba(40, 25, 15, 0.04)'
+            background: 'rgba(255, 255, 255, 0.88)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(23, 19, 15, 0.08)',
+            borderRadius: '24px',
+            padding: '28px',
+            boxShadow: '0 4px 20px -2px rgba(23, 19, 15, 0.04), 0 1px 3px rgba(23, 19, 15, 0.02)',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
+              {/* Sleek Avatar Ring */}
               <div
                 style={{
-                  width: '56px',
-                  height: '56px',
+                  width: '64px',
+                  height: '64px',
                   borderRadius: '50%',
                   background: isPro
                     ? 'linear-gradient(135deg, #e4572e 0%, #b93c18 100%)'
@@ -328,10 +361,11 @@ export default function AccountPage({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontWeight: '700',
-                  fontSize: '22px',
+                  fontWeight: '800',
+                  fontSize: '24px',
                   flexShrink: 0,
-                  boxShadow: isPro ? '0 4px 14px rgba(228,87,46,0.3)' : '0 2px 8px rgba(0,0,0,0.15)'
+                  boxShadow: isPro ? '0 4px 16px rgba(228,87,46,0.35)' : '0 2px 8px rgba(0,0,0,0.15)',
+                  border: '2px solid rgba(255, 255, 255, 0.8)',
                 }}
               >
                 {avatarLetter}
@@ -347,13 +381,14 @@ export default function AccountPage({
                       placeholder="Your Name"
                       style={{
                         padding: '6px 12px',
-                        borderRadius: '8px',
-                        border: '1px solid #dcd5cc',
+                        borderRadius: '10px',
+                        border: '1.5px solid #e4572e',
                         fontSize: '14px',
                         fontWeight: '600',
                         color: '#17130f',
                         outline: 'none',
-                        width: '180px'
+                        width: '180px',
+                        background: '#ffffff',
                       }}
                       autoFocus
                     />
@@ -369,7 +404,7 @@ export default function AccountPage({
                         color: '#fff',
                         fontSize: '12px',
                         fontWeight: '600',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
                       }}
                     >
                       Save
@@ -387,7 +422,7 @@ export default function AccountPage({
                         background: '#fff',
                         color: '#5f564e',
                         fontSize: '12px',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
                       }}
                     >
                       ✕
@@ -395,7 +430,7 @@ export default function AccountPage({
                   </div>
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#17130f' }}>
+                    <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: '#17130f', letterSpacing: '-0.4px' }}>
                       {user.displayName || 'AuraLoop User'}
                     </h2>
                     <button
@@ -403,78 +438,153 @@ export default function AccountPage({
                       onClick={() => setIsEditingName(true)}
                       title="Edit Name"
                       style={{
-                        background: 'transparent',
+                        background: 'rgba(23, 19, 15, 0.05)',
                         border: 'none',
                         color: '#8c827a',
                         cursor: 'pointer',
-                        padding: '2px 4px',
-                        fontSize: '13px'
+                        padding: '4px 6px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                       }}
                     >
                       ✎
                     </button>
                   </div>
                 )}
-                <p style={{ margin: '2px 0 0', fontSize: '13.5px', color: '#6e655d' }}>
+                <p style={{ margin: '3px 0 0', fontSize: '13.5px', color: '#6e655d', fontWeight: 500 }}>
                   {user.email}
                 </p>
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Badges */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               {isAdmin && (
                 <span
                   style={{
                     padding: '5px 12px',
                     borderRadius: '999px',
                     fontSize: '12px',
-                    fontWeight: '600',
+                    fontWeight: '700',
                     background: '#17130f',
-                    color: '#ffffff'
+                    color: '#ffffff',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
                   }}
                 >
-                  Admin
+                  <span>🛡️</span>
+                  <span>Super Admin</span>
                 </span>
               )}
-              <span
-                style={{
-                  padding: '5px 12px',
-                  borderRadius: '999px',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  background: isPro ? '#fde8dd' : '#f5f2ed',
-                  color: isPro ? '#b93c18' : '#6e655d',
-                  border: isPro ? '1px solid rgba(228,87,46,0.3)' : '1px solid #dcd5cc'
-                }}
-              >
-                {isPro ? 'Pro Member' : 'Free Tier'}
-              </span>
+
+              {isPro ? (
+                <span
+                  style={{
+                    padding: '5px 14px',
+                    borderRadius: '999px',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    background: user.isGiftedPro
+                      ? 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)'
+                      : 'linear-gradient(135deg, #fde8dd 0%, #fed7aa 100%)',
+                    color: user.isGiftedPro ? '#92400e' : '#b93c18',
+                    border: user.isGiftedPro ? '1px solid #fbbf24' : '1px solid rgba(228,87,46,0.3)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    boxShadow: '0 2px 6px rgba(228, 87, 46, 0.12)',
+                  }}
+                >
+                  <span>👑</span>
+                  <span>{user.isGiftedPro ? 'Free Lifetime Pro' : 'Lifetime Pro'}</span>
+                </span>
+              ) : (
+                <span
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: '999px',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    background: '#f5f2ed',
+                    color: '#6e655d',
+                    border: '1px solid #dcd5cc',
+                  }}
+                >
+                  Free Tier
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* User Quick Stats Ribbon */}
+          <div
+            style={{
+              marginTop: '22px',
+              paddingTop: '18px',
+              borderTop: '1px solid rgba(23, 19, 15, 0.06)',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+              gap: '12px',
+            }}
+          >
+            <div>
+              <div style={{ fontSize: '11.5px', color: '#8c827a', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>
+                Access Tier
+              </div>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: '#17130f', marginTop: 2 }}>
+                {isPro ? (user.isGiftedPro ? 'Gifted Lifetime Pro' : 'Lifetime Pro') : 'Free Tier'}
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: '11.5px', color: '#8c827a', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>
+                Desktop Client
+              </div>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: '#17130f', marginTop: 2 }}>
+                {user.hasPassword ? 'macOS App Ready' : 'Password Needed'}
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: '11.5px', color: '#8c827a', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>
+                Cloud Sync
+              </div>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: '#0e8044', marginTop: 2, display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981' }} />
+                <span>Active & Synced</span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* 2. Admin Portal Shortcut (Only if Admin) */}
+        {/* 2. Admin Portal Shortcut (If Admin) */}
         {isAdmin && (
           <div
             style={{
-              background: '#ffffff',
-              border: '1px solid #dcd5cc',
-              borderRadius: '20px',
-              padding: '22px 28px',
+              background: 'rgba(255, 255, 255, 0.88)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              border: '1px solid rgba(23, 19, 15, 0.08)',
+              borderRadius: '24px',
+              padding: '24px 28px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               flexWrap: 'wrap',
               gap: '16px',
-              boxShadow: '0 2px 12px rgba(40, 25, 15, 0.04)'
+              boxShadow: '0 4px 20px -2px rgba(23, 19, 15, 0.04)',
             }}
           >
             <div>
-              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#17130f' }}>
-                Admin Dashboard
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#17130f' }}>
+                Admin Console & User Manager
               </h3>
-              <p style={{ margin: '3px 0 0', fontSize: '13px', color: '#6e655d' }}>
-                Manage Cloudflare R2 bucket, live wallpaper catalog, and users.
+              <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#6e655d' }}>
+                Grant Free Lifetime Pro to users, manage Cloudflare R2 bucket & live wallpapers.
               </p>
             </div>
 
@@ -482,52 +592,269 @@ export default function AccountPage({
               type="button"
               onClick={onNavigateToAdmin}
               style={{
-                height: '36px',
-                padding: '0 18px',
+                height: '38px',
+                padding: '0 20px',
                 borderRadius: '999px',
                 background: '#17130f',
                 border: 'none',
                 color: '#ffffff',
                 fontSize: '13px',
-                fontWeight: '600',
+                fontWeight: '700',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
+                gap: '8px',
                 cursor: 'pointer',
-                transition: 'background 0.15s ease'
+                transition: 'all 0.15s ease',
               }}
               onMouseEnter={(e) => (e.currentTarget.style.background = '#2a241f')}
               onMouseLeave={(e) => (e.currentTarget.style.background = '#17130f')}
             >
-              <span>Open Dashboard</span>
+              <span>Open Admin Panel</span>
               <span>→</span>
             </button>
           </div>
         )}
 
-        {/* 3. macOS Desktop App Password Section */}
+        {/* 3. Redesigned Lifetime Pro Plan Card */}
+        {isPro ? (
+          <div
+            style={{
+              background: 'linear-gradient(145deg, #181512 0%, #26201b 100%)',
+              color: '#ffffff',
+              borderRadius: '24px',
+              padding: '28px',
+              border: '1.5px solid rgba(228, 87, 46, 0.4)',
+              boxShadow: '0 12px 36px -8px rgba(228, 87, 46, 0.25)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: '28px' }}>👑</span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#ffffff' }}>
+                    AuraLoop Lifetime Pro Active
+                  </h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '13px', color: 'rgba(255, 255, 255, 0.7)' }}>
+                    {user.isGiftedPro
+                      ? 'Complimentary Lifetime Pro Granted by Super Admin • Never Expires'
+                      : 'Lifetime Pro Pass Verified & Synced'}
+                  </p>
+                </div>
+              </div>
+
+              <span
+                style={{
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  color: '#10b981',
+                  background: 'rgba(16, 185, 129, 0.15)',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  padding: '5px 12px',
+                  borderRadius: '999px',
+                }}
+              >
+                ✓ All 1,582+ Wallpapers Unlocked
+              </span>
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '10px',
+                paddingTop: '12px',
+                borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+                fontSize: '13px',
+                color: 'rgba(255, 255, 255, 0.85)',
+              }}
+            >
+              <div>✨ 4K 60fps Native Playback</div>
+              <div>🖥️ Lock Screen & Screensaver Sync</div>
+              <div>⚡ Audio Reactive Visualizer</div>
+              <div>♾️ Zero Subscription Fees Forever</div>
+            </div>
+          </div>
+        ) : (
+          <div
+            style={{
+              background: 'linear-gradient(145deg, #181512 0%, #26201b 100%)',
+              color: '#ffffff',
+              borderRadius: '26px',
+              padding: '30px',
+              border: '1.5px solid rgba(228, 87, 46, 0.45)',
+              boxShadow: '0 16px 40px -10px rgba(228, 87, 46, 0.3)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Ambient Radial Glow */}
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                width: '300px',
+                height: '300px',
+                background: 'radial-gradient(circle, rgba(228, 87, 46, 0.25) 0%, transparent 70%)',
+                pointerEvents: 'none',
+              }}
+            />
+
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
+              <div>
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '3px 10px',
+                    borderRadius: 999,
+                    background: 'rgba(228, 87, 46, 0.2)',
+                    border: '1px solid rgba(228, 87, 46, 0.4)',
+                    color: '#ff8a65',
+                    fontSize: '11px',
+                    fontWeight: 800,
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase',
+                    marginBottom: 8,
+                  }}
+                >
+                  ✨ LIFETIME ACCESS • 60% OFF
+                </div>
+                <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: '#ffffff', letterSpacing: '-0.3px' }}>
+                  Upgrade to {pricing.planTitle}
+                </h3>
+                <p style={{ margin: '4px 0 0', fontSize: '13.5px', color: 'rgba(255, 255, 255, 0.75)', lineHeight: 1.5 }}>
+                  Unlock 1,582+ 4K live wallpapers & audio sync across macOS & Web forever.
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                <div style={{ fontSize: '28px', fontWeight: '900', color: '#ffffff' }}>
+                  {pricing.currency}{pricing.price}
+                </div>
+                {pricing.originalPrice > pricing.price && (
+                  <div style={{ fontSize: '15px', fontWeight: '600', color: 'rgba(255, 255, 255, 0.4)', textDecoration: 'line-through' }}>
+                    {pricing.currency}{pricing.originalPrice}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Feature Pills */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px', fontSize: '12.5px', color: 'rgba(255, 255, 255, 0.85)' }}>
+              <div>✓ Unlimited 4K 60fps Loops</div>
+              <div>✓ Lock Screen Dynamic Sync</div>
+              <div>✓ Circadian Time Tracking</div>
+              <div>✓ Offline Playback & Zero Overhead</div>
+            </div>
+
+            {/* Action Button */}
+            <button
+              type="button"
+              disabled={paymentLoading}
+              onClick={async () => {
+                setPaymentLoading(true);
+                setError('');
+                setSuccess('');
+                setPaymentStatus('Preparing secure checkout...');
+                try {
+                  await startCashfreeCheckout({
+                    user,
+                    pricing,
+                    onStatusChange: ({ message }) => {
+                      setPaymentStatus(message);
+                    },
+                    onSuccess: ({ orderId, profile }) => {
+                      setSuccess(`Payment successful! Welcome to Lifetime Pro (Order: ${orderId})`);
+                      setPaymentStatus('');
+                      if (onUserUpdated && profile) onUserUpdated(profile);
+                    },
+                    onError: (err) => {
+                      setError(err.message || 'Payment could not be completed.');
+                      setPaymentStatus('');
+                    }
+                  });
+                } catch (err) {
+                  setError(err.message || 'Checkout initiation error.');
+                } finally {
+                  setPaymentLoading(false);
+                }
+              }}
+              style={{
+                width: '100%',
+                padding: '14px 24px',
+                borderRadius: '14px',
+                border: 'none',
+                background: paymentLoading
+                  ? '#a8a29e'
+                  : 'linear-gradient(135deg, #e4572e 0%, #b93c18 100%)',
+                color: '#ffffff',
+                fontSize: '15px',
+                fontWeight: '700',
+                cursor: paymentLoading ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: paymentLoading ? 'none' : '0 6px 20px rgba(228,87,46,0.4)',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <span>
+                {paymentLoading ? (paymentStatus || 'Connecting to Cashfree...') : `Upgrade to Lifetime Pro (${pricing.currency}${pricing.price})`}
+              </span>
+            </button>
+          </div>
+        )}
+
+        {/* 4. macOS Desktop App Password Section */}
         <div
           style={{
-            background: '#ffffff',
-            border: '1px solid #dcd5cc',
-            borderRadius: '20px',
-            padding: '22px 28px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '14px',
-            boxShadow: '0 2px 12px rgba(40, 25, 15, 0.04)'
+            background: 'rgba(255, 255, 255, 0.88)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(23, 19, 15, 0.08)',
+            borderRadius: '24px',
+            padding: '24px 28px',
+            boxShadow: '0 4px 20px -2px rgba(23, 19, 15, 0.04)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-            <div>
-              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#17130f' }}>
-                macOS Desktop App Password
-              </h3>
-              <p style={{ margin: '3px 0 0', fontSize: '13px', color: '#6e655d' }}>
-                {user.hasPassword
-                  ? 'Your account has a password configured for logging into the macOS app.'
-                  : 'Set a password to sign into the native macOS app with your email.'}
-              </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div
+                style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '12px',
+                  background: '#f5f2ed',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '20px',
+                  border: '1px solid #dcd5cc',
+                }}
+              >
+                💻
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#17130f' }}>
+                  macOS Desktop App Access
+                </h3>
+                <p style={{ margin: '3px 0 0', fontSize: '13px', color: '#6e655d' }}>
+                  {user.hasPassword
+                    ? 'Your account has a password configured for signing into the macOS native client.'
+                    : 'Configure a password to sign into the native macOS app with your email.'}
+                </p>
+              </div>
             </div>
 
             <button
@@ -537,18 +864,19 @@ export default function AccountPage({
                 setError('');
               }}
               style={{
-                height: '34px',
-                padding: '0 16px',
+                height: '36px',
+                padding: '0 18px',
                 borderRadius: '999px',
                 border: '1px solid #dcd5cc',
-                background: '#faf8f5',
+                background: '#ffffff',
                 color: '#17130f',
-                fontSize: '12.5px',
+                fontSize: '13px',
                 fontWeight: '600',
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                transition: 'all 0.15s ease',
               }}
             >
               {showPasswordForm ? 'Cancel' : user.hasPassword ? 'Change Password' : 'Set Password'}
@@ -556,7 +884,7 @@ export default function AccountPage({
           </div>
 
           {showPasswordForm && (
-            <form onSubmit={handleSavePassword} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px', paddingTop: '14px', borderTop: '1px solid #f0eae1' }}>
+            <form onSubmit={handleSavePassword} style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #f0eae1' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
                 <input
                   type="password"
@@ -565,12 +893,12 @@ export default function AccountPage({
                   onChange={(e) => setNewPassword(e.target.value)}
                   required
                   style={{
-                    padding: '10px 14px',
-                    borderRadius: '10px',
+                    padding: '11px 14px',
+                    borderRadius: '12px',
                     border: '1px solid #dcd5cc',
                     fontSize: '13.5px',
                     outline: 'none',
-                    background: '#faf8f5'
+                    background: '#ffffff',
                   }}
                 />
                 <input
@@ -580,12 +908,12 @@ export default function AccountPage({
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                   style={{
-                    padding: '10px 14px',
-                    borderRadius: '10px',
+                    padding: '11px 14px',
+                    borderRadius: '12px',
                     border: '1px solid #dcd5cc',
                     fontSize: '13.5px',
                     outline: 'none',
-                    background: '#faf8f5'
+                    background: '#ffffff',
                   }}
                 />
               </div>
@@ -593,17 +921,16 @@ export default function AccountPage({
                 type="submit"
                 disabled={busy}
                 style={{
-                  height: '34px',
-                  padding: '0 18px',
+                  height: '36px',
+                  padding: '0 20px',
                   borderRadius: '999px',
                   border: 'none',
                   background: '#17130f',
                   color: '#ffffff',
-                  fontSize: '12.5px',
-                  fontWeight: '600',
+                  fontSize: '13px',
+                  fontWeight: '700',
                   cursor: 'pointer',
                   alignSelf: 'flex-start',
-                  marginTop: '4px'
                 }}
               >
                 {busy ? 'Saving…' : 'Save Password'}
@@ -612,159 +939,42 @@ export default function AccountPage({
           )}
         </div>
 
-        {/* 4. Membership / Pro Plan Card */}
-        {isPro ? (
-          <div
-            style={{
-              background: '#ffffff',
-              border: '1px solid #dcd5cc',
-              borderRadius: '20px',
-              padding: '24px 28px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px',
-              boxShadow: '0 2px 12px rgba(40, 25, 15, 0.04)'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#17130f' }}>
-                Lifetime Pro Active
-              </h3>
-              <span style={{ fontSize: '12px', fontWeight: '600', color: '#0e8044', background: '#e2f5ea', padding: '4px 10px', borderRadius: '999px' }}>
-                Active & Synced
-              </span>
-            </div>
-            <p style={{ margin: 0, fontSize: '13.5px', color: '#5f564e', lineHeight: '1.5' }}>
-              You have unlocked all 1,582+ 4K live wallpapers across both the Web catalog and the native macOS app with lock-screen sync.
-            </p>
-          </div>
-        ) : (
-          <div
-            style={{
-              background: '#ffffff',
-              border: '1.5px solid #e4572e',
-              borderRadius: '20px',
-              padding: '24px 28px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '18px',
-              boxShadow: '0 4px 20px rgba(228,87,46,0.1)'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#17130f' }}>
-                  Upgrade to {pricing.planTitle}
-                </h3>
-                <p style={{ margin: '4px 0 0', fontSize: '13.5px', color: '#6e655d' }}>
-                  {pricing.description || 'Unlock all 1,582+ 4K wallpapers in the macOS app & Web'}
-                </p>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                <div style={{ fontSize: '26px', fontWeight: '800', color: '#e4572e' }}>
-                  {pricing.currency}{pricing.price}
-                </div>
-                {pricing.originalPrice > pricing.price && (
-                  <div style={{ fontSize: '15px', fontWeight: '600', color: '#8c827a', textDecoration: 'line-through' }}>
-                    {pricing.currency}{pricing.originalPrice}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '4px' }}>
-              <button
-                type="button"
-                disabled={paymentLoading}
-                onClick={async () => {
-                  setPaymentLoading(true);
-                  setError('');
-                  setSuccess('');
-                  setPaymentStatus('Preparing secure checkout...');
-                  try {
-                    await startCashfreeCheckout({
-                      user,
-                      pricing,
-                      onStatusChange: ({ message }) => {
-                        setPaymentStatus(message);
-                      },
-                      onSuccess: ({ orderId, profile }) => {
-                        setSuccess(`Payment successful! Welcome to Lifetime Pro (Order: ${orderId})`);
-                        setPaymentStatus('');
-                        if (onUserUpdated && profile) onUserUpdated(profile);
-                      },
-                      onError: (err) => {
-                        setError(err.message || 'Payment could not be completed.');
-                        setPaymentStatus('');
-                      }
-                    });
-                  } catch (err) {
-                    setError(err.message || 'Checkout initiation error.');
-                  } finally {
-                    setPaymentLoading(false);
-                  }
-                }}
+        {/* 5. Support AuraLoop Engineering (Optional) */}
+        <div
+          style={{
+            background: 'rgba(255, 255, 255, 0.88)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: (user?.isSupporter || (user?.totalDonated > 0)) ? '1px solid #fbcfe8' : '1px solid rgba(23, 19, 15, 0.08)',
+            borderRadius: '24px',
+            padding: '24px 28px',
+            boxShadow: '0 4px 20px -2px rgba(23, 19, 15, 0.04)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div
                 style={{
-                  padding: '13px 24px',
+                  width: '42px',
+                  height: '42px',
                   borderRadius: '12px',
-                  border: 'none',
-                  background: paymentLoading
-                    ? '#a8a29e'
-                    : 'linear-gradient(135deg, #e4572e 0%, #b93c18 100%)',
-                  color: '#ffffff',
-                  fontSize: '14.5px',
-                  fontWeight: '700',
-                  cursor: paymentLoading ? 'not-allowed' : 'pointer',
+                  background: '#fdf2f8',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '8px',
-                  boxShadow: paymentLoading ? 'none' : '0 4px 14px rgba(228,87,46,0.3)',
-                  transition: 'all 0.15s ease'
+                  fontSize: '20px',
                 }}
               >
-                <span>
-                  {paymentLoading ? (paymentStatus || 'Connecting to Cashfree...') : `Upgrade to Lifetime Pro (${pricing.currency}${pricing.price})`}
-                </span>
-              </button>
-
-              {paymentStatus && paymentLoading && (
-                <div
-                  style={{
-                    padding: '12px 16px',
-                    borderRadius: '10px',
-                    background: '#eff6ff',
-                    border: '1px solid #bfdbfe',
-                    color: '#1e40af',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px'
-                  }}
-                >
-                  <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', border: '2px solid #3b82f6', borderTopColor: 'transparent', animation: 'spin 1s linear infinite' }}></span>
-                  <span>{paymentStatus}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* 5. Voluntary Supporter Section */}
-        <div style={{ background: '#ffffff', borderRadius: '18px', padding: '24px', border: (user?.isSupporter || (user?.totalDonated > 0)) ? '1px solid #fbcfe8' : '1px solid #e8e2d9', boxShadow: '0 4px 16px rgba(0,0,0,0.03)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ fontSize: '26px' }}>{(user?.isSupporter || (user?.totalDonated > 0)) ? '❤️' : '☕'}</span>
+                {(user?.isSupporter || (user?.totalDonated > 0)) ? '❤️' : '☕'}
+              </div>
               <div>
-                <div style={{ fontSize: '15px', fontWeight: '700', color: '#17130f' }}>
+                <div style={{ fontSize: '16px', fontWeight: '800', color: '#17130f' }}>
                   {(user?.isSupporter || (user?.totalDonated > 0)) ? 'Proud AuraLoop Supporter' : 'Support AuraLoop Engineering (Optional)'}
                 </div>
-                <div style={{ fontSize: '13px', color: '#685f58', marginTop: '2px' }}>
+                <div style={{ fontSize: '13px', color: '#6e655d', marginTop: '2px' }}>
                   {(user?.isSupporter || (user?.totalDonated > 0))
-                    ? `You have generously contributed ₹${user.totalDonated} to keep solo engineering alive. Thank you deeply!`
-                    : 'Over 80% of wallpapers are free forever. Optional voluntary contributions fund server CDN bandwidth and keep AuraLoop alive.'}
+                    ? `You have generously contributed ₹${user.totalDonated} to support solo craft and CDN bandwidth. Thank you!`
+                    : 'Over 80% of wallpapers are free forever. Optional voluntary contributions fund high-speed R2 CDN bandwidth.'}
                 </div>
               </div>
             </div>
@@ -775,13 +985,13 @@ export default function AccountPage({
                 onClick={() => setShowDonateForm(!showDonateForm)}
                 style={{
                   padding: '9px 18px',
-                  borderRadius: '10px',
+                  borderRadius: '999px',
                   border: '1px solid #dcd5cc',
-                  background: '#faf8f5',
+                  background: '#ffffff',
                   color: '#17130f',
                   fontSize: '13px',
                   fontWeight: '700',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
                 }}
               >
                 {showDonateForm ? 'Cancel' : 'Donate More'}
@@ -790,22 +1000,23 @@ export default function AccountPage({
           </div>
 
           {(!(user?.isSupporter || (user?.totalDonated > 0)) || showDonateForm) && (
-            <div style={{ marginTop: '18px', paddingTop: '16px', borderTop: '1px solid #eeeae4' }}>
+            <div style={{ marginTop: '18px', paddingTop: '16px', borderTop: '1px solid rgba(23, 19, 15, 0.06)' }}>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
-                {[99, 199, 499].map(amt => (
+                {[99, 199, 499].map((amt) => (
                   <button
                     key={amt}
                     type="button"
                     onClick={() => setDonateAmount(amt)}
                     style={{
-                      padding: '8px 16px',
-                      borderRadius: '8px',
+                      padding: '8px 18px',
+                      borderRadius: '999px',
                       border: donateAmount === amt ? '2px solid #17130f' : '1px solid #dcd5cc',
-                      background: donateAmount === amt ? '#17130f' : '#faf8f5',
+                      background: donateAmount === amt ? '#17130f' : '#ffffff',
                       color: donateAmount === amt ? '#ffffff' : '#17130f',
                       fontSize: '13px',
                       fontWeight: '700',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
                     }}
                   >
                     ₹{amt}
@@ -841,13 +1052,13 @@ export default function AccountPage({
                 }}
                 style={{
                   padding: '11px 22px',
-                  borderRadius: '10px',
+                  borderRadius: '999px',
                   border: 'none',
                   background: donateLoading ? '#a8a29e' : '#17130f',
                   color: '#ffffff',
                   fontSize: '13.5px',
                   fontWeight: '700',
-                  cursor: donateLoading ? 'not-allowed' : 'pointer'
+                  cursor: donateLoading ? 'not-allowed' : 'pointer',
                 }}
               >
                 {donateLoading ? 'Connecting to Cashfree...' : `Contribute ₹${donateAmount} via UPI/Card`}
@@ -856,54 +1067,62 @@ export default function AccountPage({
           )}
         </div>
 
-        {/* 6. Shortcuts */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px' }}>
+        {/* 6. Quick Shortcuts */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
           <button
             type="button"
             onClick={onBackToHome}
             style={{
-              padding: '14px 18px',
-              borderRadius: '14px',
-              border: '1px solid #dcd5cc',
-              background: '#ffffff',
+              padding: '16px 22px',
+              borderRadius: '20px',
+              border: '1px solid rgba(23, 19, 15, 0.08)',
+              background: 'rgba(255, 255, 255, 0.88)',
               color: '#17130f',
-              fontSize: '13.5px',
-              fontWeight: '600',
+              fontSize: '14px',
+              fontWeight: '700',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between'
+              justifyContent: 'space-between',
+              boxShadow: '0 2px 10px rgba(0, 0, 0, 0.02)',
+              transition: 'all 0.15s ease',
             }}
+            onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-2px)')}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
           >
-            <span>Explore 4K Wallpapers</span>
-            <span style={{ fontSize: '14px' }}>↓</span>
+            <span>Explore 4K Catalog</span>
+            <span style={{ fontSize: '15px' }}>↓</span>
           </button>
 
           <a
             href="https://github.com/avdeshjadon/AuraLoop/releases/latest/download/AuraLoop.dmg"
             download
             style={{
-              padding: '14px 18px',
-              borderRadius: '14px',
-              border: '1px solid #dcd5cc',
-              background: '#ffffff',
+              padding: '16px 22px',
+              borderRadius: '20px',
+              border: '1px solid rgba(23, 19, 15, 0.08)',
+              background: 'rgba(255, 255, 255, 0.88)',
               color: '#17130f',
-              fontSize: '13.5px',
-              fontWeight: '600',
+              fontSize: '14px',
+              fontWeight: '700',
               textDecoration: 'none',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between'
+              justifyContent: 'space-between',
+              boxShadow: '0 2px 10px rgba(0, 0, 0, 0.02)',
+              transition: 'all 0.15s ease',
             }}
+            onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-2px)')}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
           >
-            <span>Download macOS App</span>
-            <span style={{ fontSize: '13px' }}>↓</span>
+            <span>Download macOS App (.dmg)</span>
+            <span style={{ fontSize: '15px' }}>↓</span>
           </a>
         </div>
 
         {/* Footer */}
-        <div style={{ textAlign: 'center', marginTop: '12px', color: '#8c827a', fontSize: '12.5px' }}>
-          AuraLoop Native Engine v6.7.8 • © 2026 Avdesh Jadon
+        <div style={{ textAlign: 'center', marginTop: '16px', color: '#8c827a', fontSize: '12.5px' }}>
+          AuraLoop Native Engine v6.12.0 • © 2026 Avdesh Jadon
         </div>
       </main>
     </div>

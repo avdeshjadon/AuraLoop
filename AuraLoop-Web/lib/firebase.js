@@ -68,16 +68,27 @@ export async function signUpEmail(name, email, password) {
     photoURL: photoPayload
   });
 
-  // Save in Firestore
+  // Save in Firestore and user registry
   try {
-    await setDoc(doc(db, 'users', user.uid), {
+    const userDocData = {
       email: cleanEmail,
       displayName: cleanName,
       proTier: 'none',
       verifiedUTRs: [],
       hasPassword: true,
-      createdAt: Date.now()
-    }, { merge: true });
+      createdAt: Date.now(),
+      lastSeen: Date.now()
+    };
+    await setDoc(doc(db, 'users', user.uid), userDocData, { merge: true });
+    await syncUserToRegistry({
+      uid: user.uid,
+      email: cleanEmail,
+      displayName: cleanName,
+      proTier: 'none',
+      plan: 'Free Tier',
+      status: 'Active',
+      hasPassword: true
+    });
   } catch (e) {
     console.warn('Firestore set warning:', e);
   }
@@ -117,8 +128,18 @@ export async function signInWithGoogle() {
         proTier: 'none',
         verifiedUTRs: [],
         hasPassword: false, // Flag so user knows to create desktop app password!
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        lastSeen: Date.now()
       }, { merge: true });
+      await syncUserToRegistry({
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName || user.email.split('@')[0],
+        proTier: 'none',
+        plan: 'Free Tier',
+        status: 'Active',
+        hasPassword: false
+      });
     } catch (e) {
       console.warn('Firestore Google user set warning:', e);
     }
@@ -276,6 +297,16 @@ export async function hydrateUserProfile(user) {
     if (snap.exists()) firestoreData = snap.data();
   } catch {}
 
+  // Also query settings/users_registry for administrative flags (like free premium granted by admin)
+  let registryUser = null;
+  try {
+    const regSnap = await getDoc(doc(db, 'settings', 'users_registry'));
+    if (regSnap.exists()) {
+      const reg = regSnap.data();
+      registryUser = reg[user.uid] || (user.email ? Object.values(reg).find(u => u.email?.toLowerCase() === user.email.toLowerCase()) : null);
+    }
+  } catch (e) {}
+
   // Parse photoURL payload if available
   let cloudPayload = {};
   if (user.photoURL && user.photoURL.length > 10) {
@@ -289,16 +320,24 @@ export async function hydrateUserProfile(user) {
   const hasPassword = firestoreData.hasPassword ?? hasPasswordProvider ?? false;
   const isGoogleUser = user.providerData?.some(p => p.providerId === 'google.com');
 
-  const proTier = firestoreData.proTier || cloudPayload.proTier || 'none';
+  const isGiftedPro = Boolean(firestoreData.isGiftedPro || registryUser?.isGiftedPro || cloudPayload.isGiftedPro);
+  const rawTier = firestoreData.proTier || registryUser?.proTier || cloudPayload.proTier || 'none';
+  const proTier = isGiftedPro ? 'lifetime' : rawTier;
+
+  const freePremiumNotifiedWeb = Boolean(firestoreData.freePremiumNotifiedWeb || registryUser?.freePremiumNotifiedWeb);
+  const freePremiumNotifiedApp = Boolean(firestoreData.freePremiumNotifiedApp || registryUser?.freePremiumNotifiedApp);
   const totalDonated = Number(firestoreData.totalDonated || cloudPayload.totalDonated || 0);
   const isSupporter = Boolean(firestoreData.isSupporter || cloudPayload.isSupporter || totalDonated > 0);
 
-  return {
+  const profile = {
     uid: user.uid,
     email: user.email,
-    displayName: user.displayName || firestoreData.displayName || user.email.split('@')[0],
+    displayName: user.displayName || firestoreData.displayName || registryUser?.name || user.email.split('@')[0],
     photoURL: user.photoURL,
     proTier,
+    isGiftedPro,
+    freePremiumNotifiedWeb,
+    freePremiumNotifiedApp,
     verifiedUTRs: firestoreData.verifiedUTRs || cloudPayload.verifiedUTRs || [],
     hasPassword,
     isGoogleUser,
@@ -306,6 +345,97 @@ export async function hydrateUserProfile(user) {
     isSupporter,
     donations: firestoreData.donations || []
   };
+
+  // If user was gifted Pro in registry but Firestore doc or photoURL payload doesn't have it yet, write it back!
+  if (isGiftedPro && (!firestoreData.isGiftedPro || firestoreData.proTier !== 'lifetime')) {
+    try {
+      await setDoc(doc(db, 'users', user.uid), {
+        proTier: 'lifetime',
+        isGiftedPro: true,
+        updatedAt: Date.now() / 1000
+      }, { merge: true });
+
+      const updatedCloud = {
+        ...cloudPayload,
+        proTier: 'lifetime',
+        isGiftedPro: true,
+        updatedAt: Date.now() / 1000
+      };
+      await updateProfile(user, { photoURL: btoa(JSON.stringify(updatedCloud)) });
+    } catch (e) {}
+  }
+
+  // Sync to users_registry so Admin always sees active users
+  syncUserToRegistry(profile);
+
+  return profile;
+}
+
+/**
+ * Synchronize a user record to settings/users_registry in Firestore & local cache
+ */
+export async function syncUserToRegistry(userData) {
+  if (!userData?.uid && !userData?.email) return;
+  const uid = userData.uid || userData.id;
+
+  const entry = {
+    id: uid,
+    name: userData.displayName || userData.name || userData.email.split('@')[0],
+    email: userData.email,
+    role: (userData.proTier === 'lifetime' || userData.isGiftedPro) ? 'Pro Member' : 'Free User',
+    status: userData.status || 'Active',
+    plan: (userData.proTier === 'lifetime' || userData.isGiftedPro) ? 'Pro Plan' : 'Free Tier',
+    device: userData.device || 'macOS App Client',
+    downloads: userData.favorites?.length || 0,
+    lastSeen: new Date().toLocaleDateString(),
+    avatar: (userData.displayName || userData.name || userData.email || 'U').slice(0, 2).toUpperCase(),
+    joined: userData.createdAt ? new Date(userData.createdAt).toLocaleDateString() : new Date().toLocaleDateString(),
+    verified: Boolean(userData.proTier === 'lifetime' || userData.isGiftedPro),
+    isGiftedPro: Boolean(userData.isGiftedPro),
+    freePremiumNotifiedWeb: Boolean(userData.freePremiumNotifiedWeb),
+    freePremiumNotifiedApp: Boolean(userData.freePremiumNotifiedApp),
+    proTier: userData.proTier || (userData.isGiftedPro ? 'lifetime' : 'none'),
+    hasPassword: Boolean(userData.hasPassword),
+    updatedAt: Date.now() / 1000
+  };
+
+  // 1. Update Firestore settings/users_registry
+  try {
+    const regRef = doc(db, 'settings', 'users_registry');
+    await setDoc(regRef, { [uid]: entry }, { merge: true });
+  } catch (e) {
+    console.warn('[firebase] User registry sync warning:', e);
+  }
+
+  // 2. Keep local cache up to date
+  try {
+    const local = localStorage.getItem('auraloop_real_users');
+    let list = local ? JSON.parse(local) : [];
+    if (!Array.isArray(list)) list = [];
+    const idx = list.findIndex(u => u.id === uid || u.email?.toLowerCase() === entry.email?.toLowerCase());
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], ...entry };
+    } else {
+      list.push(entry);
+    }
+    localStorage.setItem('auraloop_real_users', JSON.stringify(list));
+  } catch (e) {}
+}
+
+/**
+ * Mark that the Free Premium Celebration Popup has been acknowledged by user
+ */
+export async function markFreePremiumNotifiedWeb(uid) {
+  if (!uid) return;
+  try {
+    localStorage.setItem(`auraloop_gifted_pro_seen_${uid}`, 'true');
+    const userRef = doc(db, 'users', uid);
+    await updateDoc(userRef, { freePremiumNotifiedWeb: true, updatedAt: Date.now() / 1000 });
+    const regRef = doc(db, 'settings', 'users_registry');
+    await setDoc(regRef, { [uid]: { freePremiumNotifiedWeb: true } }, { merge: true });
+  } catch (e) {
+    console.warn('[firebase] Failed to mark notified:', e);
+  }
 }
 
 export function subscribeAuth(callback) {
