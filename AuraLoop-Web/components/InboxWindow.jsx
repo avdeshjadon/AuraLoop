@@ -1670,8 +1670,12 @@ export default function InboxWindow({ inbox, regionRef }) {
                   Cancel
                 </button>
                 <a
-                  href="#waitlist"
-                  onClick={() => setDownloadModal(null)}
+                  href="https://github.com/avdeshjadon/AuraLoop/releases/latest/download/AuraLoop.dmg"
+                  download
+                  onClick={() => {
+                    setDownloadModal(null);
+                    window.location.href = 'https://github.com/avdeshjadon/AuraLoop/releases/latest/download/AuraLoop.dmg';
+                  }}
                   style={{
                     padding: '9px 22px',
                     borderRadius: 10,

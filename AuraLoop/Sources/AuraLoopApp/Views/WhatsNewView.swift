@@ -39,17 +39,17 @@ struct WhatsNewRelease: Identifiable {
 /// release is editing this one list.
 enum WhatsNew {
     static let current = WhatsNewRelease(
-        version: "6.11.0",
+        version: "6.12.0",
         date: "October 2026",
-        headline: "AuraLoop 6.11 brings full Web Admin suite integration, real-time pricing control, and unified account security.",
+        headline: "AuraLoop 6.12 brings full live motion previews for exclusive Master wallpapers, standalone Zero Telemetry docs, and streamlined direct installer downloads.",
         sections: [
             WhatsNewSection(name: "New", tint: .AuraLoopAccent, entries: [
-                WhatsNewEntry(title: "Navbar Circular Download Ring",
-                              detail: "A circular glass progress ring with live percentage appears beside Home whenever wallpapers are downloading."),
-                WhatsNewEntry(title: "Library Download Tracker",
-                              detail: "Active downloads are highlighted in a dedicated section with live progress bars, byte counts, and instant preview access."),
-                WhatsNewEntry(title: "Live Percentage on Cards",
-                              detail: "Wallpaper card download indicators now display live completion percentages directly inside the ring."),
+                WhatsNewEntry(title: "Master Collection Live Preview",
+                              detail: "Preview any exclusive 4K wallpaper in full live motion before upgrading to Lifetime Pro."),
+                WhatsNewEntry(title: "One-Click Direct Installer",
+                              detail: "Download the universal macOS DMG directly from the browser with zero redirects."),
+                WhatsNewEntry(title: "Dedicated Zero Telemetry Docs",
+                              detail: "Standalone architecture, privacy, and user manual guides available directly on the web."),
                 WhatsNewEntry(title: "Seamless Deduplication",
                               detail: "Strict tri-factor deduplication guarantees no wallpaper ever repeats between local downloads and Explore."),
                 WhatsNewEntry(title: "Modular Codebase Architecture",

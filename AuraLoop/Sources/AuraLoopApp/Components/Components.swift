@@ -1315,11 +1315,7 @@ struct WallpaperCard: View {
                     if isSelected { selection.wrappedValue.remove(item.id) }
                     else { selection.wrappedValue.insert(item.id) }
                 } else {
-                    if item.isPremium && !store.isWallpaperUnlocked(item) {
-                        store.proSheetOpen = true
-                    } else {
-                        store.openPreview(item)
-                    }
+                    store.openPreview(item)
                 }
             }
             .glassContextMenu(width: 210) { selecting ? [] : menuOptions }
@@ -1458,6 +1454,8 @@ struct WallpaperCard: View {
             // Drawn live by macOS: nothing to download and no file of AuraLoop's
             // to delete. Apple's still pictures do download, and get the
             // arrow like everything else.
+            EmptyView()
+        } else if item.isPremium && !store.isWallpaperUnlocked(item) {
             EmptyView()
         } else if !store.isOnThisMac(item) {
             Image(systemName: "arrow.down.circle")

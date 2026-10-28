@@ -229,19 +229,19 @@ public struct ProUpgradeSheet: View {
                 .cornerRadius(14)
             }
 
-            VStack(spacing: 8) {
-                Text("Visit to Website for Upgradation")
+            VStack(spacing: 10) {
+                Text("Transparent Pricing & Open Access")
                     .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(Color.AuraLoopInk)
 
-                Text("To unlock all 1,582+ 4K ultra-wide wallpapers and audio synchronization, upgrade your membership on our website.")
+                Text("Over 80% of our 4K live wallpapers are completely free forever. We charge a one-time ₹199 for our exclusive Master Collection to offset ultra-fast CDN video bandwidth and native Apple Silicon engineering.\n\nIf you love AuraLoop, you can also make an optional voluntary contribution to support solo indie development and keep the project alive.")
                     .font(.system(size: 12.5))
                     .foregroundStyle(Color.AuraLoopSecondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 8)
             }
 
-            VStack(spacing: 12) {
+            VStack(spacing: 10) {
                 // Primary action: Open Website Upgrade
                 Button {
                     AuraLoopWebLink.open(action: "upgrade")
@@ -249,12 +249,12 @@ public struct ProUpgradeSheet: View {
                     HStack(spacing: 8) {
                         Image(systemName: "crown.fill")
                             .font(.system(size: 13))
-                        Text("Visit to Website for Upgradation ↗")
+                        Text("Upgrade to Lifetime Pro (₹199) ↗")
                             .font(.system(size: 14, weight: .bold))
                     }
                     .foregroundStyle(.black)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 13)
+                    .padding(.vertical, 12)
                     .background(
                         LinearGradient(
                             colors: [Color(hex: 0xF59E0B), Color(hex: 0xD97706)],
@@ -264,6 +264,26 @@ public struct ProUpgradeSheet: View {
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .shadow(color: Color(hex: 0xF59E0B).opacity(0.35), radius: 8, x: 0, y: 3)
+                }
+                .buttonStyle(.plain)
+                .pointingCursor()
+
+                // Voluntary Donation / Support
+                Button {
+                    AuraLoopWebLink.open(action: "pricing")
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color(hex: 0xEC4899))
+                        Text("Support & Donate (\"Keep Me Alive\") ↗")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Color.AuraLoopInk)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(Color.AuraLoopInk.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .pointingCursor()

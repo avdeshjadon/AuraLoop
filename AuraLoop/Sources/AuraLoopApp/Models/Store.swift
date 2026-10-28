@@ -1435,6 +1435,12 @@ final class AppStore: ObservableObject {
         surface: ApplySurface? = nil,
         fromSchedule: Bool = false
     ) {
+        guard isWallpaperUnlocked(item) else {
+            if !fromSchedule {
+                proSheetOpen = true
+            }
+            return
+        }
         // A wallpaper whose video was moved or deleted outside AuraLoop keeps its
         // entry and its picture, and setting it used to say "Applied" while
         // nothing played and the desktop fell back to an old still (full
@@ -1479,6 +1485,10 @@ final class AppStore: ObservableObject {
         surface explicitSurface: ApplySurface?,
         fromSchedule: Bool = false
     ) async {
+        guard isWallpaperUnlocked(item) else {
+            proSheetOpen = true
+            return
+        }
         guard let entry = item.local else { return }
         let surface = explicitSurface ?? .desktop
         // Apple ships these at 240 fps, so the Efficient rule below would fire
@@ -2060,6 +2070,10 @@ final class AppStore: ObservableObject {
     // MARK: - Download (remote catalog → local library)
 
     func download(_ item: WallpaperItem) {
+        if item.isPremium && !isWallpaperUnlocked(item) {
+            proSheetOpen = true
+            return
+        }
         // Apple's aerials are fetched from Apple, into AuraLoop's own cache. The
         // catalog path below would write them into `library.json` and copy
         // them into `Masters/`, which is exactly what this feature promised

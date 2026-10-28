@@ -1,26 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { goToWaitlist } from '../lib.js';
+import { goToWaitlist, LATEST_DMG_URL } from '../lib.js';
 import { ArrowUpRight } from '../icons.jsx';
 import { initFooterLogoAnimation } from './FooterLogoAnim.js';
-
-const COLS = [
-  {
-    title: 'Engine',
-    links: [
-      { href: '#wallpapers', label: 'Curated 4K' },
-      { href: '#features', label: 'Subsystems' },
-      { href: '#top', label: 'Interactive Player' },
-    ],
-  },
-  {
-    title: 'AuraLoop',
-    links: [
-      { href: '#manifesto', label: 'Philosophy' },
-      { href: '#workflows', label: 'Hardware Profiles' },
-      { href: '#waitlist', label: 'Download .DMG', waitlist: true },
-    ],
-  },
-];
 
 function OGlyph() {
   return (
@@ -39,10 +20,18 @@ function OGlyph() {
   );
 }
 
-export default function Footer() {
+export default function Footer({ onOpenDocs, onNavigateToDocs, onOpenPricing }) {
   const footerRef = useRef(null);
 
   useEffect(() => initFooterLogoAnimation(footerRef.current), []);
+
+  const handleOpenDocs = (tab) => {
+    if (onNavigateToDocs) {
+      onNavigateToDocs(tab);
+    } else if (onOpenDocs) {
+      onOpenDocs();
+    }
+  };
 
   return (
     <footer className="ta-footer" ref={footerRef}>
@@ -66,35 +55,80 @@ export default function Footer() {
               <line className="ta-floor" x1="0" y1="0" x2="0" y2="0" />
             </svg>
           </div>
+          
           <div className="ta-footer__cols">
-            {COLS.map(col => (
-              <nav key={col.title} aria-label={`${col.title} links`}>
-                <p className="ta-footer__h">{col.title}</p>
-                <ul role="list">
-                  {col.links.map(l => (
-                    <li key={l.href}>
-                      <a href={l.href} onClick={l.waitlist ? goToWaitlist : undefined}>
-                        {l.label}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
-            ))}
-            <nav aria-label="Open Source">
-              <p className="ta-footer__h">Project</p>
+            <nav aria-label="Engine links">
+              <p className="ta-footer__h">Engine</p>
+              <ul role="list">
+                <li><a href="#wallpapers">Curated 4K</a></li>
+                <li><a href="#features">Subsystems</a></li>
+                <li><a href="#top">Interactive Player</a></li>
+              </ul>
+            </nav>
+
+            <nav aria-label="Platform links">
+              <p className="ta-footer__h">AuraLoop</p>
+              <ul role="list">
+                <li><a href="#pricing">Pricing & Support</a></li>
+                <li><a href="#manifesto">Philosophy</a></li>
+                <li><a href="#workflows">Hardware Profiles</a></li>
+                <li><a href={LATEST_DMG_URL} onClick={goToWaitlist}>Download .DMG</a></li>
+              </ul>
+            </nav>
+
+            <nav aria-label="Resources & Docs">
+              <p className="ta-footer__h">Resources</p>
               <ul role="list">
                 <li>
-                  <a href="https://github.com/avdeshjadon/AuraLoop" target="_blank" rel="noreferrer" className="ta-footer__back">
-                    GitHub Repo <ArrowUpRight size={13} />
+                  <button
+                    type="button"
+                    onClick={() => handleOpenDocs('getting-started')}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      font: 'inherit',
+                      color: 'inherit',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <span>Documentation & Manual</span>
+                    <ArrowUpRight size={13} />
+                  </button>
+                </li>
+                <li>
+                  <a href="#pricing">
+                    Voluntary Contributions
                   </a>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenDocs('privacy')}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      font: 'inherit',
+                      color: 'inherit',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}
+                  >
+                    Zero Telemetry Policy
+                  </button>
                 </li>
               </ul>
             </nav>
           </div>
         </div>
+
         <div className="ta-footer__bottom">
-          <p>© 2026 AuraLoop. Built with AVFoundation, Metal, and ExtensionKit for macOS Sequoia & Sonoma.</p>
+          <p>© 2026 AuraLoop. Proprietary native software for macOS Sequoia & Sonoma by Avdesh Jadon.</p>
           <p>Curated 4K Aerials & Masters · Zero Telemetry · Offline Solar Ephemeris</p>
         </div>
       </div>

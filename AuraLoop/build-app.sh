@@ -208,6 +208,8 @@ for arg in "$@"; do
         fi
         rm -rf "$STAGING"
         echo "==> dmg: $DMG"
+        cp -f "$DMG" "$DIR/dist/AuraLoop.dmg"
+        echo "==> generic dmg: $DIR/dist/AuraLoop.dmg"
         ;;
     esac
 done

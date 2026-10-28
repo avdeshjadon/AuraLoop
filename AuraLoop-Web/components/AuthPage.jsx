@@ -9,6 +9,7 @@ import {
   subscribeAuth,
 } from "../lib/firebase.js";
 import { usePricing } from "../lib/pricingService.js";
+import { startCashfreeCheckout } from "../lib/paymentService.js";
 
 export default function AuthPage({
   initialMode = "signin",
@@ -37,7 +38,8 @@ export default function AuthPage({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [paymentNotice, setPaymentNotice] = useState(false);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState("");
 
   const pricing = usePricing();
 
@@ -1035,41 +1037,64 @@ export default function AuthPage({
                     <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "8px" }}>
                       <button
                         type="button"
-                        onClick={() => setPaymentNotice(true)}
+                        disabled={paymentLoading}
+                        onClick={async () => {
+                          setPaymentLoading(true);
+                          setError("");
+                          setSuccess("");
+                          setPaymentStatus("Preparing checkout...");
+                          try {
+                            await startCashfreeCheckout({
+                              user,
+                              pricing,
+                              onStatusChange: ({ message }) => {
+                                setPaymentStatus(message);
+                              },
+                              onSuccess: ({ orderId, profile }) => {
+                                setSuccess(`Payment successful! Welcome to Lifetime Pro (Order: ${orderId})`);
+                                setPaymentStatus("");
+                                if (profile) setUser(profile);
+                              },
+                              onError: (err) => {
+                                setError(err.message || "Payment could not be completed.");
+                                setPaymentStatus("");
+                              }
+                            });
+                          } catch (err) {
+                            setError(err.message || "Checkout initiation error.");
+                          } finally {
+                            setPaymentLoading(false);
+                          }
+                        }}
                         style={{
                           ...submitBtnStyle,
-                          background:
-                            "linear-gradient(180deg, #e0552c 0%, #b93c18 100%)",
+                          background: paymentLoading
+                            ? "#a8a29e"
+                            : "linear-gradient(180deg, #e0552c 0%, #b93c18 100%)",
                           color: "#ffffff",
+                          cursor: paymentLoading ? "not-allowed" : "pointer",
                         }}
                       >
-                        Upgrade to Lifetime Pro ({pricing.currency}{pricing.price})
+                        {paymentLoading ? (paymentStatus || "Connecting to Cashfree...") : `Upgrade to Lifetime Pro (${pricing.currency}{pricing.price})`}
                       </button>
 
-                      {paymentNotice && (
+                      {paymentStatus && paymentLoading && (
                         <div
                           style={{
                             padding: "12px 14px",
                             borderRadius: "10px",
-                            background: "#fef3c7",
-                            border: "1px solid #fde68a",
-                            color: "#92400e",
+                            background: "#eff6ff",
+                            border: "1px solid #bfdbfe",
+                            color: "#1e40af",
                             fontSize: "13px",
                             fontWeight: "600",
                             display: "flex",
                             alignItems: "center",
-                            justifyContent: "space-between",
-                            gap: "10px",
+                            gap: "8px",
                           }}
                         >
-                          <span>This feature is coming soon! Direct online checkout via Cashfree Gateway is currently in progress.</span>
-                          <button
-                            type="button"
-                            onClick={() => setPaymentNotice(false)}
-                            style={{ background: "none", border: "none", color: "#92400e", cursor: "pointer", fontSize: "16px", fontWeight: "bold" }}
-                          >
-                            ✕
-                          </button>
+                          <span style={{ display: "inline-block", width: "12px", height: "12px", borderRadius: "50%", border: "2px solid #3b82f6", borderTopColor: "transparent", animation: "spin 1s linear infinite" }}></span>
+                          <span>{paymentStatus}</span>
                         </div>
                       )}
                     </div>

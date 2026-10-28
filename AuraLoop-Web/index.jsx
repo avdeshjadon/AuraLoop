@@ -10,6 +10,8 @@ import Hero from './components/Hero.jsx';
 import PeopleSection from './components/PeopleSection.jsx';
 import Features from './components/Features.jsx';
 import Workflows from './components/Workflows.jsx';
+import PricingSection from './components/PricingSection.jsx';
+import DocsPage from './components/DocsPage.jsx';
 import Manifesto from './components/Manifesto.jsx';
 import Footer from './components/Footer.jsx';
 import AuthPage from './components/AuthPage.jsx';
@@ -32,9 +34,10 @@ export default function AuraLoopWeb() {
   // User auth state
   const [user, setUser] = useState(null);
 
-  // Page view state: 'home' | 'account' | 'auth' | 'admin'
+  // Page view state: 'home' | 'account' | 'auth' | 'admin' | 'docs'
   const [view, setView] = useState('home');
   const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup'
+  const [docsTab, setDocsTab] = useState('getting-started');
 
   // Toast notification
   const [toast, setToast] = useState(null);
@@ -93,6 +96,18 @@ export default function AuraLoopWeb() {
             setAuthMode('signup');
             setView('auth');
           }
+        } else if (path === '/pricing' || action === 'pricing' || action === 'support' || action === 'donate') {
+          setView('home');
+          setTimeout(() => {
+            const el = document.getElementById('pricing');
+            el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 100);
+        } else if (path === '/docs' || path === '/manual' || action === 'docs' || action === 'manual') {
+          setView('docs');
+          setDocsTab('getting-started');
+        } else if (path === '/privacy' || path === '/telemetry' || action === 'privacy' || action === 'telemetry') {
+          setView('docs');
+          setDocsTab('privacy');
         } else {
           setView('home');
         }
@@ -265,6 +280,27 @@ export default function AuraLoopWeb() {
     );
   }
 
+  // 4. Standalone Full-Page Docs Route (/docs, /privacy)
+  if (view === 'docs') {
+    return (
+      <MotionConfig reducedMotion="user">
+        <DocsPage
+          initialTab={docsTab}
+          onBack={navigateToHome}
+          onNavigateToPricing={() => {
+            setView('home');
+            try {
+              window.history.pushState(null, '', '/#pricing');
+            } catch {}
+            setTimeout(() => {
+              document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
+            }, 150);
+          }}
+        />
+      </MotionConfig>
+    );
+  }
+
   // 4. Main Home Page Route (/)
   return (
     <MotionConfig reducedMotion="user">
@@ -326,10 +362,18 @@ export default function AuraLoopWeb() {
           <PeopleSection />
           <Features />
           <Workflows />
+          <PricingSection user={user} onOpenAuth={navigateToAuth} onUserUpdated={setUser} />
           <Manifesto />
         </main>
         
-        <Footer />
+        <Footer onNavigateToDocs={(tab) => {
+          setDocsTab(tab);
+          setView('docs');
+          try {
+            window.history.pushState(null, '', tab === 'privacy' ? '/privacy' : '/docs');
+          } catch {}
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }} />
       </div>
     </MotionConfig>
   );

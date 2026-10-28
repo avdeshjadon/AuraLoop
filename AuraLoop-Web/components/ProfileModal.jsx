@@ -5,6 +5,7 @@ import {
   signOutUser
 } from '../lib/firebase.js';
 import { usePricing } from '../lib/pricingService.js';
+import { startCashfreeCheckout } from '../lib/paymentService.js';
 
 export default function ProfileModal({ isOpen, onClose, user, onUserUpdated, onSignOutSuccess, initialTab = 'profile' }) {
   const [activeTab, setActiveTab] = useState(initialTab); // 'profile' | 'upgrade' | 'password'
@@ -18,8 +19,9 @@ export default function ProfileModal({ isOpen, onClose, user, onUserUpdated, onS
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPasswordForm, setShowPasswordForm] = useState(false);
 
-  // Payment notice state
-  const [paymentNotice, setPaymentNotice] = useState(false);
+  // Payment status state
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState('');
 
   // Feedback states
   const [busy, setBusy] = useState(false);
@@ -382,7 +384,25 @@ export default function ProfileModal({ isOpen, onClose, user, onUserUpdated, onS
               </div>
             </div>
 
-            <div style={{ flexShrink: 0 }}>
+            <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {(user?.isSupporter || (user?.totalDonated > 0)) && (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '6px 12px',
+                    borderRadius: '999px',
+                    fontSize: '11.5px',
+                    fontWeight: '700',
+                    background: '#fdf2f8',
+                    color: '#be185d',
+                    border: '1px solid #fbcfe8',
+                  }}
+                >
+                  ❤️ Supporter (₹{user.totalDonated})
+                </span>
+              )}
               <span
                 style={{
                   display: 'inline-flex',
@@ -563,51 +583,77 @@ export default function ProfileModal({ isOpen, onClose, user, onUserUpdated, onS
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <button
                   type="button"
-                  onClick={() => setPaymentNotice(true)}
+                  disabled={paymentLoading}
+                  onClick={async () => {
+                    setPaymentLoading(true);
+                    setError('');
+                    setSuccess('');
+                    setPaymentStatus('Connecting to payment gateway...');
+                    try {
+                      await startCashfreeCheckout({
+                        user,
+                        pricing,
+                        onStatusChange: ({ message }) => {
+                          setPaymentStatus(message);
+                        },
+                        onSuccess: ({ orderId, profile }) => {
+                          setSuccess(`Payment successful! Welcome to Lifetime Pro (Order: ${orderId})`);
+                          setPaymentStatus('');
+                          if (onUserUpdated && profile) onUserUpdated(profile);
+                        },
+                        onError: (err) => {
+                          setError(err.message || 'Payment could not be completed.');
+                          setPaymentStatus('');
+                        }
+                      });
+                    } catch (err) {
+                      setError(err.message || 'Payment initiation failed.');
+                    } finally {
+                      setPaymentLoading(false);
+                    }
+                  }}
                   style={{
                     width: '100%',
                     padding: '13px 18px',
                     borderRadius: '12px',
                     border: 'none',
-                    background: 'linear-gradient(135deg, #e4572e 0%, #b93c18 100%)',
+                    background: paymentLoading
+                      ? '#a8a29e'
+                      : 'linear-gradient(135deg, #e4572e 0%, #b93c18 100%)',
                     color: '#ffffff',
                     fontSize: '14.5px',
                     fontWeight: '700',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 16px rgba(228,87,46,0.35)',
+                    cursor: paymentLoading ? 'not-allowed' : 'pointer',
+                    boxShadow: paymentLoading ? 'none' : '0 4px 16px rgba(228,87,46,0.35)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '8px'
+                    gap: '8px',
+                    transition: 'all 0.15s ease'
                   }}
                 >
-                  <span>Upgrade to Lifetime Pro ({pricing.currency}{pricing.price})</span>
+                  <span>
+                    {paymentLoading ? (paymentStatus || 'Connecting to Cashfree...') : `Upgrade to Lifetime Pro (${pricing.currency}${pricing.price})`}
+                  </span>
                 </button>
 
-                {paymentNotice && (
+                {paymentStatus && paymentLoading && (
                   <div
                     style={{
                       padding: '12px 14px',
                       borderRadius: '10px',
-                      background: '#fef3c7',
-                      border: '1px solid #fde68a',
-                      color: '#92400e',
+                      background: '#eff6ff',
+                      border: '1px solid #bfdbfe',
+                      color: '#1e40af',
                       fontSize: '13px',
                       fontWeight: '600',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '10px'
+                      gap: '8px'
                     }}
                   >
-                    <span>This feature is coming soon! Direct online checkout via Cashfree Gateway is in progress.</span>
-                    <button
-                      type="button"
-                      onClick={() => setPaymentNotice(false)}
-                      style={{ background: 'none', border: 'none', color: '#92400e', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold' }}
-                    >
-                      ✕
-                    </button>
+                    <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', border: '2px solid #3b82f6', borderTopColor: 'transparent', animation: 'spin 1s linear infinite' }}></span>
+                    <span>{paymentStatus}</span>
                   </div>
                 )}
               </div>
@@ -639,9 +685,9 @@ export default function ProfileModal({ isOpen, onClose, user, onUserUpdated, onS
             </button>
 
             <a
-              href="https://github.com/avdeshjadon/AuraLoop"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="https://github.com/avdeshjadon/AuraLoop/releases/latest/download/AuraLoop.dmg"
+              download
+              onClick={onClose}
               style={{
                 padding: '12px 14px',
                 borderRadius: '12px',
@@ -657,8 +703,8 @@ export default function ProfileModal({ isOpen, onClose, user, onUserUpdated, onS
                 gap: '6px'
               }}
             >
-              <span>Download macOS App</span>
-              <span style={{ fontSize: '11px' }}>↗</span>
+              <span>Download macOS App (.DMG)</span>
+              <span style={{ fontSize: '11px' }}>↓</span>
             </a>
           </div>
 

@@ -94,6 +94,7 @@ struct ExploreView: View {
                                 } else {
                                     VStack(spacing: 22) {
                                         catalogNotice
+                                        premiumBanner
                                         grid
                                     }
                                 }
@@ -406,6 +407,44 @@ struct ExploreView: View {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .strokeBorder(Color.AuraLoopInk.opacity(0.13), lineWidth: 1)
             )
+        }
+    }
+
+    @ViewBuilder private var premiumBanner: some View {
+        if isPremiumActive && store.proTier == .none {
+            HStack(spacing: 14) {
+                Image(systemName: "crown.fill")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Color(hex: 0xF59E0B))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Exclusive Master Collection · Live Preview Available")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.AuraLoopInk)
+                    Text("Preview any wallpaper in full live motion. Upgrade to Lifetime Pro (₹199) to set them as your wallpaper or download.")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(Color.AuraLoopSecondary)
+                }
+                Spacer(minLength: 12)
+                Button {
+                    store.proSheetOpen = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text("Upgrade (₹199)")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundStyle(Color.AuraLoopOnInk)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(Capsule().fill(Color.AuraLoopInk))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 12)
+            .background(RoundedRectangle(cornerRadius: 16).fill(Color.AuraLoopInk.opacity(0.05)))
+            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.AuraLoopInk.opacity(0.10), lineWidth: 1))
         }
     }
 

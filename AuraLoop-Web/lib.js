@@ -27,11 +27,12 @@ export function useMedia(query, initial = false) {
  * Every waitlist call to action: scroll to the form, focus the email field and briefly
  * highlight the form. Works the same on mobile.
  */
+export const LATEST_DMG_URL = 'https://github.com/avdeshjadon/AuraLoop/releases/latest/download/AuraLoop.dmg';
+
 export function goToWaitlist(event) {
   event?.preventDefault?.();
-  // Direct download link to GitHub Releases DMG
-  const releaseUrl = 'https://github.com/avdeshjadon/AuraLoop/releases/latest';
-  window.open(releaseUrl, '_blank', 'noopener,noreferrer');
+  // Directly trigger immediate DMG download without opening GitHub release page
+  window.location.href = LATEST_DMG_URL;
 }
 
 export const isMac = () =>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import InboxWindow from './InboxWindow.jsx';
 import { useInbox } from './useInbox.js';
 import { INCOMING, PEOPLE } from '../data.js';
-import { face, goToWaitlist, useMedia } from '../lib.js';
+import { face, goToWaitlist, useMedia, LATEST_DMG_URL } from '../lib.js';
 import { Bolt } from '../icons.jsx';
 import { gsap, useGSAP, MOTION_OK } from '../../../shared/gsap.js';
 
@@ -268,8 +268,8 @@ export default function Hero() {
         <p className="ta-hero__sub">
           AuraLoop renders continuous 4K looping wallpapers and ExtensionKit lock screen synchronization on macOS with near-zero CPU footprint and whisper-quiet fans.
         </p>
-        <a href="#waitlist" className="ta-btn ta-btn--ember ta-hero__cta" onClick={goToWaitlist}>
-          Download .DMG (v6.6.0) <Bolt size={14} />
+        <a href={LATEST_DMG_URL} className="ta-btn ta-btn--ember ta-hero__cta" onClick={goToWaitlist}>
+          Download .DMG <Bolt size={14} />
         </a>
       </div>
 

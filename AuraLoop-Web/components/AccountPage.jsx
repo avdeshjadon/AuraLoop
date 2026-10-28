@@ -5,6 +5,7 @@ import {
   signOutUser
 } from '../lib/firebase.js';
 import { usePricing } from '../lib/pricingService.js';
+import { startCashfreeCheckout, startCashfreeDonation } from '../lib/paymentService.js';
 
 export default function AccountPage({
   user,
@@ -22,8 +23,12 @@ export default function AccountPage({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPasswordForm, setShowPasswordForm] = useState(false);
 
-  // Payment notice state
-  const [paymentNotice, setPaymentNotice] = useState(false);
+  // Payment & Donation status state
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState('');
+  const [donateAmount, setDonateAmount] = useState(199);
+  const [donateLoading, setDonateLoading] = useState(false);
+  const [showDonateForm, setShowDonateForm] = useState(false);
 
   // Feedback states
   const [busy, setBusy] = useState(false);
@@ -671,58 +676,187 @@ export default function AccountPage({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '4px' }}>
               <button
                 type="button"
-                onClick={() => setPaymentNotice(true)}
+                disabled={paymentLoading}
+                onClick={async () => {
+                  setPaymentLoading(true);
+                  setError('');
+                  setSuccess('');
+                  setPaymentStatus('Preparing secure checkout...');
+                  try {
+                    await startCashfreeCheckout({
+                      user,
+                      pricing,
+                      onStatusChange: ({ message }) => {
+                        setPaymentStatus(message);
+                      },
+                      onSuccess: ({ orderId, profile }) => {
+                        setSuccess(`Payment successful! Welcome to Lifetime Pro (Order: ${orderId})`);
+                        setPaymentStatus('');
+                        if (onUserUpdated && profile) onUserUpdated(profile);
+                      },
+                      onError: (err) => {
+                        setError(err.message || 'Payment could not be completed.');
+                        setPaymentStatus('');
+                      }
+                    });
+                  } catch (err) {
+                    setError(err.message || 'Checkout initiation error.');
+                  } finally {
+                    setPaymentLoading(false);
+                  }
+                }}
                 style={{
                   padding: '13px 24px',
                   borderRadius: '12px',
                   border: 'none',
-                  background: 'linear-gradient(135deg, #e4572e 0%, #b93c18 100%)',
+                  background: paymentLoading
+                    ? '#a8a29e'
+                    : 'linear-gradient(135deg, #e4572e 0%, #b93c18 100%)',
                   color: '#ffffff',
                   fontSize: '14.5px',
                   fontWeight: '700',
-                  cursor: 'pointer',
+                  cursor: paymentLoading ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  boxShadow: '0 4px 14px rgba(228,87,46,0.3)',
-                  transition: 'opacity 0.15s ease'
+                  boxShadow: paymentLoading ? 'none' : '0 4px 14px rgba(228,87,46,0.3)',
+                  transition: 'all 0.15s ease'
                 }}
               >
-                <span>Upgrade to Lifetime Pro ({pricing.currency}{pricing.price})</span>
+                <span>
+                  {paymentLoading ? (paymentStatus || 'Connecting to Cashfree...') : `Upgrade to Lifetime Pro (${pricing.currency}${pricing.price})`}
+                </span>
               </button>
 
-              {paymentNotice && (
+              {paymentStatus && paymentLoading && (
                 <div
                   style={{
-                    padding: '14px 18px',
-                    borderRadius: '12px',
-                    background: '#fef3c7',
-                    border: '1px solid #fde68a',
-                    color: '#92400e',
-                    fontSize: '13.5px',
+                    padding: '12px 16px',
+                    borderRadius: '10px',
+                    background: '#eff6ff',
+                    border: '1px solid #bfdbfe',
+                    color: '#1e40af',
+                    fontSize: '13px',
                     fontWeight: '600',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '12px'
+                    gap: '10px'
                   }}
                 >
-                  <span>This feature is coming soon! Direct online checkout via Cashfree Payment Gateway is currently in progress.</span>
-                  <button
-                    type="button"
-                    onClick={() => setPaymentNotice(false)}
-                    style={{ background: 'none', border: 'none', color: '#92400e', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold' }}
-                  >
-                    ✕
-                  </button>
+                  <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', border: '2px solid #3b82f6', borderTopColor: 'transparent', animation: 'spin 1s linear infinite' }}></span>
+                  <span>{paymentStatus}</span>
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* 5. Shortcuts */}
+        {/* 5. Voluntary Supporter Section */}
+        <div style={{ background: '#ffffff', borderRadius: '18px', padding: '24px', border: (user?.isSupporter || (user?.totalDonated > 0)) ? '1px solid #fbcfe8' : '1px solid #e8e2d9', boxShadow: '0 4px 16px rgba(0,0,0,0.03)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '26px' }}>{(user?.isSupporter || (user?.totalDonated > 0)) ? '❤️' : '☕'}</span>
+              <div>
+                <div style={{ fontSize: '15px', fontWeight: '700', color: '#17130f' }}>
+                  {(user?.isSupporter || (user?.totalDonated > 0)) ? 'Proud AuraLoop Supporter' : 'Support AuraLoop Engineering (Optional)'}
+                </div>
+                <div style={{ fontSize: '13px', color: '#685f58', marginTop: '2px' }}>
+                  {(user?.isSupporter || (user?.totalDonated > 0))
+                    ? `You have generously contributed ₹${user.totalDonated} to keep solo engineering alive. Thank you deeply!`
+                    : 'Over 80% of wallpapers are free forever. Optional voluntary contributions fund server CDN bandwidth and keep AuraLoop alive.'}
+                </div>
+              </div>
+            </div>
+
+            {(user?.isSupporter || (user?.totalDonated > 0)) && (
+              <button
+                type="button"
+                onClick={() => setShowDonateForm(!showDonateForm)}
+                style={{
+                  padding: '9px 18px',
+                  borderRadius: '10px',
+                  border: '1px solid #dcd5cc',
+                  background: '#faf8f5',
+                  color: '#17130f',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  cursor: 'pointer'
+                }}
+              >
+                {showDonateForm ? 'Cancel' : 'Donate More'}
+              </button>
+            )}
+          </div>
+
+          {(!(user?.isSupporter || (user?.totalDonated > 0)) || showDonateForm) && (
+            <div style={{ marginTop: '18px', paddingTop: '16px', borderTop: '1px solid #eeeae4' }}>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
+                {[99, 199, 499].map(amt => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setDonateAmount(amt)}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      border: donateAmount === amt ? '2px solid #17130f' : '1px solid #dcd5cc',
+                      background: donateAmount === amt ? '#17130f' : '#faf8f5',
+                      color: donateAmount === amt ? '#ffffff' : '#17130f',
+                      fontSize: '13px',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ₹{amt}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                disabled={donateLoading}
+                onClick={async () => {
+                  setDonateLoading(true);
+                  setError('');
+                  setSuccess('');
+                  try {
+                    await startCashfreeDonation({
+                      user,
+                      amount: donateAmount,
+                      onSuccess: ({ orderId, amount: paidAmt, profile }) => {
+                        setSuccess(`Thank you for your generous contribution of ₹${paidAmt}! (Order: ${orderId})`);
+                        setShowDonateForm(false);
+                        if (onUserUpdated && profile) onUserUpdated(profile);
+                      },
+                      onError: (err) => {
+                        setError(err.message || 'Contribution could not be processed.');
+                      }
+                    });
+                  } catch (err) {
+                    setError(err.message || 'Contribution error.');
+                  } finally {
+                    setDonateLoading(false);
+                  }
+                }}
+                style={{
+                  padding: '11px 22px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: donateLoading ? '#a8a29e' : '#17130f',
+                  color: '#ffffff',
+                  fontSize: '13.5px',
+                  fontWeight: '700',
+                  cursor: donateLoading ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {donateLoading ? 'Connecting to Cashfree...' : `Contribute ₹${donateAmount} via UPI/Card`}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* 6. Shortcuts */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px' }}>
           <button
             type="button"
@@ -746,9 +880,8 @@ export default function AccountPage({
           </button>
 
           <a
-            href="https://github.com/avdeshjadon/AuraLoop"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="https://github.com/avdeshjadon/AuraLoop/releases/latest/download/AuraLoop.dmg"
+            download
             style={{
               padding: '14px 18px',
               borderRadius: '14px',
@@ -763,8 +896,8 @@ export default function AccountPage({
               justifyContent: 'space-between'
             }}
           >
-            <span>Download macOS App</span>
-            <span style={{ fontSize: '13px' }}>↗</span>
+            <span>Download macOS App (.DMG)</span>
+            <span style={{ fontSize: '13px' }}>↓</span>
           </a>
         </div>
 

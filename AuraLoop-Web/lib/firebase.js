@@ -208,6 +208,63 @@ export async function upgradeToLifetimePro(utr = '') {
 }
 
 /**
+ * Record a voluntary donation to support development and keep AuraLoop alive
+ */
+export async function recordDonation(amount = 0, orderId = '') {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Please sign in to record your donation.');
+
+  const cleanAmount = Number(amount) || 0;
+  if (cleanAmount <= 0) throw new Error('Invalid donation amount.');
+
+  const ref = doc(db, 'users', user.uid);
+  const snap = await getDoc(ref);
+  const existing = snap.exists() ? snap.data() : {};
+
+  const currentTotal = Number(existing.totalDonated || 0);
+  const newTotal = currentTotal + cleanAmount;
+  const history = existing.donations || [];
+  history.push({
+    orderId: orderId || `order_${Date.now()}`,
+    amount: cleanAmount,
+    timestamp: Date.now(),
+  });
+
+  // 1. Update Firestore
+  try {
+    await setDoc(ref, {
+      totalDonated: newTotal,
+      isSupporter: true,
+      donations: history,
+      updatedAt: Date.now(),
+    }, { merge: true });
+  } catch (err) {
+    console.warn('Firestore donation update warning:', err);
+  }
+
+  // 2. Update Auth photoURL payload string for macOS app sync
+  const existingPayload = user.photoURL ? (() => {
+    try { return JSON.parse(atob(user.photoURL)); } catch { return {}; }
+  })() : {};
+
+  const cloudData = {
+    ...existingPayload,
+    totalDonated: newTotal,
+    isSupporter: true,
+    updatedAt: Date.now() / 1000,
+  };
+
+  try {
+    const payloadString = btoa(JSON.stringify(cloudData));
+    await updateProfile(user, { photoURL: payloadString });
+  } catch (err) {
+    console.warn('Auth photoURL donation warning:', err);
+  }
+
+  return await hydrateUserProfile(user);
+}
+
+/**
  * Helper to fetch complete user profile including Firestore & password provider status
  */
 export async function hydrateUserProfile(user) {
@@ -233,6 +290,8 @@ export async function hydrateUserProfile(user) {
   const isGoogleUser = user.providerData?.some(p => p.providerId === 'google.com');
 
   const proTier = firestoreData.proTier || cloudPayload.proTier || 'none';
+  const totalDonated = Number(firestoreData.totalDonated || cloudPayload.totalDonated || 0);
+  const isSupporter = Boolean(firestoreData.isSupporter || cloudPayload.isSupporter || totalDonated > 0);
 
   return {
     uid: user.uid,
@@ -242,7 +301,10 @@ export async function hydrateUserProfile(user) {
     proTier,
     verifiedUTRs: firestoreData.verifiedUTRs || cloudPayload.verifiedUTRs || [],
     hasPassword,
-    isGoogleUser
+    isGoogleUser,
+    totalDonated,
+    isSupporter,
+    donations: firestoreData.donations || []
   };
 }
 

@@ -159,9 +159,9 @@ struct PreviewView: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: loader.state)
-        .onAppear { loader.load(id: item.id, from: item.remote?.preview720) }
+        .onAppear { loader.load(id: item.id, from: item.remote?.preview720 ?? item.remote?.video) }
         .onChange(of: item.id) { _, _ in
-            loader.load(id: item.id, from: item.remote?.preview720)
+            loader.load(id: item.id, from: item.remote?.preview720 ?? item.remote?.video)
         }
     }
 
