@@ -223,7 +223,16 @@ struct PreviewView: View {
                 // all in the same box, so nothing is ever cut.
                 .frame(width: heldSetButtonWidth)
                 .onChange(of: showDisplayPopover) { _, open in
-                    heldSetButtonWidth = open && setButtonWidth > 0 ? setButtonWidth : nil
+                    if open && item.isPremium && !store.isWallpaperUnlocked(item) {
+                        showDisplayPopover = false
+                        if !AuthService.shared.isAuthenticated {
+                            store.authSheetOpen = true
+                        } else {
+                            store.proSheetOpen = true
+                        }
+                    } else {
+                        heldSetButtonWidth = open && setButtonWidth > 0 ? setButtonWidth : nil
+                    }
                 }
                 // Drawn in the window like every other menu, not in a popover.
                 // A popover paints its own square grey sheet behind whatever
@@ -421,8 +430,12 @@ struct PreviewView: View {
             .padding(.vertical, 12)
             .background(Capsule().fill(Color.AuraLoopInk.opacity(0.14)))
         } else if item.isPremium && !store.isWallpaperUnlocked(item) {
-            capsuleButton("Unlock with Pro", systemName: "crown.fill") {
-                store.proSheetOpen = true
+            capsuleButton(AuthService.shared.isAuthenticated ? "Unlock with Pro" : "Sign In to Unlock", systemName: "crown.fill") {
+                if !AuthService.shared.isAuthenticated {
+                    store.authSheetOpen = true
+                } else {
+                    store.proSheetOpen = true
+                }
             }
         } else if !item.isDownloaded {
             // Preview and Download are ONE action wearing two words — both
@@ -885,6 +898,14 @@ struct ChooseDisplayPopover: View {
     /// Applies without dismissing — people with several displays apply to
     /// them one after another; clicking outside the popover closes it.
     private func apply(_ target: ApplyTarget) {
+        guard store.isWallpaperUnlocked(item) else {
+            if !AuthService.shared.isAuthenticated {
+                store.authSheetOpen = true
+            } else {
+                store.proSheetOpen = true
+            }
+            return
+        }
         store.setWallpaper(
             item,
             mode: store.previewMode,

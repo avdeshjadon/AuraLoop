@@ -129,6 +129,7 @@ public final class AuthService: ObservableObject {
         self.generatedOTP = ""
         self.errorMessage = nil
         self.successMessage = "Signed out successfully."
+        UserDefaults.standard.removeObject(forKey: "auraLoop_pro_tier")
         AppStore.shared.proTier = .none
     }
 

@@ -2,6 +2,16 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import * as I from '../icons.jsx';
 import EXPLORE_DATA from '../explore_wallpapers.json';
+import { subscribeAuth } from '../lib/firebase.js';
+
+export const isWallpaperPremium = (item) => {
+  if (!item) return false;
+  if (item.category === 'Premium' || item.category?.toLowerCase()?.includes('premium')) return true;
+  if (item.video && item.video.toLowerCase().includes('/premium/')) return true;
+  if (item.thumb && item.thumb.toLowerCase().includes('/premium/')) return true;
+  if (item.id && String(item.id).toLowerCase().includes('premium')) return true;
+  return false;
+};
 
 // Authentic 10 Featured wallpapers directly from AuraLoop catalog
 export const FEATURED_WALLPAPERS = [
@@ -340,8 +350,21 @@ export default function InboxWindow({ inbox, regionRef }) {
   ];
   const current = allKnown.find(w => w.id === selectedId) || FEATURED_WALLPAPERS[0];
   const isCurrentLiked = !!likedMap[current.id];
+  const [authUser, setAuthUser] = useState(null);
+  useEffect(() => {
+    return subscribeAuth(u => setAuthUser(u));
+  }, []);
+  const isPro = authUser?.proTier && authUser?.proTier !== 'none';
+  const isCurrentPremium = isWallpaperPremium(current);
 
   const handleApply = () => {
+    if (isCurrentPremium && !isPro) {
+      setAppliedToast(`Exclusive Master Wallpaper: Sign in & upgrade to Pro to set or download this wallpaper.`);
+      setTimeout(() => setAppliedToast(null), 4000);
+      const pricingSection = document.getElementById('pricing');
+      pricingSection?.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
     setAppliedToast(`Applied "${current.title}" to Desktop Displays`);
     setTimeout(() => setAppliedToast(null), 3200);
   };
@@ -711,19 +734,28 @@ export default function InboxWindow({ inbox, regionRef }) {
                       gap: 8,
                       padding: '11px 24px',
                       borderRadius: 999,
-                      border: '1px solid rgba(255, 255, 255, 0.22)',
-                      background: 'rgba(0, 0, 0, 0.5)',
+                      border: isCurrentPremium && !isPro ? '1px solid rgba(226, 179, 74, 0.65)' : '1px solid rgba(255, 255, 255, 0.22)',
+                      background: isCurrentPremium && !isPro ? 'linear-gradient(135deg, rgba(226, 179, 74, 0.28) 0%, rgba(185, 60, 24, 0.42) 100%)' : 'rgba(0, 0, 0, 0.5)',
                       backdropFilter: 'blur(16px)',
-                      color: '#ffffff',
+                      color: isCurrentPremium && !isPro ? '#fcd34d' : '#ffffff',
                       fontSize: '13px',
-                      fontWeight: 600,
+                      fontWeight: 700,
                       cursor: 'pointer',
-                      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.35)',
+                      boxShadow: isCurrentPremium && !isPro ? '0 4px 20px rgba(226, 179, 74, 0.35)' : '0 4px 16px rgba(0, 0, 0, 0.35)',
                       transition: 'all 0.2s',
                     }}
                   >
-                    <span>View Wallpaper</span>
-                    <span style={{ fontSize: '11px' }}>↗</span>
+                    {isCurrentPremium && !isPro ? (
+                      <>
+                        <span style={{ fontSize: '13px' }}>👑</span>
+                        <span>Unlock with Pro</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>View Wallpaper</span>
+                        <span style={{ fontSize: '11px' }}>↗</span>
+                      </>
+                    )}
                   </button>
 
                   <button
@@ -797,6 +829,26 @@ export default function InboxWindow({ inbox, regionRef }) {
                           filter: on ? 'brightness(1.08)' : 'brightness(0.78)',
                         }}
                       />
+                      {isWallpaperPremium(wp) && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: 4,
+                            right: 4,
+                            padding: '2px 5px',
+                            borderRadius: 999,
+                            background: 'rgba(0, 0, 0, 0.85)',
+                            border: '1px solid rgba(226, 179, 74, 0.6)',
+                            color: '#fcd34d',
+                            fontSize: '9px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            zIndex: 2,
+                          }}
+                        >
+                          👑
+                        </div>
+                      )}
                     </button>
                   );
                 })}
@@ -881,6 +933,7 @@ export default function InboxWindow({ inbox, regionRef }) {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
                 {NEW_WALLPAPERS[newPage].map(card => {
                   const isCardLiked = !!likedMap[card.id];
+                  const isCardPremium = isWallpaperPremium(card);
                   return (
                     <div
                       key={card.id}
@@ -894,12 +947,12 @@ export default function InboxWindow({ inbox, regionRef }) {
                         borderRadius: 14,
                         overflow: 'hidden',
                         position: 'relative',
-                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        border: isCardPremium ? '1px solid rgba(226, 179, 74, 0.45)' : '1px solid rgba(255, 255, 255, 0.12)',
                         backgroundImage: safeBgUrl(card.thumb),
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
                         cursor: 'pointer',
-                        boxShadow: '0 6px 18px rgba(0,0,0,0.3)',
+                        boxShadow: isCardPremium ? '0 6px 20px rgba(0,0,0,0.4), 0 0 15px rgba(226, 179, 74, 0.1)' : '0 6px 18px rgba(0,0,0,0.3)',
                       }}
                     >
                       <div
@@ -910,6 +963,33 @@ export default function InboxWindow({ inbox, regionRef }) {
                         }}
                       />
 
+                      {/* Top Right Crown PRO Badge */}
+                      {isCardPremium && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: 10,
+                            right: 10,
+                            padding: '3px 8px',
+                            borderRadius: 999,
+                            background: 'rgba(0, 0, 0, 0.85)',
+                            border: '1px solid rgba(226, 179, 74, 0.55)',
+                            color: '#fcd34d',
+                            fontSize: '10.5px',
+                            fontWeight: 700,
+                            letterSpacing: '0.04em',
+                            backdropFilter: 'blur(8px)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            zIndex: 3,
+                          }}
+                        >
+                          <span style={{ fontSize: '11px' }}>👑</span>
+                          <span>PRO</span>
+                        </div>
+                      )}
+
                       {/* Favorite Button on Card */}
                       <button
                         type="button"
@@ -918,7 +998,8 @@ export default function InboxWindow({ inbox, regionRef }) {
                         style={{
                           position: 'absolute',
                           top: 10,
-                          right: 10,
+                          left: isCardPremium ? 10 : 'auto',
+                          right: isCardPremium ? 'auto' : 10,
                           width: 28,
                           height: 28,
                           borderRadius: '50%',
@@ -931,6 +1012,7 @@ export default function InboxWindow({ inbox, regionRef }) {
                           cursor: 'pointer',
                           backdropFilter: 'blur(8px)',
                           transition: 'transform 0.15s ease',
+                          zIndex: 3,
                         }}
                       >
                         {isCardLiked ? '♥' : '♡'}
@@ -1053,6 +1135,7 @@ export default function InboxWindow({ inbox, regionRef }) {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
                 {PICKS_WALLPAPERS[picksPage].map(card => {
                   const isCardLiked = !!likedMap[card.id];
+                  const isCardPremium = isWallpaperPremium(card);
                   return (
                     <div
                       key={card.id}
@@ -1066,12 +1149,12 @@ export default function InboxWindow({ inbox, regionRef }) {
                         borderRadius: 14,
                         overflow: 'hidden',
                         position: 'relative',
-                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        border: isCardPremium ? '1px solid rgba(226, 179, 74, 0.45)' : '1px solid rgba(255, 255, 255, 0.12)',
                         backgroundImage: safeBgUrl(card.thumb),
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
                         cursor: 'pointer',
-                        boxShadow: '0 6px 18px rgba(0,0,0,0.3)',
+                        boxShadow: isCardPremium ? '0 6px 20px rgba(0,0,0,0.4), 0 0 15px rgba(226, 179, 74, 0.1)' : '0 6px 18px rgba(0,0,0,0.3)',
                       }}
                     >
                       <div
@@ -1082,6 +1165,33 @@ export default function InboxWindow({ inbox, regionRef }) {
                         }}
                       />
 
+                      {/* Top Right Crown PRO Badge */}
+                      {isCardPremium && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: 10,
+                            right: 10,
+                            padding: '3px 8px',
+                            borderRadius: 999,
+                            background: 'rgba(0, 0, 0, 0.85)',
+                            border: '1px solid rgba(226, 179, 74, 0.55)',
+                            color: '#fcd34d',
+                            fontSize: '10.5px',
+                            fontWeight: 700,
+                            letterSpacing: '0.04em',
+                            backdropFilter: 'blur(8px)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            zIndex: 3,
+                          }}
+                        >
+                          <span style={{ fontSize: '11px' }}>👑</span>
+                          <span>PRO</span>
+                        </div>
+                      )}
+
                       {/* Favorite Button on Card */}
                       <button
                         type="button"
@@ -1090,7 +1200,8 @@ export default function InboxWindow({ inbox, regionRef }) {
                         style={{
                           position: 'absolute',
                           top: 10,
-                          right: 10,
+                          left: isCardPremium ? 10 : 'auto',
+                          right: isCardPremium ? 'auto' : 10,
                           width: 28,
                           height: 28,
                           borderRadius: '50%',
@@ -1103,6 +1214,7 @@ export default function InboxWindow({ inbox, regionRef }) {
                           cursor: 'pointer',
                           backdropFilter: 'blur(8px)',
                           transition: 'transform 0.15s ease',
+                          zIndex: 3,
                         }}
                       >
                         {isCardLiked ? '♥' : '♡'}
@@ -1246,7 +1358,7 @@ export default function InboxWindow({ inbox, regionRef }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18 }}>
               {exploreList.map(item => {
                 const isLiked = !!likedMap[item.id];
-                const isItemPremium = item.category === 'Premium';
+                const isItemPremium = isWallpaperPremium(item);
                 return (
                   <div
                     key={item.id}
@@ -1260,7 +1372,7 @@ export default function InboxWindow({ inbox, regionRef }) {
                       borderRadius: 14,
                       overflow: 'hidden',
                       position: 'relative',
-                      border: isItemPremium ? '1px solid rgba(226, 179, 74, 0.35)' : '1px solid rgba(255, 255, 255, 0.12)',
+                      border: isItemPremium ? '1px solid rgba(226, 179, 74, 0.45)' : '1px solid rgba(255, 255, 255, 0.12)',
                       backgroundImage: safeBgUrl(item.thumb),
                       backgroundSize: 'cover',
                       backgroundPosition: 'center',
@@ -1275,17 +1387,19 @@ export default function InboxWindow({ inbox, regionRef }) {
                         background: 'linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.75) 100%)',
                       }}
                     />
+
+                    {/* Top Right Crown PRO Badge */}
                     {isItemPremium && (
                       <div
                         style={{
                           position: 'absolute',
                           top: 10,
-                          left: 10,
+                          right: 10,
                           padding: '3px 8px',
                           borderRadius: 999,
-                          background: 'rgba(0, 0, 0, 0.75)',
-                          border: '1px solid rgba(226, 179, 74, 0.45)',
-                          color: '#e2b34a',
+                          background: 'rgba(0, 0, 0, 0.85)',
+                          border: '1px solid rgba(226, 179, 74, 0.55)',
+                          color: '#fcd34d',
                           fontSize: '10.5px',
                           fontWeight: 700,
                           letterSpacing: '0.04em',
@@ -1293,19 +1407,23 @@ export default function InboxWindow({ inbox, regionRef }) {
                           display: 'flex',
                           alignItems: 'center',
                           gap: 4,
+                          zIndex: 3,
                         }}
                       >
-                        <span>✦</span>
+                        <span style={{ fontSize: '11px' }}>👑</span>
                         <span>PRO</span>
                       </div>
                     )}
+
+                    {/* Favorite Button on Card */}
                     <button
                       type="button"
                       onClick={e => toggleFavorite(item.id, e)}
                       style={{
                         position: 'absolute',
                         top: 10,
-                        right: 10,
+                        left: isItemPremium ? 10 : 'auto',
+                        right: isItemPremium ? 'auto' : 10,
                         width: 28,
                         height: 28,
                         borderRadius: '50%',
@@ -1317,6 +1435,7 @@ export default function InboxWindow({ inbox, regionRef }) {
                         fontSize: '13px',
                         cursor: 'pointer',
                         backdropFilter: 'blur(8px)',
+                        zIndex: 3,
                       }}
                     >
                       {isLiked ? '♥' : '♡'}

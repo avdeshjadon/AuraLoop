@@ -55,7 +55,19 @@ struct WallpaperItem: Identifiable, Equatable {
     }
 
     var isPremium: Bool {
-        category.localizedCaseInsensitiveContains("premium") || id.localizedCaseInsensitiveContains("premium")
+        if category.localizedCaseInsensitiveContains("premium") || id.localizedCaseInsensitiveContains("premium") {
+            return true
+        }
+        if let videoUrl = remote?.video.absoluteString, videoUrl.localizedCaseInsensitiveContains("/premium/") {
+            return true
+        }
+        if let thumbUrl = remote?.thumbnail.absoluteString, thumbUrl.localizedCaseInsensitiveContains("/premium/") {
+            return true
+        }
+        if let localFile = local?.file, localFile.localizedCaseInsensitiveContains("premium") {
+            return true
+        }
+        return false
     }
 }
 
@@ -509,9 +521,13 @@ final class AppStore: ObservableObject {
         if storedCatalogURL.isEmpty || AppStore.retiredCatalogURLs.contains(storedCatalogURL) {
             defaults.set(AppStore.defaultCatalogURL, forKey: "catalogURL")
         }
-        if let savedTierRaw = defaults.string(forKey: "auraLoop_pro_tier"),
+        if AuthService.shared.isAuthenticated,
+           let savedTierRaw = defaults.string(forKey: "auraLoop_pro_tier"),
            let savedTier = ProTier(rawValue: savedTierRaw) {
             proTier = savedTier
+        } else {
+            proTier = .none
+            defaults.removeObject(forKey: "auraLoop_pro_tier")
         }
         if let savedUTRs = defaults.stringArray(forKey: "auraLoop_verified_utrs") {
             verifiedUTRs = Set(savedUTRs)
@@ -1307,8 +1323,11 @@ final class AppStore: ObservableObject {
 
     func isWallpaperUnlocked(_ item: WallpaperItem) -> Bool {
         guard item.isPremium else { return true }
+        // STRICT: User MUST be signed in to access premium wallpapers
+        guard AuthService.shared.isAuthenticated else { return false }
+        // STRICT: User MUST have an active Pro tier (not free/none)
+        guard proTier != .none else { return false }
         if proTier == .lifetime { return true }
-        if proTier == .none { return false }
         let premiumList = allPremiumItems
         if let idx = premiumList.firstIndex(where: { $0.id == item.id }) {
             return idx < proTier.wallpaperLimit

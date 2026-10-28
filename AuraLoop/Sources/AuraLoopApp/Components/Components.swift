@@ -1413,10 +1413,7 @@ struct WallpaperCard: View {
     }
 
     @ViewBuilder private var topLeadingChip: some View {
-        if item.isPremium && !store.isWallpaperUnlocked(item) {
-            PremiumLockBadge()
-                .padding(12)
-        } else if let label = store.appliedChipLabel(for: item.id) {
+        if let label = store.appliedChipLabel(for: item.id) {
             AppliedChip(label: label)
                 .padding(12)
         } else if store.isNew(item) {
@@ -1427,10 +1424,18 @@ struct WallpaperCard: View {
     @ViewBuilder private var topTrailingControls: some View {
         if selecting {
             SelectionTick(isSelected: isSelected).padding(12)
-        } else if item.liked {
-            HeartButton(item: item).padding(12)
-        } else if hovering {
-            HeartButton(item: item).padding(12).transition(Self.popIn)
+        } else {
+            HStack(spacing: 8) {
+                if item.isPremium {
+                    PremiumLockBadge()
+                }
+                if item.liked {
+                    HeartButton(item: item)
+                } else if hovering {
+                    HeartButton(item: item).transition(Self.popIn)
+                }
+            }
+            .padding(12)
         }
     }
 
