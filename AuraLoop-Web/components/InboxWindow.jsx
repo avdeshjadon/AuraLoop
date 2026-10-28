@@ -1697,7 +1697,7 @@ export default function InboxWindow({ inbox, regionRef }) {
                     gap: 6,
                   }}
                 >
-                  <span>Download .DMG</span>
+                  <span>Download</span>
                   <span>↓</span>
                 </a>
               </div>

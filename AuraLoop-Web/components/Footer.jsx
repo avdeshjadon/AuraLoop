@@ -72,7 +72,7 @@ export default function Footer({ onOpenDocs, onNavigateToDocs, onOpenPricing }) 
                 <li><a href="#pricing">Pricing & Support</a></li>
                 <li><a href="#manifesto">Philosophy</a></li>
                 <li><a href="#workflows">Hardware Profiles</a></li>
-                <li><a href={LATEST_DMG_URL} onClick={goToWaitlist}>Download .DMG</a></li>
+                <li><a href={LATEST_DMG_URL} onClick={goToWaitlist}>Download</a></li>
               </ul>
             </nav>
 

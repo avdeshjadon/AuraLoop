@@ -116,7 +116,7 @@ export default function DocsPage({ initialTab = 'getting-started', onBack, onNav
             }}
           >
             <Download size={14} />
-            <span>Download .DMG</span>
+            <span>Download</span>
           </a>
         </div>
       </header>
@@ -268,7 +268,7 @@ export default function DocsPage({ initialTab = 'getting-started', onBack, onNav
                   }}
                 >
                   <Download size={14} />
-                  <span>Download .DMG</span>
+                  <span>Download</span>
                 </a>
               </div>
 

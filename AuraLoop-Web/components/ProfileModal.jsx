@@ -703,7 +703,7 @@ export default function ProfileModal({ isOpen, onClose, user, onUserUpdated, onS
                 gap: '6px'
               }}
             >
-              <span>Download macOS App (.DMG)</span>
+              <span>Download macOS App</span>
               <span style={{ fontSize: '11px' }}>↓</span>
             </a>
           </div>

@@ -269,7 +269,7 @@ export default function Hero() {
           AuraLoop renders continuous 4K looping wallpapers and ExtensionKit lock screen synchronization on macOS with near-zero CPU footprint and whisper-quiet fans.
         </p>
         <a href={LATEST_DMG_URL} className="ta-btn ta-btn--ember ta-hero__cta" onClick={goToWaitlist}>
-          Download .DMG <Bolt size={14} />
+          Download <Bolt size={14} />
         </a>
       </div>
 

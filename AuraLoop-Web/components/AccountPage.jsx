@@ -896,7 +896,7 @@ export default function AccountPage({
               justifyContent: 'space-between'
             }}
           >
-            <span>Download macOS App (.DMG)</span>
+            <span>Download macOS App</span>
             <span style={{ fontSize: '13px' }}>↓</span>
           </a>
         </div>
