@@ -61,7 +61,6 @@ export default function Footer({ onOpenDocs, onNavigateToDocs, onOpenPricing }) 
               <p className="ta-footer__h">Engine</p>
               <ul role="list">
                 <li><a href="#wallpapers">Curated 4K</a></li>
-                <li><a href="#features">Subsystems</a></li>
                 <li><a href="#top">Interactive Player</a></li>
               </ul>
             </nav>
@@ -71,7 +70,6 @@ export default function Footer({ onOpenDocs, onNavigateToDocs, onOpenPricing }) 
               <ul role="list">
                 <li><a href="#pricing">Pricing & Support</a></li>
                 <li><a href="#manifesto">Philosophy</a></li>
-                <li><a href="#workflows">Hardware Profiles</a></li>
                 <li><a href={LATEST_DMG_URL} onClick={goToWaitlist}>Download</a></li>
               </ul>
             </nav>

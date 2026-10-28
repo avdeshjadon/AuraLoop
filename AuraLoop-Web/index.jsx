@@ -8,8 +8,6 @@ import { gsap, useGSAP, MOTION_OK, prefersReducedMotion } from '../../shared/gsa
 import Nav from './components/Nav.jsx';
 import Hero from './components/Hero.jsx';
 import PeopleSection from './components/PeopleSection.jsx';
-import Features from './components/Features.jsx';
-import Workflows from './components/Workflows.jsx';
 import PricingSection from './components/PricingSection.jsx';
 import DocsPage from './components/DocsPage.jsx';
 import Manifesto from './components/Manifesto.jsx';
@@ -360,8 +358,6 @@ export default function AuraLoopWeb() {
         <main id="main" tabIndex={-1}>
           <Hero />
           <PeopleSection />
-          <Features />
-          <Workflows />
           <PricingSection user={user} onOpenAuth={navigateToAuth} onUserUpdated={setUser} />
           <Manifesto />
         </main>

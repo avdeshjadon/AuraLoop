@@ -8,9 +8,7 @@ import { usePricing } from '../lib/pricingService.js';
 
 const MENU = [
   { href: '#wallpapers', label: '4K Wallpapers' },
-  { href: '#features', label: 'Engine' },
   { href: '#pricing', label: 'Pricing & Support' },
-  { href: '#workflows', label: 'Automation' },
   { href: '#manifesto', label: 'Architecture' },
 ];
 
