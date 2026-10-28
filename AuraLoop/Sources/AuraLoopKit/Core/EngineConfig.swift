@@ -79,6 +79,9 @@ public struct EngineConfig: Codable {
 }
 
 public func resolveVideoURL(entry: WallpaperEntry, mode: String, root: URL) -> URL {
+    if mode == "efficient", let variant = entry.efficientFile {
+        return resolveLibraryFile(variant, root: root)
+    }
     return resolveLibraryFile(entry.file, root: root)
 }
 
