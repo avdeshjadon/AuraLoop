@@ -258,6 +258,12 @@ if (typeof window !== 'undefined') {
   });
 }
 
+const safeBgUrl = (url) => {
+  if (!url) return 'none';
+  const encoded = url.replace(/\(/g, '%28').replace(/\)/g, '%29');
+  return `url("${encoded}")`;
+};
+
 const TABS = [
   { id: 'home', label: 'Home' },
   { id: 'explore', label: 'Explore' },
@@ -612,7 +618,7 @@ export default function InboxWindow({ inbox, regionRef }) {
                 style={{
                   position: 'absolute',
                   inset: 0,
-                  backgroundImage: `url(${current.thumb})`,
+                  backgroundImage: safeBgUrl(current.thumb),
                   backgroundSize: 'cover',
                   backgroundPosition: 'center 40%',
                   transition: 'background-image 0.4s ease',
@@ -889,7 +895,7 @@ export default function InboxWindow({ inbox, regionRef }) {
                         overflow: 'hidden',
                         position: 'relative',
                         border: '1px solid rgba(255, 255, 255, 0.12)',
-                        backgroundImage: `url(${card.thumb})`,
+                        backgroundImage: safeBgUrl(card.thumb),
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
                         cursor: 'pointer',
@@ -1061,7 +1067,7 @@ export default function InboxWindow({ inbox, regionRef }) {
                         overflow: 'hidden',
                         position: 'relative',
                         border: '1px solid rgba(255, 255, 255, 0.12)',
-                        backgroundImage: `url(${card.thumb})`,
+                        backgroundImage: safeBgUrl(card.thumb),
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
                         cursor: 'pointer',
@@ -1255,7 +1261,7 @@ export default function InboxWindow({ inbox, regionRef }) {
                       overflow: 'hidden',
                       position: 'relative',
                       border: isItemPremium ? '1px solid rgba(226, 179, 74, 0.35)' : '1px solid rgba(255, 255, 255, 0.12)',
-                      backgroundImage: `url(${item.thumb})`,
+                      backgroundImage: safeBgUrl(item.thumb),
                       backgroundSize: 'cover',
                       backgroundPosition: 'center',
                       cursor: 'pointer',
@@ -1384,7 +1390,7 @@ export default function InboxWindow({ inbox, regionRef }) {
                       overflow: 'hidden',
                       position: 'relative',
                       border: '1px solid rgba(255, 255, 255, 0.12)',
-                      backgroundImage: `url(${item.thumb})`,
+                      backgroundImage: safeBgUrl(item.thumb),
                       backgroundSize: 'cover',
                       backgroundPosition: 'center',
                       cursor: 'pointer',
@@ -1500,7 +1506,7 @@ export default function InboxWindow({ inbox, regionRef }) {
                     overflow: 'hidden',
                     position: 'relative',
                     border: '1px solid rgba(255, 255, 255, 0.12)',
-                    backgroundImage: `url(${item.thumb})`,
+                    backgroundImage: safeBgUrl(item.thumb),
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     cursor: 'pointer',
