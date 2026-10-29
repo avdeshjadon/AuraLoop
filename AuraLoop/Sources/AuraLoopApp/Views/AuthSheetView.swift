@@ -68,6 +68,10 @@ public struct AuthSheetView: View {
         .frame(width: 440, height: auth.currentUser != nil ? 310 : 380)
         .sheetSurface(cornerRadius: 24)
         .AuraLoopColorScheme()
+        .onAppear {
+            auth.errorMessage = nil
+            auth.successMessage = nil
+        }
         .animation(.easeInOut(duration: 0.2), value: auth.currentUser)
         .animation(.easeInOut(duration: 0.2), value: auth.errorMessage)
     }

@@ -53,9 +53,11 @@ export default function AuraLoopWeb() {
   useEffect(() => {
     return subscribeAuth(currentUser => {
       setUser(currentUser);
-      if (currentUser?.isGiftedPro || currentUser?.proTier === 'lifetime') {
-        const seen = localStorage.getItem(`auraloop_gifted_pro_seen_${currentUser.uid}`) === 'true';
-        if (!seen && !currentUser.freePremiumNotifiedWeb) {
+      if (currentUser?.isGiftedPro) {
+        const emailKey = currentUser.email ? currentUser.email.toLowerCase() : '';
+        const seenEmail = emailKey ? localStorage.getItem(`auraloop_gifted_pro_seen_${emailKey}`) === 'true' : false;
+        const seenUid = currentUser.uid ? localStorage.getItem(`auraloop_gifted_pro_seen_${currentUser.uid}`) === 'true' : false;
+        if (!seenEmail && !seenUid) {
           setShowRootGiftModal(true);
         }
       }
@@ -64,7 +66,11 @@ export default function AuraLoopWeb() {
 
   const handleRootDismissGiftModal = async () => {
     setShowRootGiftModal(false);
+    if (user?.email) {
+      localStorage.setItem(`auraloop_gifted_pro_seen_${user.email.toLowerCase()}`, 'true');
+    }
     if (user?.uid) {
+      localStorage.setItem(`auraloop_gifted_pro_seen_${user.uid}`, 'true');
       await markFreePremiumNotifiedWeb(user.uid);
       setUser(prev => prev ? { ...prev, freePremiumNotifiedWeb: true } : prev);
     }

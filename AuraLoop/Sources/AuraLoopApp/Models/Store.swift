@@ -1373,13 +1373,40 @@ final class AppStore: ObservableObject {
     // MARK: - Cloud Data Restoration
 
     func applyCloudUserData(_ cloud: CloudUserData) {
-        // 1. Restore Pro Tier
-        if let tierString = cloud.proTier,
-           let tier = ProTier(rawValue: tierString),
-           tier != .none {
-            if proTier == .none || tier.wallpaperLimit > proTier.wallpaperLimit {
-                proTier = tier
-                defaults.set(tier.rawValue, forKey: "auraLoop_pro_tier")
+        // 0. Account Deletion Check
+        if cloud.isDeleted == true {
+            for place in SchedulePlace.allCases {
+                stopPlaying(on: place)
+            }
+            AuthService.shared.signOut()
+            DispatchQueue.main.async {
+                let alert = NSAlert()
+                alert.messageText = "Account Permanently Deleted"
+                alert.informativeText = "Your AuraLoop account has been deleted by Administrator. You have been signed out."
+                alert.alertStyle = .critical
+                alert.addButton(withTitle: "OK")
+                alert.runModal()
+            }
+            return
+        }
+
+        let userEmail = AuthService.shared.currentUser?.email.lowercased() ?? "user"
+        let notifiedKey = "auraloop_gifted_pro_notified_\(userEmail)"
+
+        // 1. Pro Tier Restoration / Downgrade
+        if cloud.isGiftedPro == true || cloud.proTier == "lifetime" || cloud.proTier == "pro" {
+            self.proTier = .lifetime
+            defaults.set(ProTier.lifetime.rawValue, forKey: "auraLoop_pro_tier")
+        } else if let raw = cloud.proTier, let matched = ProTier(rawValue: raw), matched != .none {
+            self.proTier = matched
+            defaults.set(matched.rawValue, forKey: "auraLoop_pro_tier")
+        } else if cloud.proTier == "none" || cloud.isGiftedPro == false {
+            // Downgrade support: revert to Free Tier unless user has verified UTRs
+            if verifiedUTRs.isEmpty {
+                self.proTier = .none
+                defaults.removeObject(forKey: "auraLoop_pro_tier")
+                defaults.removeObject(forKey: notifiedKey)
+                defaults.removeObject(forKey: "auraloop_gifted_pro_notified_v1")
             }
         }
 
@@ -1415,7 +1442,6 @@ final class AppStore: ObservableObject {
             self.proTier = .lifetime
             defaults.set(ProTier.lifetime.rawValue, forKey: "auraLoop_pro_tier")
 
-            let notifiedKey = "auraloop_gifted_pro_notified_v1"
             if !defaults.bool(forKey: notifiedKey) {
                 defaults.set(true, forKey: notifiedKey)
                 DispatchQueue.main.async {

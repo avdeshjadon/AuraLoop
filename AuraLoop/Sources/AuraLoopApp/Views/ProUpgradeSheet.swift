@@ -14,42 +14,53 @@ public struct ProUpgradeSheet: View {
 
     public init() {}
 
+    private var sheetHeight: CGFloat {
+        if !auth.isAuthenticated {
+            return 310
+        } else if store.proTier != .none {
+            return 370
+        } else {
+            return 460
+        }
+    }
+
     public var body: some View {
         VStack(spacing: 0) {
             topBar
                 .padding(.horizontal, 28)
-                .padding(.top, 24)
-                .padding(.bottom, 16)
+                .padding(.top, 22)
+                .padding(.bottom, 14)
 
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 22) {
-                    if !auth.isAuthenticated {
-                        // User not logged in
-                        unauthenticatedView
-                    } else if store.proTier == .none {
-                        // User logged in, but on free tier
-                        upgradePromptView
-                    } else {
-                        // User is Pro
-                        alreadyProView
-                    }
+            if !auth.isAuthenticated {
+                unauthenticatedView
+                    .padding(.horizontal, 28)
+                    .padding(.bottom, 22)
+            } else {
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 22) {
+                        if store.proTier == .none {
+                            upgradePromptView
+                        } else {
+                            alreadyProView
+                        }
 
-                    if let notice = refreshNotice {
-                        Text(notice)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(Color(hex: 0x4ADE80))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 7)
-                            .background(Color(hex: 0x4ADE80).opacity(0.12))
-                            .clipShape(Capsule())
-                            .transition(.opacity)
+                        if let notice = refreshNotice {
+                            Text(notice)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(Color(hex: 0x4ADE80))
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 7)
+                                .background(Color(hex: 0x4ADE80).opacity(0.12))
+                                .clipShape(Capsule())
+                                .transition(.opacity)
+                        }
                     }
+                    .padding(.horizontal, 28)
+                    .padding(.bottom, 24)
                 }
-                .padding(.horizontal, 28)
-                .padding(.bottom, 26)
             }
         }
-        .frame(width: 540, height: auth.isAuthenticated && store.proTier != .none ? 360 : 420)
+        .frame(width: 540, height: sheetHeight)
         .sheetSurface(cornerRadius: 26)
         .AuraLoopColorScheme()
         .animation(.easeInOut(duration: 0.22), value: auth.isAuthenticated)
@@ -131,21 +142,23 @@ public struct ProUpgradeSheet: View {
     // MARK: - Case 1: Unauthenticated
 
     private var unauthenticatedView: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 18) {
             VStack(spacing: 8) {
                 Text("Sign in to Access Pro Wallpapers")
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.system(size: 16.5, weight: .bold))
                     .foregroundStyle(Color.AuraLoopInk)
+                    .multilineTextAlignment(.center)
 
                 Text("Log in with your registered AuraLoop account to sync your Pro status and unlock the entire 4K wallpaper library.")
                     .font(.system(size: 12.5))
                     .foregroundStyle(Color.AuraLoopSecondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 16)
+                    .lineSpacing(2)
+                    .padding(.horizontal, 20)
             }
-            .padding(.top, 10)
+            .frame(maxWidth: .infinity)
 
-            VStack(spacing: 12) {
+            VStack(spacing: 11) {
                 // Button 1: Sign In in App
                 Button {
                     dismiss()
@@ -161,9 +174,9 @@ public struct ProUpgradeSheet: View {
                     }
                     .foregroundStyle(Color.AuraLoopOnInk)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, 11)
                     .background(Color.AuraLoopInk)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .pointingCursor()
@@ -180,14 +193,16 @@ public struct ProUpgradeSheet: View {
                     }
                     .foregroundStyle(Color.AuraLoopInk)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, 11)
                     .background(Color.AuraLoopInk.opacity(0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .pointingCursor()
             }
+            .frame(maxWidth: 360)
         }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Case 2: Logged in on Free Tier -> Visit Website for Upgradation
@@ -229,16 +244,23 @@ public struct ProUpgradeSheet: View {
                 .cornerRadius(14)
             }
 
-            VStack(spacing: 10) {
-                Text("Transparent Pricing & Open Access")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(Color.AuraLoopInk)
+            VStack(spacing: 12) {
+                VStack(spacing: 5) {
+                    Text("Unlock AuraLoop Lifetime Pro")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(Color.AuraLoopInk)
 
-                Text("Over 80% of our 4K live wallpapers are completely free forever. We charge a one-time ₹199 for our exclusive Master Collection to offset ultra-fast CDN video bandwidth and native Apple Silicon engineering.\n\nIf you love AuraLoop, you can also make an optional voluntary contribution to support solo indie development and keep the project alive.")
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(Color.AuraLoopSecondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 8)
+                    Text("One-time ₹199 • Unlock 1,582+ master 4K live wallpapers forever")
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(Color.AuraLoopSecondary)
+                }
+
+                HStack(spacing: 8) {
+                    perkBadge(icon: "sparkles", text: "1,582+ 4K Loops")
+                    perkBadge(icon: "bolt.fill", text: "60 FPS Native")
+                    perkBadge(icon: "lock.laptopcomputer", text: "Lock Screen Sync")
+                }
+                .padding(.top, 2)
             }
 
             VStack(spacing: 10) {
@@ -370,5 +392,20 @@ public struct ProUpgradeSheet: View {
             .padding(.top, 10)
         }
         .padding(.vertical, 10)
+    }
+
+    private func perkBadge(icon: String, text: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 10.5))
+                .foregroundStyle(Color(hex: 0xF59E0B))
+            Text(text)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Color.AuraLoopInk)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color.AuraLoopInk.opacity(0.05))
+        .clipShape(Capsule())
     }
 }

@@ -17,6 +17,7 @@ import {
   AlertCircle,
   Crown,
   Gift,
+  Trash2,
 } from 'lucide-react';
 import {
   fetchRealFirestoreUsers,
@@ -26,6 +27,7 @@ import {
   adminGrantFreePremium,
   adminRevokePro,
   adminToggleUserStatus,
+  adminDeleteUser,
   subscribeRealUsers,
 } from '../services/firebaseAuthService';
 
@@ -257,6 +259,41 @@ export default function UserManagement({
           size: 'Free Tier',
           type: 'user',
         });
+      },
+    });
+  };
+
+  /**
+   * Permanently delete user from Firebase & Database
+   */
+  const handleDeleteUser = (user) => {
+    if (user.email === REAL_ADMIN_USER.email) {
+      showToast('Super Admin account cannot be deleted.');
+      return;
+    }
+
+    onTriggerConfirmation({
+      title: '🗑️ Permanently Delete User',
+      message: `Are you sure you want to permanently delete "${user.name}" (${user.email})? This action cannot be undone. All Pro licenses, cloud records, and account access will be erased forever.`,
+      targetName: `${user.name} (${user.email})`,
+      actionType: 'danger',
+      confirmText: 'Delete Permanently',
+      onConfirm: async () => {
+        try {
+          await adminDeleteUser(user);
+          const updated = users.filter((u) => u.id !== user.id && u.email?.toLowerCase() !== user.email?.toLowerCase());
+          setUsers(updated);
+          showToast(`User ${user.email} permanently deleted.`);
+          logActivity({
+            title: user.name,
+            action: 'Permanently Deleted User Account (Firebase & Cloud)',
+            category: 'User Sync',
+            size: 'Deleted',
+            type: 'user',
+          });
+        } catch (err) {
+          showToast(`Failed to delete user: ${err.message}`);
+        }
       },
     });
   };
@@ -569,6 +606,23 @@ export default function UserManagement({
                             onClick={() => handleToggleStatus(u)}
                           >
                             {u.status === 'Active' ? 'Suspend' : 'Activate'}
+                          </button>
+
+                          <button
+                            className="btn-light-pill"
+                            style={{
+                              padding: '4px 10px',
+                              fontSize: 11,
+                              color: '#DC2626',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                            }}
+                            onClick={() => handleDeleteUser(u)}
+                            title="Permanently delete user from Firebase & Cloud"
+                          >
+                            <Trash2 size={11} />
+                            <span>Delete</span>
                           </button>
                         </div>
                       )}

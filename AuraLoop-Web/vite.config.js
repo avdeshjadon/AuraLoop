@@ -4,12 +4,13 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import createOrderHandler from './api/cashfree/create-order.js';
 import verifyOrderHandler from './api/cashfree/verify-order.js';
+import entitlementsHandler from './api/admin/entitlements.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-function cashfreeDevPlugin() {
+function devApiPlugin() {
   return {
-    name: 'cashfree-dev-api',
+    name: 'auraloop-dev-api',
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         const url = req.url || '';
@@ -31,6 +32,15 @@ function cashfreeDevPlugin() {
           });
           return;
         }
+        if (url.startsWith('/api/admin/entitlements')) {
+          let body = '';
+          req.on('data', chunk => { body += chunk; });
+          req.on('end', async () => {
+            req.body = body;
+            await entitlementsHandler(req, res);
+          });
+          return;
+        }
         next();
       });
     }
@@ -43,7 +53,7 @@ export default defineConfig(({ mode }) => {
   Object.assign(process.env, env);
 
   return {
-    plugins: [react(), cashfreeDevPlugin()],
+    plugins: [react(), devApiPlugin()],
     resolve: {
       alias: {
         '../../shared': path.resolve(__dirname, './shared'),

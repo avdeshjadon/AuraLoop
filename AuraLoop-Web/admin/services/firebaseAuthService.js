@@ -76,15 +76,69 @@ const KNOWN_ACCOUNTS = [
 export async function fetchRealFirestoreUsers() {
   const userMap = new Map();
 
+  const deletedEmails = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('auraloop_deleted_users') || '[]');
+    } catch {
+      return [];
+    }
+  })();
+
   // 1. Always put Super Admin first
   userMap.set(REAL_ADMIN_USER.email.toLowerCase(), { ...REAL_ADMIN_USER });
 
-  // 2. Add known seed accounts
+  // 2. Add known seed accounts if not deleted
   KNOWN_ACCOUNTS.forEach((seed) => {
-    userMap.set(seed.email.toLowerCase(), { ...seed });
+    const emailLower = seed.email.toLowerCase();
+    if (!deletedEmails.includes(emailLower)) {
+      userMap.set(emailLower, { ...seed });
+    }
   });
 
-  // 3. Load from Firestore settings/users_registry (guaranteed shared document)
+  // 3. Load authoritative entitlements from Cloudflare R2 / CDN
+  try {
+    const cdnRes = await fetch(`https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/user_entitlements.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (cdnRes.ok) {
+      const entitlements = await cdnRes.json();
+      Object.entries(entitlements).forEach(([emailKey, data]) => {
+        const emailLower = emailKey.toLowerCase();
+        if (data.isDeleted || deletedEmails.includes(emailLower)) {
+          userMap.delete(emailLower);
+          return;
+        }
+
+        const existing = userMap.get(emailLower) || {};
+        const isGifted = Boolean(data.isGiftedPro);
+        const isPro = data.proTier === 'lifetime' || data.proTier === 'pro' || isGifted;
+
+        userMap.set(emailLower, {
+          ...existing,
+          email: emailLower,
+          name: existing.name || emailLower.split('@')[0],
+          status: data.isSuspended ? 'Suspended' : (existing.status || 'Active'),
+          isSuspended: Boolean(data.isSuspended),
+          plan: emailLower === REAL_ADMIN_USER.email.toLowerCase()
+            ? 'Super Admin'
+            : (isPro ? 'Pro Plan' : 'Free Tier'),
+          role: emailLower === REAL_ADMIN_USER.email.toLowerCase()
+            ? 'Super Admin & Creator'
+            : (isPro ? 'Pro Member' : 'Free User'),
+          proTier: isGifted ? 'lifetime' : (data.proTier || 'none'),
+          isGiftedPro: isGifted,
+          verified: isPro,
+          device: existing.device || 'macOS App Client',
+          downloads: existing.downloads ?? 12,
+          lastSeen: existing.lastSeen || 'Active Today',
+          avatar: (existing.name || emailLower).slice(0, 2).toUpperCase(),
+          joined: existing.joined || '2026',
+        });
+      });
+    }
+  } catch (err) {
+    console.info('[firebaseAuthService] CDN entitlements fetch notice:', err?.message);
+  }
+
+  // 4. Load from Firestore settings/users_registry (guaranteed shared document)
   try {
     const regSnap = await getDoc(doc(db, 'settings', 'users_registry'));
     if (regSnap.exists()) {
@@ -92,6 +146,10 @@ export async function fetchRealFirestoreUsers() {
       Object.entries(regData).forEach(([key, val]) => {
         if (val && typeof val === 'object' && val.email) {
           const emailLower = val.email.toLowerCase();
+          if (val.isDeleted || deletedEmails.includes(emailLower)) {
+            userMap.delete(emailLower);
+            return;
+          }
           const existing = userMap.get(emailLower) || {};
           const isGifted = Boolean(val.isGiftedPro || existing.isGiftedPro);
           const isPro = val.proTier === 'lifetime' || isGifted || val.plan === 'Pro Plan';
@@ -135,6 +193,10 @@ export async function fetchRealFirestoreUsers() {
         const d = docSnap.data();
         if (d && d.email) {
           const emailLower = d.email.toLowerCase();
+          if (d.isDeleted || deletedEmails.includes(emailLower)) {
+            userMap.delete(emailLower);
+            return;
+          }
           const existing = userMap.get(emailLower) || {};
           const isGifted = Boolean(d.isGiftedPro || existing.isGiftedPro);
           const isPro = d.proTier === 'lifetime' || isGifted || d.proTier === 'pro';
@@ -179,6 +241,10 @@ export async function fetchRealFirestoreUsers() {
         parsed.forEach((item) => {
           if (item?.email) {
             const emailLower = item.email.toLowerCase();
+            if (item.isDeleted || deletedEmails.includes(emailLower)) {
+              userMap.delete(emailLower);
+              return;
+            }
             const existing = userMap.get(emailLower) || {};
             userMap.set(emailLower, { ...existing, ...item });
           }
@@ -193,8 +259,64 @@ export async function fetchRealFirestoreUsers() {
 }
 
 /**
+ * Synchronize user entitlement changes with Cloudflare R2 (universal propagation to Web & macOS)
+ */
+async function syncEntitlementToCloud(email, entitlement) {
+  if (!email) return;
+  try {
+    const res = await fetch('/api/admin/entitlements', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, ...entitlement })
+    });
+    if (res.ok) {
+      console.info('[firebaseAuthService] Synced entitlement to Cloudflare R2 via API:', email);
+      return;
+    }
+  } catch (err) {
+    console.warn('[firebaseAuthService] API sync notice, attempting direct Cloudflare PUT:', err?.message);
+  }
+
+  // Fallback: Direct Cloudflare R2 API call
+  try {
+    const accountId = import.meta.env.VITE_CLOUDFLARE_ACCOUNT_ID;
+    const bucket = import.meta.env.VITE_AURALOOP_R2_BUCKET || 'auraloop-wallpapers';
+    const token = import.meta.env.VITE_CLOUDFLARE_API_TOKEN;
+    if (!accountId || !token) return;
+
+    const cdnBase = import.meta.env.VITE_CDN_BASE_URL || 'https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev';
+    const cdnUrl = `${cdnBase}/user_entitlements.json?t=${Date.now()}`;
+
+    let current = {};
+    try {
+      const getRes = await fetch(cdnUrl, { cache: 'no-store' });
+      if (getRes.ok) current = await getRes.json();
+    } catch {}
+
+    const emailLower = email.toLowerCase();
+    current[emailLower] = {
+      ...(current[emailLower] || {}),
+      email: emailLower,
+      ...entitlement,
+      updatedAt: Date.now()
+    };
+
+    await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${bucket}/objects/user_entitlements.json`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(current, null, 2)
+    });
+  } catch (e) {
+    console.warn('[firebaseAuthService] Direct Cloudflare PUT notice:', e?.message);
+  }
+}
+
+/**
  * Grant Free Lifetime Pro to any user from Admin Panel without payment.
- * Automatically synchronizes with both Firestore documents and registry.
+ * Automatically synchronizes with Cloudflare R2, Firestore documents and registry.
  */
 export async function adminGrantFreePremium(user) {
   if (!user || user.email === REAL_ADMIN_USER.email) return;
@@ -212,18 +334,24 @@ export async function adminGrantFreePremium(user) {
     verified: true,
   };
 
-  // 1. Update Firestore settings/users_registry
+  // 1. Synchronize with authoritative Cloudflare R2 entitlements
+  await syncEntitlementToCloud(user.email, {
+    proTier: 'lifetime',
+    isGiftedPro: true,
+  });
+
+  // 2. Update Firestore settings/users_registry
   try {
     const regRef = doc(db, 'settings', 'users_registry');
     await setDoc(regRef, {
-      [user.id]: updatedUser
+      [user.id || user.email.replace(/[@.]/g, '_')]: updatedUser
     }, { merge: true });
   } catch (e) {
     console.warn('[firebaseAuthService] Failed to update registry on grant:', e);
   }
 
-  // 2. Update user's direct Firestore doc if id is valid
-  if (user.id && !user.id.startsWith('USR_LAVENDER')) {
+  // 3. Update user's direct Firestore doc if id is valid
+  if (user.id && !user.id.startsWith('USR_LAVENDER') && !user.id.startsWith('ADMIN_')) {
     try {
       const userRef = doc(db, 'users', user.id);
       await setDoc(userRef, {
@@ -239,7 +367,7 @@ export async function adminGrantFreePremium(user) {
     }
   }
 
-  // 3. Update local cache
+  // 4. Update local cache
   try {
     const local = localStorage.getItem('auraloop_real_users');
     let list = local ? JSON.parse(local) : [];
@@ -257,7 +385,7 @@ export async function adminGrantFreePremium(user) {
 }
 
 /**
- * Revoke Pro and switch back to Free Tier
+ * Revoke Pro and switch back to Free Tier (Downgrade)
  */
 export async function adminRevokePro(user) {
   if (!user || user.email === REAL_ADMIN_USER.email) return;
@@ -272,14 +400,22 @@ export async function adminRevokePro(user) {
     verified: false,
   };
 
+  // 1. Synchronize downgrade with authoritative Cloudflare R2 entitlements
+  await syncEntitlementToCloud(user.email, {
+    proTier: 'none',
+    isGiftedPro: false,
+  });
+
+  // 2. Update Firestore settings/users_registry
   try {
     const regRef = doc(db, 'settings', 'users_registry');
     await setDoc(regRef, {
-      [user.id]: updatedUser
+      [user.id || user.email.replace(/[@.]/g, '_')]: updatedUser
     }, { merge: true });
   } catch (e) {}
 
-  if (user.id && !user.id.startsWith('USR_LAVENDER')) {
+  // 3. Update user's direct Firestore doc if id is valid
+  if (user.id && !user.id.startsWith('USR_LAVENDER') && !user.id.startsWith('ADMIN_')) {
     try {
       const userRef = doc(db, 'users', user.id);
       await setDoc(userRef, {
@@ -290,6 +426,7 @@ export async function adminRevokePro(user) {
     } catch (e) {}
   }
 
+  // 4. Update local cache
   try {
     const local = localStorage.getItem('auraloop_real_users');
     let list = local ? JSON.parse(local) : [];
@@ -318,14 +455,19 @@ export async function adminToggleUserStatus(user) {
     updatedAt: Date.now() / 1000,
   };
 
+  // 1. Synchronize suspension with Cloudflare R2
+  await syncEntitlementToCloud(user.email, {
+    isSuspended,
+  });
+
   try {
     const regRef = doc(db, 'settings', 'users_registry');
     await setDoc(regRef, {
-      [user.id]: updatedUser
+      [user.id || user.email.replace(/[@.]/g, '_')]: updatedUser
     }, { merge: true });
   } catch (e) {}
 
-  if (user.id && !user.id.startsWith('USR_LAVENDER')) {
+  if (user.id && !user.id.startsWith('USR_LAVENDER') && !user.id.startsWith('ADMIN_')) {
     try {
       const userRef = doc(db, 'users', user.id);
       await setDoc(userRef, {
@@ -373,6 +515,75 @@ export function saveRealUsers(users) {
   try {
     localStorage.setItem('auraloop_real_users', JSON.stringify(users));
   } catch {}
+}
+
+/**
+ * Permanently delete a user from Firestore, Cloudflare R2 entitlements, and local registry
+ */
+export async function adminDeleteUser(user) {
+  if (!user || user.email === REAL_ADMIN_USER.email) {
+    throw new Error('Super Admin account cannot be deleted.');
+  }
+
+  const emailLower = user.email.toLowerCase();
+
+  // 1. Record in local deleted set so they never reload
+  try {
+    const list = JSON.parse(localStorage.getItem('auraloop_deleted_users') || '[]');
+    if (!list.includes(emailLower)) {
+      list.push(emailLower);
+      localStorage.setItem('auraloop_deleted_users', JSON.stringify(list));
+    }
+  } catch {}
+
+  // 2. Synchronize deletion with Cloudflare R2 entitlements
+  await syncEntitlementToCloud(emailLower, {
+    deleteUser: true,
+    isDeleted: true,
+    status: 'Deleted',
+    proTier: 'none',
+    isGiftedPro: false,
+  });
+
+  // 3. Delete user document from Firestore collection('users')
+  if (user.id && !user.id.startsWith('USR_LAVENDER') && !user.id.startsWith('ADMIN_')) {
+    try {
+      await deleteDoc(doc(db, 'users', user.id));
+    } catch (e) {
+      console.warn('[firebaseAuthService] Firestore deleteDoc notice:', e);
+    }
+  }
+
+  // 4. Remove from Firestore settings/users_registry
+  try {
+    const regRef = doc(db, 'settings', 'users_registry');
+    const snap = await getDoc(regRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      const updated = { ...data };
+      delete updated[user.id];
+      delete updated[emailLower.replace(/[@.]/g, '_')];
+      await setDoc(regRef, updated);
+    }
+  } catch (e) {}
+
+  // 5. Remove from local cache
+  try {
+    const local = localStorage.getItem('auraloop_real_users');
+    let list = local ? JSON.parse(local) : [];
+    if (Array.isArray(list)) {
+      list = list.filter((u) => u.id !== user.id && u.email?.toLowerCase() !== emailLower);
+      localStorage.setItem('auraloop_real_users', JSON.stringify(list));
+    }
+  } catch {}
+
+  // 6. Remove from KNOWN_ACCOUNTS in memory
+  const kIdx = KNOWN_ACCOUNTS.findIndex(k => k.email.toLowerCase() === emailLower);
+  if (kIdx >= 0) {
+    KNOWN_ACCOUNTS.splice(kIdx, 1);
+  }
+
+  return true;
 }
 
 export async function adminSignIn(email, password) {

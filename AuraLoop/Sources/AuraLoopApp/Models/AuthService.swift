@@ -30,6 +30,7 @@ public struct CloudUserData: Codable {
     public var updatedAt: Double?
     public var isGiftedPro: Bool?
     public var freePremiumNotifiedApp: Bool?
+    public var isDeleted: Bool?
 
     public init(
         proTier: String? = nil,
@@ -39,7 +40,8 @@ public struct CloudUserData: Codable {
         isSuspended: Bool? = nil,
         suspensionReason: String? = nil,
         isGiftedPro: Bool? = nil,
-        freePremiumNotifiedApp: Bool? = nil
+        freePremiumNotifiedApp: Bool? = nil,
+        isDeleted: Bool? = nil
     ) {
         self.proTier = proTier
         self.verifiedUTRs = verifiedUTRs
@@ -49,6 +51,7 @@ public struct CloudUserData: Codable {
         self.suspensionReason = suspensionReason
         self.isGiftedPro = isGiftedPro
         self.freePremiumNotifiedApp = freePremiumNotifiedApp
+        self.isDeleted = isDeleted
     }
 
 
@@ -141,7 +144,7 @@ public final class AuthService: ObservableObject {
         self.pendingPassword = ""
         self.generatedOTP = ""
         self.errorMessage = nil
-        self.successMessage = "Signed out successfully."
+        self.successMessage = nil
         UserDefaults.standard.removeObject(forKey: "auraLoop_pro_tier")
         AppStore.shared.proTier = .none
     }
@@ -451,27 +454,68 @@ public final class AuthService: ObservableObject {
 
     public func fetchCloudData(idToken: String, uid: String) async -> CloudUserData? {
         // 1. Try Firestore direct user doc
-        var cloud = await readFromFirestore(uid: uid, idToken: idToken)
+        var cloud = await readFromFirestore(uid: uid, idToken: idToken) ?? CloudUserData()
 
-        // 2. Check settings/users_registry (shared Firestore registry)
-        if let reg = await readFromRegistry(uid: uid, idToken: idToken) {
-            if cloud == nil {
-                cloud = reg
-            } else {
-                if reg.isGiftedPro == true {
-                    cloud?.isGiftedPro = true
-                    cloud?.proTier = "lifetime"
+        // 2. Fetch authoritative Cloudflare R2 entitlements
+        if let entitlements = await fetchCloudflareEntitlements(),
+           let email = currentUser?.email.lowercased(),
+           let userEntitlement = entitlements[email] as? [String: Any] {
+            let isGifted = userEntitlement["isGiftedPro"] as? Bool ?? false
+            let tier = userEntitlement["proTier"] as? String ?? "none"
+            let isSuspended = userEntitlement["isSuspended"] as? Bool ?? false
+            let isDeleted = userEntitlement["isDeleted"] as? Bool ?? false
+
+            if isDeleted {
+                cloud.isDeleted = true
+                cloud.isGiftedPro = false
+                cloud.proTier = "none"
+            } else if isGifted || tier == "lifetime" || tier == "pro" {
+                cloud.isGiftedPro = isGifted
+                cloud.proTier = (tier == "pro") ? "pro" : "lifetime"
+            } else if tier == "none" || !isGifted {
+                cloud.isGiftedPro = false
+                let hasUTRs = !(cloud.verifiedUTRs ?? []).isEmpty
+                if !hasUTRs {
+                    cloud.proTier = "none"
                 }
+            }
+
+            if isSuspended {
+                cloud.isSuspended = true
             }
         }
 
-        // 3. Fallback to Firebase Auth accounts:lookup
-        if cloud == nil, let photoUrl = await fetchProfilePhotoUrl(idToken: idToken),
+        // 3. Check settings/users_registry (shared Firestore registry)
+        if let reg = await readFromRegistry(uid: uid, idToken: idToken) {
+            if reg.isGiftedPro == true {
+                cloud.isGiftedPro = true
+                cloud.proTier = "lifetime"
+            }
+        }
+
+        // 4. Fallback to Firebase Auth accounts:lookup photoUrl
+        if cloud.proTier == nil, let photoUrl = await fetchProfilePhotoUrl(idToken: idToken),
            let decoded = CloudUserData.decode(from: photoUrl) {
             cloud = decoded
         }
 
         return cloud
+    }
+
+    private func fetchCloudflareEntitlements() async -> [String: Any]? {
+        let ts = Int(Date().timeIntervalSince1970)
+        guard let url = URL(string: "https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/user_entitlements.json?t=\(ts)") else { return nil }
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        req.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        req.timeoutInterval = 6
+
+        guard let (data, resp) = try? await URLSession.shared.data(for: req),
+              let http = resp as? HTTPURLResponse, http.statusCode == 200,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+        return json
     }
 
     private func readFromRegistry(uid: String, idToken: String) async -> CloudUserData? {

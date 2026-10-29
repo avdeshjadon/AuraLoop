@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import {
   signInEmail,
   signUpEmail,
@@ -24,10 +25,14 @@ export default function AuthPage({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Password creation/change for Google & Email users
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
   const [showPasswordSection, setShowPasswordSection] = useState(false);
 
   // Edit Name
@@ -581,19 +586,48 @@ export default function AuthPage({
                       <label style={{ ...labelStyle, marginBottom: "7px" }}>
                         PASSWORD
                       </label>
-                      <input
-                        type="password"
-                        required
-                        placeholder="••••••••"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        style={{
-                          ...inputStyle,
-                          height: "48px",
-                          padding: "12px 16px",
-                          fontSize: "14.5px",
-                        }}
-                      />
+                      <div style={{ position: "relative" }}>
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          required
+                          placeholder="••••••••"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          style={{
+                            ...inputStyle,
+                            height: "48px",
+                            padding: "12px 46px 12px 16px",
+                            fontSize: "14.5px",
+                            width: "100%",
+                            boxSizing: "border-box",
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                          title={showPassword ? "Hide password" : "Show password"}
+                          style={{
+                            position: "absolute",
+                            right: "12px",
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            background: "transparent",
+                            border: "none",
+                            cursor: "pointer",
+                            color: "#8c827a",
+                            padding: "6px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            transition: "color 0.15s ease",
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = "#17130f")}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = "#8c827a")}
+                        >
+                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
                     </div>
 
                     <button
@@ -657,34 +691,92 @@ export default function AuthPage({
 
                     <div>
                       <label style={labelStyle}>PASSWORD (6+ characters)</label>
-                      <input
-                        type="password"
-                        required
-                        placeholder="Create a strong password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        style={{
-                          ...inputStyle,
-                          height: "44px",
-                          padding: "11px 14px",
-                        }}
-                      />
+                      <div style={{ position: "relative" }}>
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          required
+                          placeholder="Create a strong password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          style={{
+                            ...inputStyle,
+                            height: "44px",
+                            padding: "11px 44px 11px 14px",
+                            width: "100%",
+                            boxSizing: "border-box",
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                          title={showPassword ? "Hide password" : "Show password"}
+                          style={{
+                            position: "absolute",
+                            right: "10px",
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            background: "transparent",
+                            border: "none",
+                            cursor: "pointer",
+                            color: "#8c827a",
+                            padding: "4px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            transition: "color 0.15s ease",
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = "#17130f")}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = "#8c827a")}
+                        >
+                          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
                     </div>
 
                     <div>
                       <label style={labelStyle}>CONFIRM PASSWORD</label>
-                      <input
-                        type="password"
-                        required
-                        placeholder="Repeat password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        style={{
-                          ...inputStyle,
-                          height: "44px",
-                          padding: "11px 14px",
-                        }}
-                      />
+                      <div style={{ position: "relative" }}>
+                        <input
+                          type={showConfirmPassword ? "text" : "password"}
+                          required
+                          placeholder="Repeat password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          style={{
+                            ...inputStyle,
+                            height: "44px",
+                            padding: "11px 44px 11px 14px",
+                            width: "100%",
+                            boxSizing: "border-box",
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                          title={showConfirmPassword ? "Hide password" : "Show password"}
+                          style={{
+                            position: "absolute",
+                            right: "10px",
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            background: "transparent",
+                            border: "none",
+                            cursor: "pointer",
+                            color: "#8c827a",
+                            padding: "4px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            transition: "color 0.15s ease",
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = "#17130f")}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = "#8c827a")}
+                        >
+                          {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
                     </div>
 
                     <button
@@ -945,27 +1037,85 @@ export default function AuthPage({
                         <label style={labelStyle}>
                           NEW PASSWORD (6+ characters)
                         </label>
-                        <input
-                          type="password"
-                          required
-                          placeholder="••••••••"
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          style={inputStyle}
-                        />
+                        <div style={{ position: "relative" }}>
+                          <input
+                            type={showNewPassword ? "text" : "password"}
+                            required
+                            placeholder="••••••••"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            style={{
+                              ...inputStyle,
+                              paddingRight: "44px",
+                              width: "100%",
+                              boxSizing: "border-box",
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowNewPassword(!showNewPassword)}
+                            aria-label={showNewPassword ? "Hide password" : "Show password"}
+                            title={showNewPassword ? "Hide password" : "Show password"}
+                            style={{
+                              position: "absolute",
+                              right: "10px",
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              background: "transparent",
+                              border: "none",
+                              cursor: "pointer",
+                              color: "#8c827a",
+                              padding: "4px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
                       </div>
                       <div>
                         <label style={labelStyle}>CONFIRM NEW PASSWORD</label>
-                        <input
-                          type="password"
-                          required
-                          placeholder="••••••••"
-                          value={confirmNewPassword}
-                          onChange={(e) =>
-                            setConfirmNewPassword(e.target.value)
-                          }
-                          style={inputStyle}
-                        />
+                        <div style={{ position: "relative" }}>
+                          <input
+                            type={showConfirmNewPassword ? "text" : "password"}
+                            required
+                            placeholder="••••••••"
+                            value={confirmNewPassword}
+                            onChange={(e) =>
+                              setConfirmNewPassword(e.target.value)
+                            }
+                            style={{
+                              ...inputStyle,
+                              paddingRight: "44px",
+                              width: "100%",
+                              boxSizing: "border-box",
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmNewPassword(!showConfirmNewPassword)}
+                            aria-label={showConfirmNewPassword ? "Hide password" : "Show password"}
+                            title={showConfirmNewPassword ? "Hide password" : "Show password"}
+                            style={{
+                              position: "absolute",
+                              right: "10px",
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              background: "transparent",
+                              border: "none",
+                              cursor: "pointer",
+                              color: "#8c827a",
+                              padding: "4px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            {showConfirmNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
                       </div>
                       <button
                         type="submit"

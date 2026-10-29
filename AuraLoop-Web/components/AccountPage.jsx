@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import {
   updateUserProfileName,
   setUserPassword,
@@ -24,6 +25,8 @@ export default function AccountPage({
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [showPass1, setShowPass1] = useState(false);
+  const [showPass2, setShowPass2] = useState(false);
 
   // Payment & Donation status state
   const [paymentLoading, setPaymentLoading] = useState(false);
@@ -49,9 +52,11 @@ export default function AccountPage({
     window.scrollTo({ top: 0, behavior: 'instant' });
 
     // Check if user was granted Free Premium and hasn't seen the popup yet
-    if (user?.isGiftedPro || user?.proTier === 'lifetime') {
-      const alreadySeen = localStorage.getItem(`auraloop_gifted_pro_seen_${user.uid}`) === 'true';
-      if (!alreadySeen && !user?.freePremiumNotifiedWeb) {
+    if (user?.isGiftedPro) {
+      const emailKey = user.email ? user.email.toLowerCase() : '';
+      const seenEmail = emailKey ? localStorage.getItem(`auraloop_gifted_pro_seen_${emailKey}`) === 'true' : false;
+      const seenUid = user.uid ? localStorage.getItem(`auraloop_gifted_pro_seen_${user.uid}`) === 'true' : false;
+      if (!seenEmail && !seenUid) {
         setShowGiftModal(true);
       }
     }
@@ -59,7 +64,11 @@ export default function AccountPage({
 
   const handleDismissGiftModal = async () => {
     setShowGiftModal(false);
+    if (user?.email) {
+      localStorage.setItem(`auraloop_gifted_pro_seen_${user.email.toLowerCase()}`, 'true');
+    }
     if (user?.uid) {
+      localStorage.setItem(`auraloop_gifted_pro_seen_${user.uid}`, 'true');
       await markFreePremiumNotifiedWeb(user.uid);
       if (onUserUpdated) {
         onUserUpdated({ ...user, freePremiumNotifiedWeb: true });
@@ -886,36 +895,89 @@ export default function AccountPage({
           {showPasswordForm && (
             <form onSubmit={handleSavePassword} style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #f0eae1' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
-                <input
-                  type="password"
-                  placeholder="New Password (min 6 chars)"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  required
-                  style={{
-                    padding: '11px 14px',
-                    borderRadius: '12px',
-                    border: '1px solid #dcd5cc',
-                    fontSize: '13.5px',
-                    outline: 'none',
-                    background: '#ffffff',
-                  }}
-                />
-                <input
-                  type="password"
-                  placeholder="Confirm New Password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  style={{
-                    padding: '11px 14px',
-                    borderRadius: '12px',
-                    border: '1px solid #dcd5cc',
-                    fontSize: '13.5px',
-                    outline: 'none',
-                    background: '#ffffff',
-                  }}
-                />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPass1 ? 'text' : 'password'}
+                    placeholder="New Password (min 6 chars)"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    style={{
+                      padding: '11px 44px 11px 14px',
+                      borderRadius: '12px',
+                      border: '1px solid #dcd5cc',
+                      fontSize: '13.5px',
+                      outline: 'none',
+                      background: '#ffffff',
+                      width: '100%',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPass1(!showPass1)}
+                    aria-label={showPass1 ? 'Hide password' : 'Show password'}
+                    title={showPass1 ? 'Hide password' : 'Show password'}
+                    style={{
+                      position: 'absolute',
+                      right: '10px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#8c827a',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {showPass1 ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPass2 ? 'text' : 'password'}
+                    placeholder="Confirm New Password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    style={{
+                      padding: '11px 44px 11px 14px',
+                      borderRadius: '12px',
+                      border: '1px solid #dcd5cc',
+                      fontSize: '13.5px',
+                      outline: 'none',
+                      background: '#ffffff',
+                      width: '100%',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPass2(!showPass2)}
+                    aria-label={showPass2 ? 'Hide password' : 'Show password'}
+                    title={showPass2 ? 'Hide password' : 'Show password'}
+                    style={{
+                      position: 'absolute',
+                      right: '10px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#8c827a',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {showPass2 ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
               <button
                 type="submit"

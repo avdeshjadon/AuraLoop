@@ -286,16 +286,43 @@ export async function recordDonation(amount = 0, orderId = '') {
 }
 
 /**
- * Helper to fetch complete user profile including Firestore & password provider status
+ * Helper to fetch complete user profile including Cloudflare R2 entitlements, Firestore & password provider status
  */
 export async function hydrateUserProfile(user) {
   if (!user) return null;
+
+  // 1. Fetch authoritative cloud entitlements from Cloudflare R2 / CDN
+  let cloudEntitlement = null;
+  if (user.email) {
+    try {
+      const cdnRes = await fetch(`https://pub-f4cbb5cee07745c28cfa1399a4010695.r2.dev/user_entitlements.json?t=${Date.now()}`, { cache: 'no-store' });
+      if (cdnRes.ok) {
+        const entitlements = await cdnRes.json();
+        cloudEntitlement = entitlements[user.email.toLowerCase()];
+      }
+    } catch (e) {
+      console.warn('[firebase] Entitlements CDN check notice:', e?.message);
+    }
+  }
 
   let firestoreData = {};
   try {
     const snap = await getDoc(doc(db, 'users', user.uid));
     if (snap.exists()) firestoreData = snap.data();
   } catch {}
+
+  // If user has been deleted by Administrator, purge their Firebase Auth user and sign out!
+  if (cloudEntitlement?.isDeleted || firestoreData.isDeleted) {
+    try {
+      if (auth.currentUser) {
+        await auth.currentUser.delete();
+      }
+    } catch (e) {
+      console.warn('[firebase] Firebase Auth user delete notice:', e);
+      try { await fbSignOut(auth); } catch {}
+    }
+    return null;
+  }
 
   // Also query settings/users_registry for administrative flags (like free premium granted by admin)
   let registryUser = null;
@@ -320,14 +347,37 @@ export async function hydrateUserProfile(user) {
   const hasPassword = firestoreData.hasPassword ?? hasPasswordProvider ?? false;
   const isGoogleUser = user.providerData?.some(p => p.providerId === 'google.com');
 
-  const isGiftedPro = Boolean(firestoreData.isGiftedPro || registryUser?.isGiftedPro || cloudPayload.isGiftedPro);
-  const rawTier = firestoreData.proTier || registryUser?.proTier || cloudPayload.proTier || 'none';
-  const proTier = isGiftedPro ? 'lifetime' : rawTier;
+  // Compute final Pro status prioritizing Cloudflare R2 entitlements
+  let isGiftedPro = false;
+  let proTier = 'none';
+
+  if (cloudEntitlement) {
+    if (cloudEntitlement.isGiftedPro === true || cloudEntitlement.proTier === 'lifetime' || cloudEntitlement.proTier === 'pro') {
+      isGiftedPro = Boolean(cloudEntitlement.isGiftedPro);
+      proTier = cloudEntitlement.proTier === 'pro' ? 'pro' : 'lifetime';
+    } else if (cloudEntitlement.proTier === 'none' || cloudEntitlement.isGiftedPro === false) {
+      isGiftedPro = false;
+      const hasVerifiedUTRs = (firestoreData.verifiedUTRs || []).length > 0;
+      proTier = hasVerifiedUTRs ? 'lifetime' : 'none';
+      // Reset seen flag on downgrade so future gifts will trigger the modal
+      if (user.email) {
+        try {
+          localStorage.removeItem(`auraloop_gifted_pro_seen_${user.email.toLowerCase()}`);
+          localStorage.removeItem(`auraloop_gifted_pro_seen_${user.uid}`);
+        } catch {}
+      }
+    }
+  } else {
+    isGiftedPro = Boolean(firestoreData.isGiftedPro || registryUser?.isGiftedPro || cloudPayload.isGiftedPro);
+    const rawTier = firestoreData.proTier || registryUser?.proTier || cloudPayload.proTier || 'none';
+    proTier = isGiftedPro ? 'lifetime' : rawTier;
+  }
 
   const freePremiumNotifiedWeb = Boolean(firestoreData.freePremiumNotifiedWeb || registryUser?.freePremiumNotifiedWeb);
   const freePremiumNotifiedApp = Boolean(firestoreData.freePremiumNotifiedApp || registryUser?.freePremiumNotifiedApp);
   const totalDonated = Number(firestoreData.totalDonated || cloudPayload.totalDonated || 0);
   const isSupporter = Boolean(firestoreData.isSupporter || cloudPayload.isSupporter || totalDonated > 0);
+  const isSuspended = Boolean(cloudEntitlement?.isSuspended || firestoreData.isSuspended || registryUser?.isSuspended);
 
   const profile = {
     uid: user.uid,
@@ -336,6 +386,7 @@ export async function hydrateUserProfile(user) {
     photoURL: user.photoURL,
     proTier,
     isGiftedPro,
+    isSuspended,
     freePremiumNotifiedWeb,
     freePremiumNotifiedApp,
     verifiedUTRs: firestoreData.verifiedUTRs || cloudPayload.verifiedUTRs || [],
@@ -346,7 +397,7 @@ export async function hydrateUserProfile(user) {
     donations: firestoreData.donations || []
   };
 
-  // If user was gifted Pro in registry but Firestore doc or photoURL payload doesn't have it yet, write it back!
+  // If user was gifted Pro, keep Firestore doc and photoURL payload synchronized
   if (isGiftedPro && (!firestoreData.isGiftedPro || firestoreData.proTier !== 'lifetime')) {
     try {
       await setDoc(doc(db, 'users', user.uid), {
@@ -359,6 +410,23 @@ export async function hydrateUserProfile(user) {
         ...cloudPayload,
         proTier: 'lifetime',
         isGiftedPro: true,
+        updatedAt: Date.now() / 1000
+      };
+      await updateProfile(user, { photoURL: btoa(JSON.stringify(updatedCloud)) });
+    } catch (e) {}
+  } else if (!isGiftedPro && proTier === 'none' && (firestoreData.isGiftedPro || firestoreData.proTier === 'lifetime')) {
+    // If downgraded, synchronize Firestore and photoURL payload back to none
+    try {
+      await setDoc(doc(db, 'users', user.uid), {
+        proTier: 'none',
+        isGiftedPro: false,
+        updatedAt: Date.now() / 1000
+      }, { merge: true });
+
+      const updatedCloud = {
+        ...cloudPayload,
+        proTier: 'none',
+        isGiftedPro: false,
         updatedAt: Date.now() / 1000
       };
       await updateProfile(user, { photoURL: btoa(JSON.stringify(updatedCloud)) });
